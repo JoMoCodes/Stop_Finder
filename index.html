@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stop Finder — prototype</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(1200px 800px at 70% -10%, #243044, #131820 60%); color: #eef2f6;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 28px;
+  }
+  h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: .3px; }
+  .sub { color: #9fb0c0; margin-bottom: 26px; font-size: 14px; }
+  .grid { display: grid; gap: 16px; width: 100%; max-width: 460px; }
+  a.card, div.card {
+    display: block; text-decoration: none; color: inherit;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px; padding: 18px 20px; transition: transform .12s ease, background .12s ease;
+  }
+  a.card:hover { transform: translateY(-2px); background: rgba(255,255,255,0.09); }
+  .card h2 { margin: 0 0 4px; font-size: 17px; }
+  .card p { margin: 0; color: #9fb0c0; font-size: 13px; line-height: 1.45; }
+  .card.soon { opacity: .55; }
+  .tag {
+    float: right; font-size: 11px; padding: 2px 9px; border-radius: 999px;
+    background: rgba(120,200,140,0.18); color: #9be3ad; border: 1px solid rgba(120,200,140,0.3);
+  }
+  .tag.wip { background: rgba(255,180,120,0.15); color: #ffc89a; border-color: rgba(255,180,120,0.3); }
+  .foot { margin-top: 24px; color: #6f8298; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>Stop Finder</h1>
+  <div class="sub">Address-pattern recognition — prototype</div>
+
+  <div class="grid">
+    <a class="card" href="apartment-mockup.html">
+      <span class="tag">live</span>
+      <h2>3D Apartment</h2>
+      <p>Rotate a building and click any door to decode its unit number into building · floor · unit.</p>
+    </a>
+
+    <div class="card soon">
+      <span class="tag wip">coming soon</span>
+      <h2>2D Address Grid</h2>
+      <p>Find a house from its number using the odd/even side and hundred-block rules.</p>
+    </div>
+  </div>
+
+  <div class="foot">Work in progress — pieces are being built and tuned.</div>
+</body>
+</html>
