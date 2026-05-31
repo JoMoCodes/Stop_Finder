@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stop Finder — 3D Apartment Mockup</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  #panel {
+    position: fixed; top: 16px; left: 16px; max-width: 320px;
+    background: rgba(20, 24, 30, 0.82); backdrop-filter: blur(6px);
+    color: #eef2f6; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px; padding: 14px 16px; line-height: 1.45;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35); font-size: 13px;
+  }
+  #panel h1 { margin: 0 0 6px; font-size: 15px; letter-spacing: .2px; }
+  #panel .sub { color: #9fb0c0; font-size: 12px; margin-bottom: 10px; }
+  #panel .addr { color: #ffb38a; font-weight: 600; }
+  #readout {
+    margin-top: 10px; padding: 10px 12px; border-radius: 8px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+    font-size: 13px;
+  }
+  #readout .num { font-size: 18px; font-weight: 700; color: #ffd9a0; }
+  #readout .decode { color: #cfe0ee; margin-top: 2px; }
+  #panel .hint { margin-top: 10px; color: #8aa0b2; font-size: 11.5px; }
+  kbd {
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px; padding: 1px 5px; font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="panel">
+  <h1>3D Apartment — mockup</h1>
+  <div class="sub">Example address: <span class="addr">8727 Point Park Dr APT 2102</span></div>
+  <div>Building <b>2</b> · numbering = <code>bldg×1000 + floor×100 + unit</code></div>
+  <div id="readout">
+    <div class="num" id="ro-num">APT 2102</div>
+    <div class="decode" id="ro-decode">Building 2 · Floor 1 · Unit 02 &nbsp;<span style="color:#ffb38a">(highlighted)</span></div>
+  </div>
+  <div class="hint">
+    <kbd>drag</kbd> rotate &nbsp; <kbd>scroll</kbd> zoom &nbsp; <kbd>right-drag</kbd> pan<br>
+    Click any door to decode its number.
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   CONFIG  — everything we'll tune as the real logic firms up.
+   ============================================================ */
+const CONFIG = {
+  buildingNumber: 2,
+  floors: 3,
+  unitsPerFloor: 6,
+  firstFloorNumber: 1,        // is the ground floor "1"? change here
+  firstUnitIndex: 1,          // does each floor start at ...01?
+
+  // How a door's mailing number is built. Swap this when you tell
+  // me the real rule (e.g. building could be a letter, floor in 100s, etc.)
+  unitNumber: (b, f, u) => b * 1000 + f * 100 + u,
+
+  highlightNumber: 2102,      // the real example unit, called out in orange
+  colorDoorsByParity: false,  // flip to true to tint odd vs even doors
+
+  // rough dimensions (meters-ish)
+  unitWidth: 4.2,
+  buildingDepth: 7,
+  floorHeight: 3.3,
+};
+
+/* ---- palette ---- */
+const COLOR = {
+  wall:      0xd9cbb2,
+  trim:      0x6b5b4a,
+  roof:      0x5a4c3d,
+  door:      0x7a4a2b,
+  doorHi:    0xff7a33,
+  doorEven:  0x8a5a36,
+  doorOdd:   0x6f4326,
+  window:    0x9ec9e8,
+  walkway:   0xb8b3a8,
+  railing:   0x3f3f3f,
+  stairs:    0x9a9388,
+  grass:     0x86996a,
+  drive:     0x9a9a9a,
+  sky:       0xbfd9ec,
+};
+
+/* ---- derived geometry ---- */
+const W = CONFIG.unitsPerFloor * CONFIG.unitWidth; // total width
+const D = CONFIG.buildingDepth;
+const FH = CONFIG.floorHeight;
+const H = CONFIG.floors * FH;
+const FRONT = D / 2;
+
+/* ============================================================
+   scene / camera / renderer
+   ============================================================ */
+const app = document.getElementById('app');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(COLOR.sky);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(W * 0.62, H * 1.05, FRONT + W * 0.82);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+app.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, H * 0.45, 0);
+controls.maxPolarAngle = Math.PI * 0.49; // don't go under the ground
+controls.update();
+
+/* ---- lights ---- */
+scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 0.85));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.1);
+sun.position.set(W, H * 1.8, FRONT + W);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+/* ============================================================
+   helpers
+   ============================================================ */
+function box(w, h, d, color, x = 0, y = 0, z = 0, opts = {}) {
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...opts });
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  scene.add(m);
+  return m;
+}
+
+function makeTextTexture(text, opts = {}) {
+  const { w = 512, h = 256, bg = 'rgba(255,255,255,0.92)', fg = '#16202b', font = 'bold 150px sans-serif' } = opts;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
+  ctx.fillStyle = fg;
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, w / 2, h / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function label(text, planeW, planeH, opts = {}) {
+  const tex = makeTextTexture(text, opts);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  return new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), mat);
+}
+
+/* ============================================================
+   build the building
+   ============================================================ */
+const doorMeshes = [];
+
+// ground + driveway
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(W * 4, D * 6),
+  new THREE.MeshStandardMaterial({ color: COLOR.grass, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.16;
+scene.add(ground);
+box(W * 1.25, 0.04, 6, COLOR.drive, 0, -0.14, FRONT + 4.6);
+
+// per-floor body + trim band
+for (let fi = 0; fi < CONFIG.floors; fi++) {
+  const yBase = fi * FH;
+  box(W, FH, D, COLOR.wall, 0, yBase + FH / 2, 0);              // floor body
+  box(W + 0.25, 0.16, D + 0.25, COLOR.trim, 0, (fi + 1) * FH, 0); // band on top
+}
+
+// roof
+box(W + 0.9, 0.42, D + 0.9, COLOR.roof, 0, H + 0.2, 0);
+
+// stair towers at each end
+for (const sx of [-(W / 2 + 1.1), (W / 2 + 1.1)]) {
+  box(2.0, H, D * 0.78, COLOR.stairs, sx, H / 2, 0);
+  // a few visible steps on the front face
+  for (let s = 0; s < CONFIG.floors * 5; s++) {
+    box(1.8, 0.16, 0.5, COLOR.trim, sx, s * (FH / 5) + 0.1, FRONT - 0.4 - (s % 5) * 0.4 + 0.0);
+  }
+}
+
+// doors, windows, number labels, walkways
+for (let fi = 0; fi < CONFIG.floors; fi++) {
+  const yBase = fi * FH;
+  const floorNo = CONFIG.firstFloorNumber + fi;
+
+  // walkway slab (balcony) in front of each floor
+  box(W, 0.16, 1.7, COLOR.walkway, 0, yBase - 0.06, FRONT + 0.85);
+  if (fi > 0) {
+    box(W, 0.85, 0.08, COLOR.railing, 0, yBase + 0.42, FRONT + 1.68); // railing
+  }
+
+  // big "FLOOR n" tag on the left end wall, facing -X
+  const fl = label('FLOOR ' + floorNo, 3.4, 1.7, {
+    bg: 'rgba(18,24,32,0.78)', fg: '#ffe9cf', font: 'bold 120px sans-serif'
+  });
+  fl.position.set(-(W / 2) - 0.06, yBase + FH * 0.55, 0);
+  fl.rotation.y = -Math.PI / 2;
+  scene.add(fl);
+
+  for (let ui = 0; ui < CONFIG.unitsPerFloor; ui++) {
+    const unitNo = CONFIG.firstUnitIndex + ui;
+    const number = CONFIG.unitNumber(CONFIG.buildingNumber, floorNo, unitNo);
+    const cx = (ui - (CONFIG.unitsPerFloor - 1) / 2) * CONFIG.unitWidth;
+    const isHi = number === CONFIG.highlightNumber;
+
+    // door colour
+    let doorColor = COLOR.door;
+    if (CONFIG.colorDoorsByParity) doorColor = (unitNo % 2 === 0) ? COLOR.doorEven : COLOR.doorOdd;
+    if (isHi) doorColor = COLOR.doorHi;
+
+    const door = box(1.3, 2.1, 0.12, doorColor, cx - 0.95, yBase + 1.05, FRONT + 0.05,
+      { emissive: isHi ? COLOR.doorHi : 0x000000, emissiveIntensity: isHi ? 0.35 : 0 });
+    door.userData = { building: CONFIG.buildingNumber, floor: floorNo, unit: unitNo, number };
+    door.userData.baseColor = doorColor;
+    doorMeshes.push(door);
+
+    // window
+    box(1.35, 1.35, 0.1, COLOR.window, cx + 1.0, yBase + 1.45, FRONT + 0.05,
+      { roughness: 0.25, metalness: 0.1 });
+
+    // number plate above the door
+    const plate = label(String(number), 1.95, 0.98, { font: 'bold 150px sans-serif' });
+    plate.position.set(cx, yBase + 2.62, FRONT + 0.08);
+    scene.add(plate);
+  }
+}
+
+/* ============================================================
+   click-to-decode
+   ============================================================ */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let down = null, selected = null;
+
+function setSelected(mesh) {
+  if (selected && selected !== mesh) {
+    const wasHi = selected.userData.number === CONFIG.highlightNumber;
+    selected.material.emissive.setHex(wasHi ? COLOR.doorHi : 0x000000);
+    selected.material.emissiveIntensity = wasHi ? 0.35 : 0;
+  }
+  selected = mesh;
+  mesh.material.emissive.setHex(0xffd9a0);
+  mesh.material.emissiveIntensity = 0.5;
+
+  const u = mesh.userData;
+  document.getElementById('ro-num').textContent = 'APT ' + u.number;
+  document.getElementById('ro-decode').textContent =
+    `Building ${u.building} · Floor ${u.floor} · Unit ${String(u.unit).padStart(2, '0')}`;
+}
+
+renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!down) return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+  down = null;
+  if (moved > 6) return; // it was a drag, not a click
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(doorMeshes, false);
+  if (hits.length) setSelected(hits[0].object);
+});
+
+/* ============================================================
+   loop + resize
+   ============================================================ */
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onResize);
+
+function tick() {
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>
