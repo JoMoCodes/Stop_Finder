@@ -12,7 +12,7 @@
   canvas { display: block; }
 
   #panel {
-    position: fixed; top: 16px; left: 16px; max-width: 320px;
+    position: fixed; top: 16px; left: 16px; max-width: 300px;
     background: rgba(20, 24, 30, 0.82); backdrop-filter: blur(6px);
     color: #eef2f6; border: 1px solid rgba(255,255,255,0.12);
     border-radius: 12px; padding: 14px 16px; line-height: 1.45;
@@ -20,14 +20,13 @@
   }
   #panel h1 { margin: 0 0 6px; font-size: 15px; letter-spacing: .2px; }
   #panel .sub { color: #9fb0c0; font-size: 12px; margin-bottom: 10px; }
-  #panel .addr { color: #ffb38a; font-weight: 600; }
+  #panel code { color: #ffd9a0; font-size: 11.5px; }
   #readout {
     margin-top: 10px; padding: 10px 12px; border-radius: 8px;
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
-    font-size: 13px;
   }
   #readout .num { font-size: 18px; font-weight: 700; color: #ffd9a0; }
-  #readout .decode { color: #cfe0ee; margin-top: 2px; }
+  #readout .decode { color: #cfe0ee; margin-top: 2px; font-size: 13px; }
   #panel .hint { margin-top: 10px; color: #8aa0b2; font-size: 11.5px; }
   kbd {
     background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18);
@@ -40,15 +39,14 @@
 
 <div id="panel">
   <h1>3D Apartment — mockup</h1>
-  <div class="sub">Example address: <span class="addr">8727 Point Park Dr APT 2102</span></div>
-  <div>Building <b>2</b> · numbering = <code>bldg×1000 + floor×100 + unit</code></div>
+  <div class="sub">Building <b>1</b> of the complex · same layout front &amp; back</div>
+  <div>Numbering (provisional): <code>bldg×1000 + floor×100 + unit</code></div>
   <div id="readout">
-    <div class="num" id="ro-num">APT 2102</div>
-    <div class="decode" id="ro-decode">Building 2 · Floor 1 · Unit 02 &nbsp;<span style="color:#ffb38a">(highlighted)</span></div>
+    <div class="num" id="ro-num">Click a door</div>
+    <div class="decode" id="ro-decode">…to decode it into building · floor · unit</div>
   </div>
   <div class="hint">
-    <kbd>drag</kbd> rotate &nbsp; <kbd>scroll</kbd> zoom &nbsp; <kbd>right-drag</kbd> pan<br>
-    Click any door to decode its number.
+    <kbd>drag</kbd> rotate &nbsp; <kbd>scroll</kbd> zoom &nbsp; <kbd>right-drag</kbd> pan
   </div>
 </div>
 
@@ -66,52 +64,49 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /* ============================================================
-   CONFIG  — everything we'll tune as the real logic firms up.
+   CONFIG — tune as the real logic firms up.
+   Modeled on a 2-story Texas garden 4-plex: doors paired in
+   the center under a central stair + 2nd-floor balcony, the
+   same layout repeated on the back of the building.
    ============================================================ */
 const CONFIG = {
-  buildingNumber: 2,
-  floors: 3,
-  unitsPerFloor: 6,
-  firstFloorNumber: 1,        // is the ground floor "1"? change here
-  firstUnitIndex: 1,          // does each floor start at ...01?
+  buildingNumber: 1,
+  floors: 2,
 
-  // How a door's mailing number is built. Swap this when you tell
-  // me the real rule (e.g. building could be a letter, floor in 100s, etc.)
+  // provisional unit number rule
   unitNumber: (b, f, u) => b * 1000 + f * 100 + u,
+  highlightNumber: null,      // e.g. 1101 to call one out in orange
 
-  highlightNumber: 2102,      // the real example unit, called out in orange
-  colorDoorsByParity: false,  // flip to true to tint odd vs even doors
-
-  // rough dimensions (meters-ish)
-  unitWidth: 4.2,
-  buildingDepth: 7,
-  floorHeight: 3.3,
+  // dimensions (meters-ish)
+  width: 14,
+  depth: 9,
+  floorHeight: 3.2,
+  doorOffsetX: 1.45,          // the two center doors flank the middle
+  windowOffsetX: 4.6,         // windows sit out on the flanks
 };
 
-/* ---- palette ---- */
+/* ---- palette (brick bottom, red siding top, cream trim, black steel) ---- */
 const COLOR = {
-  wall:      0xd9cbb2,
-  trim:      0x6b5b4a,
-  roof:      0x5a4c3d,
-  door:      0x7a4a2b,
-  doorHi:    0xff7a33,
-  doorEven:  0x8a5a36,
-  doorOdd:   0x6f4326,
-  window:    0x9ec9e8,
+  ground:    0x86996a,
   walkway:   0xb8b3a8,
-  railing:   0x3f3f3f,
-  stairs:    0x9a9388,
-  grass:     0x86996a,
-  drive:     0x9a9a9a,
+  brick:     0xc7b29a,   // lower floor
+  siding:    0xb0493a,   // upper floor (red)
+  band:      0xe7dcc4,   // trim band between floors
+  roof:      0x4a3b30,
+  canopy:    0xe9ddc4,   // cream fascia / eyebrow over the entry
+  door:      0x4f8d5a,   // green door
+  doorHi:    0xff7a33,
+  glass:     0x3a4654,
+  trim:      0xe9ddc4,
+  balcony:   0xcfc7b6,   // concrete landing
+  step:      0xcfc7b6,
+  railing:   0x1f1f1f,   // black metal
   sky:       0xbfd9ec,
 };
 
-/* ---- derived geometry ---- */
-const W = CONFIG.unitsPerFloor * CONFIG.unitWidth; // total width
-const D = CONFIG.buildingDepth;
-const FH = CONFIG.floorHeight;
+const W = CONFIG.width, D = CONFIG.depth, FH = CONFIG.floorHeight;
 const H = CONFIG.floors * FH;
-const FRONT = D / 2;
+const HALF_D = D / 2;
 
 /* ============================================================
    scene / camera / renderer
@@ -120,24 +115,23 @@ const app = document.getElementById('app');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(COLOR.sky);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(W * 0.62, H * 1.05, FRONT + W * 0.82);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
+camera.position.set(W * 0.8, H * 1.45, HALF_D + W * 0.95);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
 app.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, H * 0.45, 0);
-controls.maxPolarAngle = Math.PI * 0.49; // don't go under the ground
+controls.maxPolarAngle = Math.PI * 0.49;
 controls.update();
 
-/* ---- lights ---- */
-scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 0.85));
-const sun = new THREE.DirectionalLight(0xfff4e0, 1.1);
-sun.position.set(W, H * 1.8, FRONT + W);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 0.9));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.05);
+sun.position.set(W, H * 2, HALF_D + W);
 scene.add(sun);
 scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
@@ -153,7 +147,7 @@ function box(w, h, d, color, x = 0, y = 0, z = 0, opts = {}) {
 }
 
 function makeTextTexture(text, opts = {}) {
-  const { w = 512, h = 256, bg = 'rgba(255,255,255,0.92)', fg = '#16202b', font = 'bold 150px sans-serif' } = opts;
+  const { w = 512, h = 256, bg = 'rgba(255,255,255,0.95)', fg = '#16202b', font = 'bold 170px sans-serif' } = opts;
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const ctx = c.getContext('2d');
@@ -165,96 +159,98 @@ function makeTextTexture(text, opts = {}) {
   ctx.fillText(text, w / 2, h / 2);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 8;
-  tex.needsUpdate = true;
   return tex;
 }
 
-function label(text, planeW, planeH, opts = {}) {
-  const tex = makeTextTexture(text, opts);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+function label(text, planeW, planeH) {
+  const mat = new THREE.MeshBasicMaterial({ map: makeTextTexture(text), transparent: true });
   return new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), mat);
 }
 
-/* ============================================================
-   build the building
-   ============================================================ */
 const doorMeshes = [];
 
-// ground + driveway
+/* ============================================================
+   building shell
+   ============================================================ */
+new THREE.Mesh(); // noop keep tree-shake calm
+
+// ground + a sidewalk in front of each face
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(W * 4, D * 6),
-  new THREE.MeshStandardMaterial({ color: COLOR.grass, roughness: 1 })
+  new THREE.PlaneGeometry(W * 5, D * 6),
+  new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1 })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.16;
 scene.add(ground);
-box(W * 1.25, 0.04, 6, COLOR.drive, 0, -0.14, FRONT + 4.6);
 
-// per-floor body + trim band
-for (let fi = 0; fi < CONFIG.floors; fi++) {
-  const yBase = fi * FH;
-  box(W, FH, D, COLOR.wall, 0, yBase + FH / 2, 0);              // floor body
-  box(W + 0.25, 0.16, D + 0.25, COLOR.trim, 0, (fi + 1) * FH, 0); // band on top
+for (const s of [1, -1]) {
+  box(W + 2, 0.04, 2.4, COLOR.walkway, 0, -0.14, s * (HALF_D + 1.4));
 }
 
-// roof
-box(W + 0.9, 0.42, D + 0.9, COLOR.roof, 0, H + 0.2, 0);
+// two stacked floor bodies: brick lower, red upper
+box(W, FH, D, COLOR.brick, 0, FH / 2, 0);
+box(W, FH, D, COLOR.siding, 0, FH + FH / 2, 0);
+box(W + 0.15, 0.18, D + 0.15, COLOR.band, 0, FH, 0);        // trim band
+box(W + 1.4, 0.4, D + 1.4, COLOR.roof, 0, H + 0.2, 0);       // overhanging roof
 
-// stair towers at each end
-for (const sx of [-(W / 2 + 1.1), (W / 2 + 1.1)]) {
-  box(2.0, H, D * 0.78, COLOR.stairs, sx, H / 2, 0);
-  // a few visible steps on the front face
-  for (let s = 0; s < CONFIG.floors * 5; s++) {
-    box(1.8, 0.16, 0.5, COLOR.trim, sx, s * (FH / 5) + 0.1, FRONT - 0.4 - (s % 5) * 0.4 + 0.0);
+/* ============================================================
+   one façade (called for front s=+1 and back s=-1)
+   ============================================================ */
+function buildFacade(s, isFront) {
+  const surf = s * (HALF_D + 0.05);      // door/window plane
+  const plateZ = s * (HALF_D + 0.09);
+  const yaw = s > 0 ? 0 : Math.PI;        // so back-side text faces outward
+  const leftIdx = isFront ? 1 : 3;
+  const rightIdx = isFront ? 2 : 4;
+
+  for (let fi = 0; fi < CONFIG.floors; fi++) {
+    const base = fi * FH;
+    const floorNo = fi + 1;
+
+    // two center doors + number plates
+    for (const d of [{ x: -CONFIG.doorOffsetX, idx: leftIdx }, { x: CONFIG.doorOffsetX, idx: rightIdx }]) {
+      const number = CONFIG.unitNumber(CONFIG.buildingNumber, floorNo, d.idx);
+      const isHi = number === CONFIG.highlightNumber;
+      const door = box(1.25, 2.05, 0.14, isHi ? COLOR.doorHi : COLOR.door, d.x, base + 1.05, surf,
+        { emissive: isHi ? COLOR.doorHi : 0x000000, emissiveIntensity: isHi ? 0.35 : 0 });
+      door.userData = { building: CONFIG.buildingNumber, floor: floorNo, unit: d.idx, number };
+      doorMeshes.push(door);
+
+      // number plate — centered directly above the door
+      const plate = label(String(number), 1.7, 0.85);
+      plate.position.set(d.x, base + 2.5, plateZ);
+      plate.rotation.y = yaw;
+      scene.add(plate);
+    }
+
+    // flank windows (kept simple — ignored per the brief)
+    for (const wx of [-CONFIG.windowOffsetX, CONFIG.windowOffsetX]) {
+      box(2.0, 1.7, 0.05, COLOR.trim, wx, base + 1.65, surf);
+      box(1.65, 1.4, 0.06, COLOR.glass, wx, base + 1.65, s * (HALF_D + 0.07), { roughness: 0.3, metalness: 0.1 });
+    }
   }
+
+  // 2nd-floor balcony / landing in front of the upper doors
+  box(6.6, 0.16, 1.5, COLOR.balcony, 0, FH - 0.06, s * (HALF_D + 0.75));
+  box(6.6, 0.85, 0.07, COLOR.railing, 0, FH + 0.42, s * (HALF_D + 1.45)); // outer railing
+
+  // central exterior staircase, ground -> landing (rises right→center)
+  const z = s * (HALF_D + 1.0);
+  const x0 = 3.0, x1 = -0.4, y0 = 0.12, y1 = FH - 0.05;
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11;
+    box(0.7, 0.12, 1.25, COLOR.step, THREE.MathUtils.lerp(x0, x1, t) * s, THREE.MathUtils.lerp(y0, y1, t), z);
+  }
+  const ax = x0 * s, bx = x1 * s, ay = y0, by = y1;
+  const rail = box(Math.hypot(bx - ax, by - ay), 0.07, 0.07, COLOR.railing, (ax + bx) / 2, (ay + by) / 2 + 0.9, z);
+  rail.rotation.z = Math.atan2(by - ay, bx - ax);
+
+  // cream eyebrow / canopy projecting over the central entry
+  box(7, 0.4, 1.7, COLOR.canopy, 0, H - 0.05, s * (HALF_D + 0.9));
 }
 
-// doors, windows, number labels, walkways
-for (let fi = 0; fi < CONFIG.floors; fi++) {
-  const yBase = fi * FH;
-  const floorNo = CONFIG.firstFloorNumber + fi;
-
-  // walkway slab (balcony) in front of each floor
-  box(W, 0.16, 1.7, COLOR.walkway, 0, yBase - 0.06, FRONT + 0.85);
-  if (fi > 0) {
-    box(W, 0.85, 0.08, COLOR.railing, 0, yBase + 0.42, FRONT + 1.68); // railing
-  }
-
-  // big "FLOOR n" tag on the left end wall, facing -X
-  const fl = label('FLOOR ' + floorNo, 3.4, 1.7, {
-    bg: 'rgba(18,24,32,0.78)', fg: '#ffe9cf', font: 'bold 120px sans-serif'
-  });
-  fl.position.set(-(W / 2) - 0.06, yBase + FH * 0.55, 0);
-  fl.rotation.y = -Math.PI / 2;
-  scene.add(fl);
-
-  for (let ui = 0; ui < CONFIG.unitsPerFloor; ui++) {
-    const unitNo = CONFIG.firstUnitIndex + ui;
-    const number = CONFIG.unitNumber(CONFIG.buildingNumber, floorNo, unitNo);
-    const cx = (ui - (CONFIG.unitsPerFloor - 1) / 2) * CONFIG.unitWidth;
-    const isHi = number === CONFIG.highlightNumber;
-
-    // door colour
-    let doorColor = COLOR.door;
-    if (CONFIG.colorDoorsByParity) doorColor = (unitNo % 2 === 0) ? COLOR.doorEven : COLOR.doorOdd;
-    if (isHi) doorColor = COLOR.doorHi;
-
-    const door = box(1.3, 2.1, 0.12, doorColor, cx - 0.95, yBase + 1.05, FRONT + 0.05,
-      { emissive: isHi ? COLOR.doorHi : 0x000000, emissiveIntensity: isHi ? 0.35 : 0 });
-    door.userData = { building: CONFIG.buildingNumber, floor: floorNo, unit: unitNo, number };
-    door.userData.baseColor = doorColor;
-    doorMeshes.push(door);
-
-    // window
-    box(1.35, 1.35, 0.1, COLOR.window, cx + 1.0, yBase + 1.45, FRONT + 0.05,
-      { roughness: 0.25, metalness: 0.1 });
-
-    // number plate above the door
-    const plate = label(String(number), 1.95, 0.98, { font: 'bold 150px sans-serif' });
-    plate.position.set(cx, yBase + 2.62, FRONT + 0.08);
-    scene.add(plate);
-  }
-}
+buildFacade(1, true);
+buildFacade(-1, false);
 
 /* ============================================================
    click-to-decode
@@ -284,7 +280,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (!down) return;
   const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
   down = null;
-  if (moved > 6) return; // it was a drag, not a click
+  if (moved > 6) return;
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -296,19 +292,17 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 /* ============================================================
    loop + resize
    ============================================================ */
-function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
-window.addEventListener('resize', onResize);
+  renderer.setSize(innerWidth, innerHeight);
+});
 
-function tick() {
+(function tick() {
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
-}
-tick();
+})();
 </script>
 </body>
 </html>
