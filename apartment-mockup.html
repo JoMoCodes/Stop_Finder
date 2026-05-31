@@ -12,7 +12,7 @@
   canvas { display: block; }
 
   #panel {
-    position: fixed; top: 16px; left: 16px; max-width: 300px;
+    position: fixed; top: 16px; left: 16px; max-width: 310px;
     background: rgba(20, 24, 30, 0.82); backdrop-filter: blur(6px);
     color: #eef2f6; border: 1px solid rgba(255,255,255,0.12);
     border-radius: 12px; padding: 14px 16px; line-height: 1.45;
@@ -20,7 +20,6 @@
   }
   #panel h1 { margin: 0 0 6px; font-size: 15px; letter-spacing: .2px; }
   #panel .sub { color: #9fb0c0; font-size: 12px; margin-bottom: 10px; }
-  #panel code { color: #ffd9a0; font-size: 11.5px; }
   #readout {
     margin-top: 10px; padding: 10px 12px; border-radius: 8px;
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
@@ -39,11 +38,11 @@
 
 <div id="panel">
   <h1>3D Apartment — mockup</h1>
-  <div class="sub">Building <b>1</b> of the complex · same layout front &amp; back</div>
-  <div>Numbering (provisional): <code>bldg×1000 + floor×100 + unit</code></div>
+  <div class="sub">Buildings <b>1</b> &amp; <b>2</b> · units run sequentially around each building</div>
+  <div>Order: front F1 L→R, F2 L→R, then back the same. Building 2 continues where 1 ends.</div>
   <div id="readout">
     <div class="num" id="ro-num">Click a door</div>
-    <div class="decode" id="ro-decode">…to decode it into building · floor · unit</div>
+    <div class="decode" id="ro-decode">…to decode building · face · floor · side</div>
   </div>
   <div class="hint">
     <kbd>drag</kbd> rotate &nbsp; <kbd>scroll</kbd> zoom &nbsp; <kbd>right-drag</kbd> pan
@@ -64,49 +63,36 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /* ============================================================
-   CONFIG — tune as the real logic firms up.
-   Modeled on a 2-story Texas garden 4-plex: doors paired in
-   the center under a central stair + 2nd-floor balcony, the
-   same layout repeated on the back of the building.
+   CONFIG
+   2-story garden 4-plex. Units numbered sequentially around the
+   building: front F1 (L,R), front F2 (L,R), back F1 (L,R), back F2 (L,R).
+   Building 2 continues the sequence (101-108, then 109-116).
    ============================================================ */
 const CONFIG = {
-  buildingNumber: 1,
   floors: 2,
-
-  // provisional unit number rule
-  unitNumber: (b, f, u) => b * 1000 + f * 100 + u,
-  highlightNumber: null,      // e.g. 1101 to call one out in orange
-
-  // dimensions (meters-ish)
   width: 14,
   depth: 9,
   floorHeight: 3.2,
-  doorOffsetX: 1.45,          // the two center doors flank the middle
-  windowOffsetX: 4.6,         // windows sit out on the flanks
+  doorOffsetX: 1.45,     // the two center doors flank the middle
+  windowOffsetX: 4.6,    // windows on the flanks
+  gap: 10,               // space between the two buildings
+  highlightNumber: null, // e.g. 101 to call one out in orange
 };
 
-/* ---- palette (brick bottom, red siding top, cream trim, black steel) ---- */
 const COLOR = {
-  ground:    0x86996a,
-  walkway:   0xb8b3a8,
-  brick:     0xc7b29a,   // lower floor
-  siding:    0xb0493a,   // upper floor (red)
-  band:      0xe7dcc4,   // trim band between floors
-  roof:      0x4a3b30,
-  canopy:    0xe9ddc4,   // cream fascia / eyebrow over the entry
-  door:      0x4f8d5a,   // green door
-  doorHi:    0xff7a33,
-  glass:     0x3a4654,
-  trim:      0xe9ddc4,
-  balcony:   0xcfc7b6,   // concrete landing
-  step:      0xcfc7b6,
-  railing:   0x1f1f1f,   // black metal
-  sky:       0xbfd9ec,
+  ground:  0x86996a, walkway: 0xb8b3a8, road: 0x8c8c8c,
+  brick:   0xc7b29a, siding:  0xb0493a, band: 0xe7dcc4,
+  roof:    0x4a3b30, canopy:  0xe9ddc4,
+  door:    0x4f8d5a, doorHi:  0xff7a33,
+  glass:   0x3a4654, trim:    0xe9ddc4,
+  balcony: 0xcfc7b6, step:    0xcfc7b6, railing: 0x1f1f1f,
+  sky:     0xbfd9ec,
 };
 
 const W = CONFIG.width, D = CONFIG.depth, FH = CONFIG.floorHeight;
 const H = CONFIG.floors * FH;
 const HALF_D = D / 2;
+const SPAN = W + CONFIG.gap;
 
 /* ============================================================
    scene / camera / renderer
@@ -115,8 +101,8 @@ const app = document.getElementById('app');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(COLOR.sky);
 
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
-camera.position.set(W * 0.8, H * 1.45, HALF_D + W * 0.95);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 3000);
+camera.position.set(SPAN * 0.30, H * 1.95, HALF_D + SPAN * 1.05);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -125,24 +111,24 @@ app.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.target.set(0, H * 0.45, 0);
+controls.target.set(0, H * 0.42, 0);
 controls.maxPolarAngle = Math.PI * 0.49;
 controls.update();
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 0.9));
 const sun = new THREE.DirectionalLight(0xfff4e0, 1.05);
-sun.position.set(W, H * 2, HALF_D + W);
+sun.position.set(SPAN, H * 2.5, HALF_D + SPAN);
 scene.add(sun);
 scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
 /* ============================================================
    helpers
    ============================================================ */
-function box(w, h, d, color, x = 0, y = 0, z = 0, opts = {}) {
+function box(parent, w, h, d, color, x, y, z, opts = {}) {
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...opts });
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   m.position.set(x, y, z);
-  scene.add(m);
+  parent.add(m);
   return m;
 }
 
@@ -162,95 +148,120 @@ function makeTextTexture(text, opts = {}) {
   return tex;
 }
 
-function label(text, planeW, planeH) {
-  const mat = new THREE.MeshBasicMaterial({ map: makeTextTexture(text), transparent: true });
-  return new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), mat);
+function label(parent, text, pw, ph, texOpts = {}) {
+  const mat = new THREE.MeshBasicMaterial({ map: makeTextTexture(text, texOpts), transparent: true });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
+  parent.add(m);
+  return m;
 }
 
 const doorMeshes = [];
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 /* ============================================================
-   building shell
+   one façade  (front: s=+1 / isFront=true,  back: s=-1 / false)
+   numbering: number = start + faceOrder*4 + floor*2 + side
    ============================================================ */
-new THREE.Mesh(); // noop keep tree-shake calm
+function buildFacade(g, buildingNo, start, s, isFront) {
+  const surf = s * (HALF_D + 0.05);
+  const plateZ = s * (HALF_D + 0.09);
+  const yaw = s > 0 ? 0 : Math.PI;           // back-side text faces outward
+  const faceOrder = isFront ? 0 : 1;
+  const face = isFront ? 'front' : 'back';
+  // "left/right" from the view of someone facing this side, so the back is mirrored
+  const leftX = isFront ? -CONFIG.doorOffsetX : CONFIG.doorOffsetX;
+  const rightX = isFront ? CONFIG.doorOffsetX : -CONFIG.doorOffsetX;
 
-// ground + a sidewalk in front of each face
+  for (let fi = 0; fi < CONFIG.floors; fi++) {
+    const base = fi * FH;
+    const floorNo = fi + 1;
+
+    for (const sd of [{ x: leftX, side: 'left', i: 0 }, { x: rightX, side: 'right', i: 1 }]) {
+      const number = start + faceOrder * 4 + fi * 2 + sd.i;
+      const isHi = CONFIG.highlightNumber != null && number === CONFIG.highlightNumber;
+
+      const door = box(g, 1.25, 2.05, 0.14, isHi ? COLOR.doorHi : COLOR.door, sd.x, base + 1.05, surf,
+        { emissive: isHi ? COLOR.doorHi : 0x000000, emissiveIntensity: isHi ? 0.35 : 0 });
+      door.userData = { building: buildingNo, floor: floorNo, face, side: sd.side, number };
+      doorMeshes.push(door);
+
+      // number plate, centered directly above the door
+      const plate = label(g, String(number), 1.7, 0.85);
+      plate.position.set(sd.x, base + 2.5, plateZ);
+      plate.rotation.y = yaw;
+    }
+
+    // flank windows (simple)
+    for (const wx of [-CONFIG.windowOffsetX, CONFIG.windowOffsetX]) {
+      box(g, 2.0, 1.7, 0.05, COLOR.trim, wx, base + 1.65, surf);
+      box(g, 1.65, 1.4, 0.06, COLOR.glass, wx, base + 1.65, s * (HALF_D + 0.07), { roughness: 0.3, metalness: 0.1 });
+    }
+  }
+
+  // 2nd-floor balcony / landing
+  box(g, 6.6, 0.16, 1.5, COLOR.balcony, 0, FH - 0.06, s * (HALF_D + 0.75));
+  box(g, 6.6, 0.85, 0.07, COLOR.railing, 0, FH + 0.42, s * (HALF_D + 1.45));
+
+  // central exterior staircase (ground -> landing)
+  const z = s * (HALF_D + 1.0);
+  const x0 = 3.0, x1 = -0.4, y0 = 0.12, y1 = FH - 0.05;
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11;
+    box(g, 0.7, 0.12, 1.25, COLOR.step, THREE.MathUtils.lerp(x0, x1, t) * s, THREE.MathUtils.lerp(y0, y1, t), z);
+  }
+  const ax = x0 * s, bx = x1 * s;
+  const rail = box(g, Math.hypot(bx - ax, y1 - y0), 0.07, 0.07, COLOR.railing, (ax + bx) / 2, (y0 + y1) / 2 + 0.9, z);
+  rail.rotation.z = Math.atan2(y1 - y0, bx - ax);
+
+  // cream eyebrow / canopy over the entry
+  box(g, 7, 0.4, 1.7, COLOR.canopy, 0, H - 0.05, s * (HALF_D + 0.9));
+}
+
+/* ============================================================
+   a whole building (shell + both façades + end-wall numbers)
+   ============================================================ */
+function buildBuilding({ number, start, x }) {
+  const g = new THREE.Group();
+  g.position.x = x;
+  scene.add(g);
+
+  box(g, W, FH, D, COLOR.brick, 0, FH / 2, 0);                 // brick lower
+  box(g, W, FH, D, COLOR.siding, 0, FH + FH / 2, 0);           // red upper
+  box(g, W + 0.15, 0.18, D + 0.15, COLOR.band, 0, FH, 0);      // trim band
+  box(g, W + 1.4, 0.4, D + 1.4, COLOR.roof, 0, H + 0.2, 0);    // overhanging roof
+  for (const s of [1, -1]) box(g, W + 2, 0.04, 2.4, COLOR.walkway, 0, -0.14, s * (HALF_D + 1.4));
+
+  buildFacade(g, number, start, 1, true);
+  buildFacade(g, number, start, -1, false);
+
+  // big building number on each end wall (how you ID it from the road)
+  for (const ex of [1, -1]) {
+    const sign = label(g, String(number), 2.4, 2.4, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 320px sans-serif' });
+    sign.position.set(ex * (W / 2 + 0.06), H * 0.6, 0);
+    sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
+  }
+  return g;
+}
+
+/* ground + shared driveway, then the two buildings */
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(W * 5, D * 6),
+  new THREE.PlaneGeometry(SPAN * 4, D * 8),
   new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1 })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.16;
 scene.add(ground);
 
-for (const s of [1, -1]) {
-  box(W + 2, 0.04, 2.4, COLOR.walkway, 0, -0.14, s * (HALF_D + 1.4));
-}
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(SPAN + 22, 6),
+  new THREE.MeshStandardMaterial({ color: COLOR.road, roughness: 1 })
+);
+road.rotation.x = -Math.PI / 2;
+road.position.set(0, -0.13, HALF_D + 4.8);
+scene.add(road);
 
-// two stacked floor bodies: brick lower, red upper
-box(W, FH, D, COLOR.brick, 0, FH / 2, 0);
-box(W, FH, D, COLOR.siding, 0, FH + FH / 2, 0);
-box(W + 0.15, 0.18, D + 0.15, COLOR.band, 0, FH, 0);        // trim band
-box(W + 1.4, 0.4, D + 1.4, COLOR.roof, 0, H + 0.2, 0);       // overhanging roof
-
-/* ============================================================
-   one façade (called for front s=+1 and back s=-1)
-   ============================================================ */
-function buildFacade(s, isFront) {
-  const surf = s * (HALF_D + 0.05);      // door/window plane
-  const plateZ = s * (HALF_D + 0.09);
-  const yaw = s > 0 ? 0 : Math.PI;        // so back-side text faces outward
-  const leftIdx = isFront ? 1 : 3;
-  const rightIdx = isFront ? 2 : 4;
-
-  for (let fi = 0; fi < CONFIG.floors; fi++) {
-    const base = fi * FH;
-    const floorNo = fi + 1;
-
-    // two center doors + number plates
-    for (const d of [{ x: -CONFIG.doorOffsetX, idx: leftIdx }, { x: CONFIG.doorOffsetX, idx: rightIdx }]) {
-      const number = CONFIG.unitNumber(CONFIG.buildingNumber, floorNo, d.idx);
-      const isHi = number === CONFIG.highlightNumber;
-      const door = box(1.25, 2.05, 0.14, isHi ? COLOR.doorHi : COLOR.door, d.x, base + 1.05, surf,
-        { emissive: isHi ? COLOR.doorHi : 0x000000, emissiveIntensity: isHi ? 0.35 : 0 });
-      door.userData = { building: CONFIG.buildingNumber, floor: floorNo, unit: d.idx, number };
-      doorMeshes.push(door);
-
-      // number plate — centered directly above the door
-      const plate = label(String(number), 1.7, 0.85);
-      plate.position.set(d.x, base + 2.5, plateZ);
-      plate.rotation.y = yaw;
-      scene.add(plate);
-    }
-
-    // flank windows (kept simple — ignored per the brief)
-    for (const wx of [-CONFIG.windowOffsetX, CONFIG.windowOffsetX]) {
-      box(2.0, 1.7, 0.05, COLOR.trim, wx, base + 1.65, surf);
-      box(1.65, 1.4, 0.06, COLOR.glass, wx, base + 1.65, s * (HALF_D + 0.07), { roughness: 0.3, metalness: 0.1 });
-    }
-  }
-
-  // 2nd-floor balcony / landing in front of the upper doors
-  box(6.6, 0.16, 1.5, COLOR.balcony, 0, FH - 0.06, s * (HALF_D + 0.75));
-  box(6.6, 0.85, 0.07, COLOR.railing, 0, FH + 0.42, s * (HALF_D + 1.45)); // outer railing
-
-  // central exterior staircase, ground -> landing (rises right→center)
-  const z = s * (HALF_D + 1.0);
-  const x0 = 3.0, x1 = -0.4, y0 = 0.12, y1 = FH - 0.05;
-  for (let i = 0; i < 12; i++) {
-    const t = i / 11;
-    box(0.7, 0.12, 1.25, COLOR.step, THREE.MathUtils.lerp(x0, x1, t) * s, THREE.MathUtils.lerp(y0, y1, t), z);
-  }
-  const ax = x0 * s, bx = x1 * s, ay = y0, by = y1;
-  const rail = box(Math.hypot(bx - ax, by - ay), 0.07, 0.07, COLOR.railing, (ax + bx) / 2, (ay + by) / 2 + 0.9, z);
-  rail.rotation.z = Math.atan2(by - ay, bx - ax);
-
-  // cream eyebrow / canopy projecting over the central entry
-  box(7, 0.4, 1.7, COLOR.canopy, 0, H - 0.05, s * (HALF_D + 0.9));
-}
-
-buildFacade(1, true);
-buildFacade(-1, false);
+buildBuilding({ number: 1, start: 101, x: -SPAN / 2 });
+buildBuilding({ number: 2, start: 109, x: SPAN / 2 });
 
 /* ============================================================
    click-to-decode
@@ -261,9 +272,8 @@ let down = null, selected = null;
 
 function setSelected(mesh) {
   if (selected && selected !== mesh) {
-    const wasHi = selected.userData.number === CONFIG.highlightNumber;
-    selected.material.emissive.setHex(wasHi ? COLOR.doorHi : 0x000000);
-    selected.material.emissiveIntensity = wasHi ? 0.35 : 0;
+    selected.material.emissive.setHex(0x000000);
+    selected.material.emissiveIntensity = 0;
   }
   selected = mesh;
   mesh.material.emissive.setHex(0xffd9a0);
@@ -272,7 +282,7 @@ function setSelected(mesh) {
   const u = mesh.userData;
   document.getElementById('ro-num').textContent = 'APT ' + u.number;
   document.getElementById('ro-decode').textContent =
-    `Building ${u.building} · Floor ${u.floor} · Unit ${String(u.unit).padStart(2, '0')}`;
+    `Building ${u.building} · ${cap(u.face)} · Floor ${u.floor} · ${cap(u.side)}`;
 }
 
 renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
