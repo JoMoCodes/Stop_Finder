@@ -126,6 +126,13 @@ const COLOR = {
 const W = CONFIG.width, D = CONFIG.depth, FH = CONFIG.floorHeight;
 const H = CONFIG.floors * FH, HALF_D = D / 2, SPAN = W + CONFIG.gap;
 
+/* ---- Part 2: tall 4-story walk-up (3 doors per floor). Same depth as the
+   plex so the shared ground/road still fit; only wider. Units are 3 digits
+   where the FIRST digit is the floor and the last two digits are the column. */
+const TW = 18, TD = 9, TFLOORS = 4, TFH = 3.2;
+const TH = TFLOORS * TFH, THALF_D = TD / 2;   // 12.8 tall, 4.5 half-depth
+const TDOORX = [-5.5, 0, 5.5];                 // left / middle / right doors
+
 /* ============================================================ */
 const app = document.getElementById('app');
 const scene = new THREE.Scene();
@@ -272,10 +279,111 @@ function buildShell(g, number) {
 /* arrows tracing the counting order on the example front façade:
    bottom-left -> bottom-right -> up to top-left -> top-right */
 function addArrows(g) {
-  const z = 4.95, yb = 2.0, yt = 5.25, xl = -CONFIG.doorOffsetX, xr = CONFIG.doorOffsetX;
+  // pushed forward to sit right at the front edge of the central staircase
+  const z = HALF_D + 1.55, yb = 2.0, yt = 5.25, xl = -CONFIG.doorOffsetX, xr = CONFIG.doorOffsetX;
   arrow(g, new THREE.Vector3(xl, yb, z), new THREE.Vector3(xr, yb, z), COLOR.arrow); // 1st -> 2nd
   arrow(g, new THREE.Vector3(xr, yb, z), new THREE.Vector3(xl, yt, z), COLOR.arrow); // wrap up
   arrow(g, new THREE.Vector3(xl, yt, z), new THREE.Vector3(xr, yt, z), COLOR.arrow); // 3rd -> 4th
+}
+
+/* ============================================================
+   PART 2 — 4-story building. First digit = floor.
+   ============================================================ */
+
+/* options are the SAME unit on every floor (e.g. 129/229/329/429) so the
+   learner must read the first digit to pick the right floor. */
+function makeTowerOptions(correct) {
+  const suffix = correct % 100;
+  return shuffle([1, 2, 3, 4].map(f => f * 100 + suffix));
+}
+
+function buildTowerShell(g, txt) {
+  for (let fi = 0; fi < TFLOORS; fi++) {
+    box(g, TW, TFH, TD, fi % 2 ? COLOR.siding : COLOR.brick, 0, fi * TFH + TFH / 2, 0);
+    box(g, TW + 0.15, 0.16, TD + 0.15, COLOR.band, 0, (fi + 1) * TFH, 0);
+  }
+  box(g, TW + 1.4, 0.4, TD + 1.4, COLOR.roof, 0, TH + 0.2, 0);
+
+  const sw = 2.2, sy = -0.14, st = 0.05;
+  for (const s of [1, -1]) box(g, TW + 2 * sw, st, sw, COLOR.walkway, 0, sy, s * (THALF_D + sw / 2));
+  for (const ex of [1, -1]) box(g, sw, st, TD + 2 * sw, COLOR.walkway, ex * (TW / 2 + sw / 2), sy, 0);
+
+  // building identifier — a LETTER, so it can't be mistaken for the floor digit
+  for (const ex of [1, -1]) {
+    const sign = label(g, txt, 2.6, 2.6, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 300px sans-serif' });
+    sign.position.set(ex * (TW / 2 + 0.06), TH * 0.62, 0);
+    sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
+  }
+}
+
+/* exterior walkways on floors 2-4, a ground stoop, and a switchback stair */
+function buildTowerAccess(g) {
+  const wDepth = 1.7, wzc = THALF_D + 0.85;
+  for (let fi = 1; fi < TFLOORS; fi++) {
+    box(g, TW, 0.16, wDepth, COLOR.balcony, 0, fi * TFH - 0.06, wzc);
+    for (const px of [-TW / 2 + 0.6, -3, 3, TW / 2 - 0.6])
+      box(g, 0.18, fi * TFH, 0.18, COLOR.trim, px, (fi * TFH) / 2, wzc + wDepth / 2 - 0.2);
+  }
+  box(g, TW, 0.12, wDepth, COLOR.step, 0, 0.0, wzc); // ground stoop
+
+  const flight = (x, z0, z1, y0, y1, n = 6) => {
+    const dz = (z1 - z0) / n;
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n;
+      box(g, 1.4, 0.12, Math.abs(dz) + 0.02, COLOR.step, x, y0 + (y1 - y0) * t, z0 + dz * (i + 0.5));
+    }
+  };
+  const landing = (yc, zc) => box(g, 3.0, 0.14, 1.4, COLOR.balcony, 10.8, yc - 0.07, zc);
+
+  const zF = THALF_D + 0.9, zB = -1.6, xA = 10.0, xB = 11.6;
+  for (let t = 0; t < TFLOORS - 1; t++) {
+    const yFloor = t * TFH, yMid = t * TFH + TFH / 2, yNext = (t + 1) * TFH;
+    landing(yFloor, zF);
+    flight(xA, zF - 0.7, zB + 0.7, yFloor, yMid);
+    landing(yMid, zB);
+    flight(xB, zB + 0.7, zF - 0.7, yMid, yNext);
+  }
+  landing((TFLOORS - 1) * TFH, zF);
+}
+
+/* big up-arrow + floor badges on the left: shows the first digit climbing 1->4 */
+function addTowerArrows(g) {
+  const x = -TW / 2 - 0.9, z = THALF_D + 1.6;
+  arrow(g, new THREE.Vector3(x, 1.6, z), new THREE.Vector3(x, TH - 0.9, z), COLOR.arrow);
+  for (let fi = 0; fi < TFLOORS; fi++) {
+    const b = label(g, String(fi + 1), 1.0, 1.0,
+      { bg: 'rgba(20,24,30,0.85)', fg: '#ffd54a', font: 'bold 240px sans-serif' });
+    b.position.set(x, fi * TFH + 2.55, z + 0.02);
+  }
+}
+
+/* one front façade: 4 floors x 3 doors. getUnit(floor, col) -> {type,value} */
+function buildTowerFacade(g, getUnit, raycastList, blankStates) {
+  const surf = THALF_D + 0.05, plateZ = THALF_D + 0.10;
+  for (let fi = 0; fi < TFLOORS; fi++) {
+    const base = fi * TFH;
+    TDOORX.forEach((dx, ii) => {
+      const u = getUnit(fi, ii);
+      const door = box(g, 1.3, 2.05, 0.14, COLOR.door, dx, base + 1.05, surf);
+      if (!u || u.type === 'none') return;
+      if (u.type === 'num') {
+        const plate = label(g, String(u.value), 1.8, 0.9);
+        plate.position.set(dx, base + 2.55, plateZ);
+      } else {
+        const plate = label(g, '?', 1.8, 0.9, { fg: '#c0392b' });
+        plate.position.set(dx, base + 2.55, plateZ);
+        const bstate = { value: u.value, solved: false, plate, options: makeTowerOptions(u.value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
+    });
+    for (const wx of [-7.6, -2.75, 2.75, 7.6]) {
+      box(g, 1.3, 1.5, 0.05, COLOR.trim, wx, base + 1.5, surf);
+      box(g, 1.05, 1.25, 0.06, COLOR.glass, wx, base + 1.5, surf + 0.03, { roughness: 0.3, metalness: 0.1 });
+    }
+  }
 }
 
 /* ---- ground + road (shared) ---- */
@@ -291,10 +399,22 @@ road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, HALF_D + 5.4); scene
    course stages
    ============================================================ */
 const STAGES = [
-  { kind: 'example', number: 1, start: 101 },                 // 101-108, arrows, no quiz
-  { kind: 'quiz',    number: 2, start: 109, blanks: [112] },          // 109-112, blank 112
-  { kind: 'quiz',    number: 3, start: 113, blanks: [115, 116] },     // 113-116, blanks 115,116
-  { kind: 'quiz',    number: 4, start: 117, blanks: [118, 119, 120] },// 117-120, only 117 shown
+  // ---- PART 1 — sequential numbering around a 2-story 4-plex ----
+  { part: 1, type: 'plex', kind: 'example', number: 1, start: 101 },                   // 101-108, arrows
+  { part: 1, type: 'plex', kind: 'quiz',    number: 2, start: 109, blanks: [112] },           // blank 112
+  { part: 1, type: 'plex', kind: 'quiz',    number: 3, start: 113, blanks: [115, 116] },      // blanks 115,116
+  { part: 1, type: 'plex', kind: 'quiz',    number: 4, start: 117, blanks: [118, 119, 120] }, // 3 blanks
+
+  // ---- PART 2 — 3-digit units, first digit = floor (4 floors x 3 doors) ----
+  // unit(floor fi 0-3, col ii 0-2) = (fi+1)*100 + suffixes[ii]
+  { part: 2, type: 'tower', kind: 'example', label: 'A', suffixes: [28, 29, 30] },     // 128..430, arrows
+  { part: 2, type: 'tower', kind: 'quiz', label: 'B', difficulty: 'Easy',
+    suffixes: [21, 22, 23], blanks: [222] },                                           // 1 blank
+  { part: 2, type: 'tower', kind: 'quiz', label: 'C', difficulty: 'Medium',
+    suffixes: [35, 36, 37], blanks: [236, 335, 437, 137] },                            // 4 blanks
+  { part: 2, type: 'tower', kind: 'quiz', label: 'D', difficulty: 'Difficult',
+    suffixes: [47, 48, 49],                                                            // only floor 1 + 348 shown
+    blanks: [247, 248, 249, 347, 349, 447, 448, 449] },                                // 8 blanks
 ];
 
 function makeOptions(correct) {
@@ -325,21 +445,36 @@ function buildStageGroup(i) {
   scene.add(g);
   const raycastList = [], blankStates = [];
 
-  buildShell(g, st.number);
-
-  if (st.kind === 'example') {
-    const u = (fo, fi, ii) => ({ type: 'num', value: st.start + fo * 4 + fi * 2 + ii });
-    buildFacade(g, 1, true, u, raycastList, blankStates);
-    buildFacade(g, -1, false, u, raycastList, blankStates);
-    addArrows(g);
+  if (st.type === 'tower') {
+    buildTowerShell(g, st.label);
+    buildTowerAccess(g);
+    if (st.kind === 'example') {
+      buildTowerFacade(g, (fi, ii) => ({ type: 'num', value: (fi + 1) * 100 + st.suffixes[ii] }),
+        raycastList, blankStates);
+      addTowerArrows(g);
+    } else {
+      const blankSet = new Set(st.blanks);
+      buildTowerFacade(g, (fi, ii) => {
+        const v = (fi + 1) * 100 + st.suffixes[ii];
+        return { type: blankSet.has(v) ? 'blank' : 'num', value: v };
+      }, raycastList, blankStates);
+    }
   } else {
-    const blankSet = new Set(st.blanks);
-    buildFacade(g, 1, true, (fo, fi, ii) => {
-      const v = st.start + fi * 2 + ii;
-      return { type: blankSet.has(v) ? 'blank' : 'num', value: v };
-    }, raycastList, blankStates);
-    // back of a course building carries no numbers (its units belong to the next building)
-    buildFacade(g, -1, false, () => ({ type: 'none' }), raycastList, blankStates);
+    buildShell(g, st.number);
+    if (st.kind === 'example') {
+      const u = (fo, fi, ii) => ({ type: 'num', value: st.start + fo * 4 + fi * 2 + ii });
+      buildFacade(g, 1, true, u, raycastList, blankStates);
+      buildFacade(g, -1, false, u, raycastList, blankStates);
+      addArrows(g);
+    } else {
+      const blankSet = new Set(st.blanks);
+      buildFacade(g, 1, true, (fo, fi, ii) => {
+        const v = st.start + fi * 2 + ii;
+        return { type: blankSet.has(v) ? 'blank' : 'num', value: v };
+      }, raycastList, blankStates);
+      // back of a course building carries no numbers (its units belong to the next building)
+      buildFacade(g, -1, false, () => ({ type: 'none' }), raycastList, blankStates);
+    }
   }
 
   g.userData = { raycastList, blankStates };
@@ -365,6 +500,12 @@ const EXAMPLE_PROMPT =
   'Drag to look around and <b>memorize the pattern</b>, then on the next buildings you will ' +
   '<b>fill in the missing unit numbers</b>. When you are ready, <b>click Continue</b>.';
 
+const EXAMPLE2_PROMPT =
+  '<b>Part 2 — the first digit.</b> Taller buildings use <b>3-digit unit numbers</b>. ' +
+  'The trick: the <b>first digit tells you the floor</b> — floor 1 is 1__, floor 2 is 2__, and so on. ' +
+  'The last two digits stay the same as you go <b>straight up</b> a column. ' +
+  'Notice every unit on floor 3 starts with <b>3</b>. Drag to look around, and when you have it, <b>click Ready</b>.';
+
 const groups = {};
 const celebrated = new Set();
 let currentIndex = -1, currentStage = null;
@@ -374,9 +515,14 @@ let activeBlank = null; // blank whose options are open
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
-function frontView() {
-  camera.position.set(5, H * 0.6, 25);
-  controls.target.set(0, H * 0.45, 0);
+function frameStage(st) {
+  if (st.type === 'tower') {
+    camera.position.set(7, TH * 0.5, 38);
+    controls.target.set(0, TH * 0.42, 0);
+  } else {
+    camera.position.set(5, H * 0.6, 25);
+    controls.target.set(0, H * 0.45, 0);
+  }
   controls.update();
 }
 
@@ -394,22 +540,27 @@ function showStage(i) {
 
   closeQuiz();
   ui.next.classList.add('hidden');
+  ui.continueBtn.classList.add('hidden');
+  ui.back.classList.add('hidden');
   controls.autoRotate = false;
 
   if (currentStage.kind === 'example') {
-    ui.prompt.innerHTML = EXAMPLE_PROMPT;
+    const isP2 = currentStage.part === 2;
+    ui.prompt.innerHTML = isP2 ? EXAMPLE2_PROMPT : EXAMPLE_PROMPT;
+    ui.continueBtn.textContent = isP2 ? 'Ready ▸' : 'Continue ▸';
     ui.continueBtn.classList.remove('hidden');
-    ui.back.classList.add('hidden');
+    if (currentIndex > 0) ui.back.classList.remove('hidden');
   } else {
-    ui.prompt.innerHTML =
-      `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
-      `Click a door marked <b>?</b>, then pick its correct unit number from the options on the right.`;
-    ui.continueBtn.classList.add('hidden');
+    ui.prompt.innerHTML = currentStage.part === 2
+      ? `<b>Building ${currentStage.label} · ${currentStage.difficulty}</b> — the first digit is the floor. ` +
+        `Click a door marked <b>?</b>, then pick its correct unit number on the right.`
+      : `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
+        `Click a door marked <b>?</b>, then pick its correct unit number from the options on the right.`;
     ui.back.classList.remove('hidden');
   }
   ui.prompt.classList.remove('hidden');
 
-  frontView();
+  frameStage(currentStage);
 
   // revisiting an already-finished building: show its Next button (no confetti)
   if (currentStage.kind === 'quiz' && allSolved()) showNext();
@@ -467,7 +618,10 @@ function checkComplete() {
 
 function showNext() {
   const isLast = currentIndex === STAGES.length - 1;
-  ui.next.textContent = isLast ? 'Next Pattern ▸' : 'Next Building ▸';
+  const nextStage = STAGES[currentIndex + 1];
+  if (isLast) ui.next.textContent = 'Start Over ▸';
+  else if (nextStage && nextStage.kind === 'example') ui.next.textContent = 'Next: Part 2 ▸';
+  else ui.next.textContent = 'Next Building ▸';
   ui.next.classList.remove('hidden');
 }
 
@@ -485,11 +639,11 @@ function resetCourse() {
   celebrated.clear();
 }
 
-ui.continueBtn.onclick = () => showStage(1);
+ui.continueBtn.onclick = () => showStage(currentIndex + 1);
 ui.back.onclick = () => showStage(Math.max(0, currentIndex - 1));
 ui.next.onclick = () => {
   if (currentIndex < STAGES.length - 1) showStage(currentIndex + 1);
-  else { resetCourse(); showStage(0); } // "Next Pattern" — fresh run from the example for now
+  else { resetCourse(); showStage(0); } // "Start Over" — fresh run from Part 1
 };
 
 /* ---- click a blank door/plate to open its options ---- */
