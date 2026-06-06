@@ -347,15 +347,22 @@ function buildTowerAccess(g) {
 }
 
 /* big up-arrow + floor badges on the left: shows the first digit climbing 1->4 */
-function addTowerArrows(g) {
-  const x = -TW / 2 - 0.9, z = THALF_D + 1.6;
-  arrow(g, new THREE.Vector3(x, 1.6, z), new THREE.Vector3(x, TH - 0.9, z), COLOR.arrow);
-  for (let fi = 0; fi < TFLOORS; fi++) {
-    const b = label(g, String(fi + 1), 1.0, 1.0,
-      { bg: 'rgba(20,24,30,0.85)', fg: '#ffd54a', font: 'bold 240px sans-serif' });
-    b.position.set(x, fi * TFH + 2.55, z + 0.02);
-  }
+function addTowerArrows(g) { 
+  const x = -TW / 2 - 0.9, z = THALF_D + 1.6; 
+  
+  // 1. Create a specific X coordinate for the arrow (subtract more to move it left)
+  const arrowX = x - 0; 
+  
+  // 2. Use 'arrowX' instead of 'x' here
+  arrow(g, new THREE.Vector3(arrowX, 1.6, z), new THREE.Vector3(arrowX, TH - 0.9, z), COLOR.arrow); 
+  
+  // The labels will stay in their original position because they still use 'x'
+  for (let fi = 0; fi < TFLOORS; fi++) { 
+    const b = label(g, String(fi + 1), 1.0, 1.0, { bg: 'rgba(20,24,30,0.85)', fg: '#ffd54a', font: 'bold 240px sans-serif' }); 
+    b.position.set(x, fi * TFH + 2.55, z + 0.02); 
+  } 
 }
+
 
 /* one front façade: 4 floors x 3 doors. getUnit(floor, col) -> {type,value} */
 function buildTowerFacade(g, getUnit, raycastList, blankStates) {
