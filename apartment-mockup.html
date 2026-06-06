@@ -37,36 +37,56 @@
   }
   button.ghost:hover { background: rgba(255,255,255,0.18); }
 
-  #ready { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 10; }
-  #ready:hover { transform: translateX(-50%) translateY(-2px); }
-
-  /* slide-2 nav bar */
-  #nav2 {
-    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+  /* bottom button bar */
+  #bottombar {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
     z-index: 10; display: flex; align-items: center; gap: 10px;
-    background: rgba(20,24,30,0.82); border: 1px solid rgba(255,255,255,0.14);
-    padding: 10px 12px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
   }
-  #nav2 .lbl { color: #9fb0c0; font-size: 13px; padding: 0 6px; }
-  #nav2 button { padding: 11px 24px; font-size: 15px; }
+
+  /* right-side quiz panel */
+  #quiz {
+    position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
+    width: 224px; z-index: 11;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #quiz .qhead { color: #eef2f6; font-weight: 600; margin-bottom: 12px; text-align: center; }
+  #quiz .qhead small { display: block; color: #9fb0c0; font-weight: 400; font-size: 12px; margin-top: 2px; }
+  #qopts { display: flex; flex-direction: column; gap: 8px; }
+  button.opt {
+    background: rgba(255,255,255,0.08); color: #eef2f6;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+    padding: 10px 14px; font-size: 16px; font-weight: 600; text-align: left;
+    box-shadow: none;
+  }
+  button.opt:hover { background: rgba(255,255,255,0.16); transform: none; }
+  button.opt .ltr { display: inline-block; width: 22px; color: #ffd9a0; }
+  button.opt.wrong { background: rgba(229,57,53,0.25); border-color: rgba(229,57,53,0.6); animation: shake .3s; }
+  button.opt.right { background: rgba(87,201,126,0.28); border-color: rgba(87,201,126,0.7); }
+  button.opt:disabled { cursor: default; }
+  #qmsg { margin-top: 12px; text-align: center; font-size: 13px; min-height: 16px; }
+  #qmsg.ok { color: #7ee0a0; }
+  #qmsg.bad { color: #ff9a8a; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 </style>
 </head>
 <body>
 <div id="app"></div>
 
-<div id="prompt">
-  This is a common example of a <b>number layout</b> you can find at most <b>apartment buildings</b>.
-  In this course you will try to <b>memorize the patterns</b> of each example and then <b>fill in the blanks</b>
-  for the buildings that are <b>missing unit numbers</b>. When you're ready <b>click continue</b> to begin.
+<div id="prompt"></div>
+
+<!-- right-side multiple-choice panel -->
+<div id="quiz" class="hidden">
+  <div class="qhead">Which unit is this?<small>Pick the number that fits the pattern</small></div>
+  <div id="qopts"></div>
+  <div id="qmsg"></div>
 </div>
 
-<button id="ready">Ready ▸</button>
-
-<div id="nav2" class="hidden">
-  <button id="backEx" class="ghost">◀ Example</button>
-  <span class="lbl">Building 2 — view</span>
-  <button id="frontBtn">Front</button>
-  <button id="backBtn">Back</button>
+<div id="bottombar">
+  <button id="back" class="ghost hidden">◀ Back</button>
+  <button id="continue" class="hidden">Continue ▸</button>
+  <button id="next" class="hidden">Next Building ▸</button>
 </div>
 
 <script type="importmap">
@@ -84,8 +104,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /* ============================================================
    CONFIG — 2-story garden 4-plex. Units run sequentially around
-   each building: front F1 (L,R), F2 (L,R), then back F1 (L,R), F2 (L,R).
-   Bld 1 = 101-108, Bld 2 = 109-116.
+   each building: front F1 (L,R), F2 (L,R), then back F1, F2.
+   Each "building" in the course shows one façade of 4 units:
+   Bld 1 = example 101-108, Bld 2 = 109-112, Bld 3 = 113-116,
+   Bld 4 = 117-120 (continuing the same numbering).
    ============================================================ */
 const CONFIG = {
   floors: 2, width: 14, depth: 9, floorHeight: 3.2,
@@ -98,6 +120,7 @@ const COLOR = {
   roof: 0x4a3b30, canopy: 0xe9ddc4,
   door: 0x4f8d5a, glass: 0x3a4654, trim: 0xe9ddc4,
   balcony: 0xcfc7b6, step: 0xcfc7b6, sky: 0xbfd9ec,
+  arrow: 0xffd54a,
 };
 
 const W = CONFIG.width, D = CONFIG.depth, FH = CONFIG.floorHeight;
@@ -118,7 +141,6 @@ app.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.49;
-controls.autoRotateSpeed = 1.3;
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 0.9));
 const sun = new THREE.DirectionalLight(0xfff4e0, 1.05);
@@ -148,11 +170,53 @@ function label(parent, text, pw, ph, texOpts = {}) {
     new THREE.MeshBasicMaterial({ map: makeTextTexture(text, texOpts), transparent: true }));
   parent.add(m); return m;
 }
+function setPlateText(plate, text, texOpts = {}) {
+  plate.material.map.dispose();
+  plate.material.map = makeTextTexture(text, texOpts);
+  plate.material.needsUpdate = true;
+}
+
+/* ---- a bright, readable 3D arrow from -> to ---- */
+function arrow(parent, from, to, color) {
+  const dir = to.clone().sub(from);
+  const len = dir.length();
+  const shaftLen = Math.max(0.05, len - 0.6);
+  const grp = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, shaftLen, 12), mat);
+  shaft.position.y = shaftLen / 2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.6, 16), mat);
+  head.position.y = shaftLen + 0.3;
+  grp.add(shaft, head);
+  grp.position.copy(from);
+  grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  parent.add(grp);
+}
 
 /* ============================================================
-   one façade  (front s=+1 / back s=-1)
+   façade pieces shared by every building
    ============================================================ */
-function buildFacade(g, start, s, isFront) {
+function addWindows(g, fi, s) {
+  const base = fi * FH, surf = s * (HALF_D + 0.05);
+  for (const wx of [-CONFIG.windowOffsetX, CONFIG.windowOffsetX]) {
+    box(g, 2.0, 1.7, 0.05, COLOR.trim, wx, base + 1.65, surf);
+    box(g, 1.65, 1.4, 0.06, COLOR.glass, wx, base + 1.65, s * (HALF_D + 0.07), { roughness: 0.3, metalness: 0.1 });
+  }
+}
+function addFacadeCommon(g, s) {
+  // open 2nd-floor landing (no fence)
+  box(g, 6.6, 0.16, 1.5, COLOR.balcony, 0, FH - 0.06, s * (HALF_D + 0.75));
+  // central staircase, no handrail
+  const z = s * (HALF_D + 1.0), x0 = 3.0, x1 = -0.4, y0 = 0.12, y1 = FH - 0.05;
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11;
+    box(g, 0.7, 0.12, 1.25, COLOR.step, THREE.MathUtils.lerp(x0, x1, t) * s, THREE.MathUtils.lerp(y0, y1, t), z);
+  }
+  box(g, 7, 0.4, 1.7, COLOR.canopy, 0, H - 0.05, s * (HALF_D + 0.9));   // eyebrow canopy
+}
+
+/* one façade. getUnit(faceOrder, floor, side) -> {type:'num'|'blank'|'none', value} */
+function buildFacade(g, s, isFront, getUnit, raycastList, blankStates) {
   const surf = s * (HALF_D + 0.05), plateZ = s * (HALF_D + 0.09);
   const yaw = s > 0 ? 0 : Math.PI, faceOrder = isFront ? 0 : 1;
   const leftX = isFront ? -CONFIG.doorOffsetX : CONFIG.doorOffsetX;
@@ -161,59 +225,60 @@ function buildFacade(g, start, s, isFront) {
   for (let fi = 0; fi < CONFIG.floors; fi++) {
     const base = fi * FH;
     for (const sd of [{ x: leftX, i: 0 }, { x: rightX, i: 1 }]) {
-      const number = start + faceOrder * 4 + fi * 2 + sd.i;
-      box(g, 1.25, 2.05, 0.14, COLOR.door, sd.x, base + 1.05, surf);
-      const plate = label(g, String(number), 1.7, 0.85);          // centered above the door
-      plate.position.set(sd.x, base + 2.5, plateZ);
-      plate.rotation.y = yaw;
+      const u = getUnit(faceOrder, fi, sd.i);
+      const door = box(g, 1.25, 2.05, 0.14, COLOR.door, sd.x, base + 1.05, surf);
+      if (!u || u.type === 'none') continue;
+
+      if (u.type === 'num') {
+        const plate = label(g, String(u.value), 1.7, 0.85);
+        plate.position.set(sd.x, base + 2.5, plateZ);
+        plate.rotation.y = yaw;
+      } else { // blank — clickable
+        const plate = label(g, '?', 1.7, 0.85, { fg: '#c0392b' });
+        plate.position.set(sd.x, base + 2.5, plateZ);
+        plate.rotation.y = yaw;
+        const bstate = { value: u.value, solved: false, plate, options: makeOptions(u.value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
     }
-    for (const wx of [-CONFIG.windowOffsetX, CONFIG.windowOffsetX]) {
-      box(g, 2.0, 1.7, 0.05, COLOR.trim, wx, base + 1.65, surf);
-      box(g, 1.65, 1.4, 0.06, COLOR.glass, wx, base + 1.65, s * (HALF_D + 0.07), { roughness: 0.3, metalness: 0.1 });
-    }
+    addWindows(g, fi, s);
   }
-
-  // open 2nd-floor landing (no fence)
-  box(g, 6.6, 0.16, 1.5, COLOR.balcony, 0, FH - 0.06, s * (HALF_D + 0.75));
-
-  // central staircase, no handrail
-  const z = s * (HALF_D + 1.0), x0 = 3.0, x1 = -0.4, y0 = 0.12, y1 = FH - 0.05;
-  for (let i = 0; i < 12; i++) {
-    const t = i / 11;
-    box(g, 0.7, 0.12, 1.25, COLOR.step, THREE.MathUtils.lerp(x0, x1, t) * s, THREE.MathUtils.lerp(y0, y1, t), z);
-  }
-
-  box(g, 7, 0.4, 1.7, COLOR.canopy, 0, H - 0.05, s * (HALF_D + 0.9));   // eyebrow canopy
+  addFacadeCommon(g, s);
 }
 
 /* ============================================================
-   a whole building + wraparound sidewalk
+   building shell (walls, roof, sidewalk, side number signs)
    ============================================================ */
-function buildBuilding({ number, start, x }) {
-  const g = new THREE.Group();
-  g.position.x = x; scene.add(g);
-
+function buildShell(g, number) {
   box(g, W, FH, D, COLOR.brick, 0, FH / 2, 0);
   box(g, W, FH, D, COLOR.siding, 0, FH + FH / 2, 0);
   box(g, W + 0.15, 0.18, D + 0.15, COLOR.band, 0, FH, 0);
   box(g, W + 1.4, 0.4, D + 1.4, COLOR.roof, 0, H + 0.2, 0);
 
-  // sidewalk wrapping all four sides
   const sw = 2.2, sy = -0.14, st = 0.05;
   for (const s of [1, -1]) box(g, W + 2 * sw, st, sw, COLOR.walkway, 0, sy, s * (HALF_D + sw / 2));
   for (const ex of [1, -1]) box(g, sw, st, D + 2 * sw, COLOR.walkway, ex * (W / 2 + sw / 2), sy, 0);
-
-  buildFacade(g, start, 1, true);
-  buildFacade(g, start, -1, false);
 
   for (const ex of [1, -1]) {
     const sign = label(g, String(number), 2.4, 2.4, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 320px sans-serif' });
     sign.position.set(ex * (W / 2 + 0.06), H * 0.6, 0);
     sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
   }
-  return g;
 }
 
+/* arrows tracing the counting order on the example front façade:
+   bottom-left -> bottom-right -> up to top-left -> top-right */
+function addArrows(g) {
+  const z = 4.95, yb = 2.0, yt = 5.25, xl = -CONFIG.doorOffsetX, xr = CONFIG.doorOffsetX;
+  arrow(g, new THREE.Vector3(xl, yb, z), new THREE.Vector3(xr, yb, z), COLOR.arrow); // 1st -> 2nd
+  arrow(g, new THREE.Vector3(xr, yb, z), new THREE.Vector3(xl, yt, z), COLOR.arrow); // wrap up
+  arrow(g, new THREE.Vector3(xl, yt, z), new THREE.Vector3(xr, yt, z), COLOR.arrow); // 3rd -> 4th
+}
+
+/* ---- ground + road (shared) ---- */
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(SPAN * 4, D * 8),
   new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1 }));
 ground.rotation.x = -Math.PI / 2; ground.position.y = -0.17; scene.add(ground);
@@ -222,76 +287,287 @@ const road = new THREE.Mesh(new THREE.PlaneGeometry(SPAN + 24, 6),
   new THREE.MeshStandardMaterial({ color: COLOR.road, roughness: 1 }));
 road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, HALF_D + 5.4); scene.add(road);
 
-const b1 = buildBuilding({ number: 1, start: 101, x: -SPAN / 2 });
-const b2 = buildBuilding({ number: 2, start: 109, x: SPAN / 2 });
+/* ============================================================
+   course stages
+   ============================================================ */
+const STAGES = [
+  { kind: 'example', number: 1, start: 101 },                 // 101-108, arrows, no quiz
+  { kind: 'quiz',    number: 2, start: 109, blanks: [112] },          // 109-112, blank 112
+  { kind: 'quiz',    number: 3, start: 113, blanks: [115, 116] },     // 113-116, blanks 115,116
+  { kind: 'quiz',    number: 4, start: 117, blanks: [118, 119, 120] },// 117-120, only 117 shown
+];
 
-const B1 = new THREE.Vector3(-SPAN / 2, H * 0.45, 0);
-const B2 = new THREE.Vector3(SPAN / 2, H * 0.45, 0);
+function makeOptions(correct) {
+  const pool = [];
+  for (const d of [-3, -2, -1, 1, 2, 3, 5, -5, 7, 10, -10]) {
+    const n = correct + d;
+    if (n > 100 && n !== correct) pool.push(n);
+  }
+  shuffle(pool);
+  const distract = [];
+  for (const n of pool) {
+    if (distract.length >= 3) break;
+    if (!distract.includes(n)) distract.push(n);
+  }
+  return shuffle([correct, ...distract]);
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildStageGroup(i) {
+  const st = STAGES[i];
+  const g = new THREE.Group();
+  scene.add(g);
+  const raycastList = [], blankStates = [];
+
+  buildShell(g, st.number);
+
+  if (st.kind === 'example') {
+    const u = (fo, fi, ii) => ({ type: 'num', value: st.start + fo * 4 + fi * 2 + ii });
+    buildFacade(g, 1, true, u, raycastList, blankStates);
+    buildFacade(g, -1, false, u, raycastList, blankStates);
+    addArrows(g);
+  } else {
+    const blankSet = new Set(st.blanks);
+    buildFacade(g, 1, true, (fo, fi, ii) => {
+      const v = st.start + fi * 2 + ii;
+      return { type: blankSet.has(v) ? 'blank' : 'num', value: v };
+    }, raycastList, blankStates);
+    // back of a course building carries no numbers (its units belong to the next building)
+    buildFacade(g, -1, false, () => ({ type: 'none' }), raycastList, blankStates);
+  }
+
+  g.userData = { raycastList, blankStates };
+  return g;
+}
 
 /* ============================================================
-   camera fly + slide control
+   UI + state
    ============================================================ */
-let tween = null;
-const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-function flyTo(toPos, toTar, dur = 900) {
-  tween = { fromPos: camera.position.clone(), toPos: toPos.clone(),
-            fromTar: controls.target.clone(), toTar: toTar.clone(), t0: performance.now(), dur };
-}
-function viewFace(face) {
-  const dz = face === 'front' ? 1 : -1;
-  flyTo(new THREE.Vector3(B2.x, B2.y + H * 0.5, B2.z + dz * 25), B2);
-}
-
 const ui = {
   prompt: document.getElementById('prompt'),
-  ready: document.getElementById('ready'),
-  nav2: document.getElementById('nav2'),
+  quiz: document.getElementById('quiz'),
+  qopts: document.getElementById('qopts'),
+  qmsg: document.getElementById('qmsg'),
+  back: document.getElementById('back'),
+  continueBtn: document.getElementById('continue'),
+  next: document.getElementById('next'),
 };
 
-function showSlide(n) {
-  tween = null;
-  if (n === 1) {
-    b1.visible = true; b2.visible = false;
-    controls.autoRotate = true;
-    controls.target.copy(B1);
-    camera.position.set(B1.x, B1.y + H * 0.75, B1.z + 27);
-    ui.prompt.classList.remove('hidden'); ui.ready.classList.remove('hidden');
-    ui.nav2.classList.add('hidden');
-  } else {
-    b1.visible = false; b2.visible = true;
-    controls.autoRotate = false;
-    ui.prompt.classList.add('hidden'); ui.ready.classList.add('hidden');
-    ui.nav2.classList.remove('hidden');
-    viewFace('front');
-  }
+const EXAMPLE_PROMPT =
+  'This is a common <b>number layout</b> you can find at most <b>apartment buildings</b>. ' +
+  'The units count up in order — the <b>yellow arrows</b> show the direction the pattern flows. ' +
+  'Drag to look around and <b>memorize the pattern</b>, then on the next buildings you will ' +
+  '<b>fill in the missing unit numbers</b>. When you are ready, <b>click Continue</b>.';
+
+const groups = {};
+const celebrated = new Set();
+let currentIndex = -1, currentStage = null;
+let blanks = [];        // raycast targets for the active building
+let activeBlank = null; // blank whose options are open
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function frontView() {
+  camera.position.set(5, H * 0.6, 25);
+  controls.target.set(0, H * 0.45, 0);
   controls.update();
 }
 
-ui.ready.onclick = () => showSlide(2);
-document.getElementById('backEx').onclick = () => showSlide(1);
-document.getElementById('frontBtn').onclick = () => viewFace('front');
-document.getElementById('backBtn').onclick = () => viewFace('back');
+function allSolved() {
+  const states = groups[currentIndex]?.userData.blankStates || [];
+  return states.length > 0 && states.every(s => s.solved);
+}
 
-showSlide(1);
+function showStage(i) {
+  currentIndex = i;
+  currentStage = STAGES[i];
+  if (!groups[i]) groups[i] = buildStageGroup(i);
+  for (const k in groups) groups[k].visible = (Number(k) === i);
+  blanks = groups[i].userData.raycastList;
 
-/* ---- loop + resize ---- */
+  closeQuiz();
+  ui.next.classList.add('hidden');
+  controls.autoRotate = false;
+
+  if (currentStage.kind === 'example') {
+    ui.prompt.innerHTML = EXAMPLE_PROMPT;
+    ui.continueBtn.classList.remove('hidden');
+    ui.back.classList.add('hidden');
+  } else {
+    ui.prompt.innerHTML =
+      `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
+      `Click a door marked <b>?</b>, then pick its correct unit number from the options on the right.`;
+    ui.continueBtn.classList.add('hidden');
+    ui.back.classList.remove('hidden');
+  }
+  ui.prompt.classList.remove('hidden');
+
+  frontView();
+
+  // revisiting an already-finished building: show its Next button (no confetti)
+  if (currentStage.kind === 'quiz' && allSolved()) showNext();
+}
+
+/* ---- quiz interaction ---- */
+function openQuiz(bstate) {
+  if (bstate.solved) return;
+  activeBlank = bstate;
+  ui.qopts.innerHTML = '';
+  bstate.options.forEach((val, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.innerHTML = `<span class="ltr">${'abcd'[idx]})</span> ${val}`;
+    btn.onclick = () => chooseOption(bstate, val, btn);
+    ui.qopts.appendChild(btn);
+  });
+  ui.qmsg.textContent = '';
+  ui.qmsg.className = '';
+  ui.quiz.classList.remove('hidden');
+}
+
+function chooseOption(bstate, val, btn) {
+  if (bstate !== activeBlank || bstate.solved) return;
+  if (val === bstate.value) {
+    bstate.solved = true;
+    setPlateText(bstate.plate, String(bstate.value));
+    btn.classList.add('right');
+    [...ui.qopts.children].forEach(b => b.disabled = true);
+    ui.qmsg.textContent = '✓ Correct!';
+    ui.qmsg.className = 'ok';
+    setTimeout(() => { if (!activeBlank || activeBlank.solved) closeQuiz(); }, 650);
+    checkComplete();
+  } else {
+    btn.disabled = true;
+    btn.classList.add('wrong');
+    ui.qmsg.textContent = 'Not quite — try again.';
+    ui.qmsg.className = 'bad';
+  }
+}
+
+function closeQuiz() {
+  activeBlank = null;
+  ui.quiz.classList.add('hidden');
+}
+
+function checkComplete() {
+  if (!allSolved()) return;
+  if (!celebrated.has(currentIndex)) {
+    celebrated.add(currentIndex);
+    fireConfetti();
+  }
+  showNext();
+}
+
+function showNext() {
+  const isLast = currentIndex === STAGES.length - 1;
+  ui.next.textContent = isLast ? 'Next Pattern ▸' : 'Next Building ▸';
+  ui.next.classList.remove('hidden');
+}
+
+/* ---- buttons ---- */
+function resetCourse() {
+  for (const k of Object.keys(groups)) {
+    const g = groups[k];
+    scene.remove(g);
+    g.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) { o.material.map?.dispose(); o.material.dispose(); }
+    });
+    delete groups[k];
+  }
+  celebrated.clear();
+}
+
+ui.continueBtn.onclick = () => showStage(1);
+ui.back.onclick = () => showStage(Math.max(0, currentIndex - 1));
+ui.next.onclick = () => {
+  if (currentIndex < STAGES.length - 1) showStage(currentIndex + 1);
+  else { resetCourse(); showStage(0); } // "Next Pattern" — fresh run from the example for now
+};
+
+/* ---- click a blank door/plate to open its options ---- */
+let downPos = null;
+renderer.domElement.addEventListener('pointerdown', e => { downPos = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  if (moved > 6 || currentStage.kind !== 'quiz') return; // a drag, or no quiz here
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  for (const h of raycaster.intersectObjects(blanks, false)) {
+    const bs = h.object.userData.bstate;
+    if (bs && !bs.solved) { openQuiz(bs); return; }
+  }
+});
+
+/* ============================================================
+   confetti (lightweight 2D canvas overlay)
+   ============================================================ */
+const cc = document.createElement('canvas');
+cc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50';
+document.body.appendChild(cc);
+const cctx = cc.getContext('2d');
+function sizeConfetti() { cc.width = innerWidth; cc.height = innerHeight; }
+sizeConfetti();
+
+let confetti = [];
+function fireConfetti() {
+  const colors = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', '#ff9800'];
+  for (let i = 0; i < 170; i++) {
+    confetti.push({
+      x: innerWidth / 2 + (Math.random() - 0.5) * 240,
+      y: innerHeight * 0.32,
+      vx: (Math.random() - 0.5) * 10,
+      vy: -7 - Math.random() * 9,
+      g: 0.22 + Math.random() * 0.12,
+      rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45,
+      w: 6 + Math.random() * 7, h: 8 + Math.random() * 9,
+      color: colors[i % colors.length],
+    });
+  }
+}
+function drawConfetti() {
+  cctx.clearRect(0, 0, cc.width, cc.height);
+  if (!confetti.length) return;
+  confetti = confetti.filter(p => p.y < innerHeight + 40);
+  for (const p of confetti) {
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+    cctx.save();
+    cctx.translate(p.x, p.y); cctx.rotate(p.rot);
+    cctx.fillStyle = p.color;
+    cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    cctx.restore();
+  }
+}
+
+/* ============================================================
+   loop + resize
+   ============================================================ */
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  sizeConfetti();
 });
 (function tick() {
-  if (tween) {
-    const k = Math.min(1, (performance.now() - tween.t0) / tween.dur);
-    const e = easeInOut(k);
-    camera.position.lerpVectors(tween.fromPos, tween.toPos, e);
-    controls.target.lerpVectors(tween.fromTar, tween.toTar, e);
-    if (k >= 1) tween = null;
-  }
   controls.update();
   renderer.render(scene, camera);
+  drawConfetti();
   requestAnimationFrame(tick);
 })();
+
+showStage(0);
 </script>
 </body>
 </html>
