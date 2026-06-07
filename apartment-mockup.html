@@ -78,7 +78,7 @@
 
 <!-- right-side multiple-choice panel -->
 <div id="quiz" class="hidden">
-  <div class="qhead">Which unit is this?<small>Pick the number that fits the pattern</small></div>
+  <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that fits the pattern</small></div>
   <div id="qopts"></div>
   <div id="qmsg"></div>
 </div>
@@ -132,6 +132,20 @@ const H = CONFIG.floors * FH, HALF_D = D / 2, SPAN = W + CONFIG.gap;
 const TW = 18, TD = 9, TFLOORS = 4, TFH = 3.2;
 const TH = TFLOORS * TFH, THALF_D = TD / 2;   // 12.8 tall, 4.5 half-depth
 const TDOORX = [-5.5, 0, 5.5];                 // left / middle / right doors
+
+/* ---- Part 3: wide 2-story "garden row" with 5 doors per floor. Units are
+   4- or 5-digit; the LEADING digit(s) are the building number, then the floor,
+   then the door. Learners fill the gaps, then name the building. */
+const RW = 24, RD = 9, RFLOORS = 2, RFH = 3.2;
+const RH = RFLOORS * RFH, RHALF_D = RD / 2;
+const RDOORX = [-9.6, -4.8, 0, 4.8, 9.6];
+
+/* ---- Part 4: 4-story block numbered around BOTH faces (front doors + the
+   doors directly behind them). 5-digit units: building*1000 + floor*100 +
+   suffix, where the front gets odd suffixes and the back gets even. */
+const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
+const BH = BFLOORS * BFH, BHALF_D = BD / 2;
+const BDOORX = 3.6;                            // door offset from centre
 
 /* ============================================================ */
 const app = document.getElementById('app');
@@ -393,6 +407,173 @@ function buildTowerFacade(g, getUnit, raycastList, blankStates) {
   }
 }
 
+/* ============================================================
+   PART 3 — wide 2-story row. Leading digit(s) = building number.
+   ============================================================ */
+
+/* a plain stacked-floor slab (walls, bands, roof, sidewalks) shared by
+   Parts 3 and 4 */
+function buildSlabShell(g, w, d, floors, fh) {
+  const h = floors * fh, halfD = d / 2;
+  for (let fi = 0; fi < floors; fi++) {
+    box(g, w, fh, d, fi % 2 ? COLOR.siding : COLOR.brick, 0, fi * fh + fh / 2, 0);
+    box(g, w + 0.15, 0.16, d + 0.15, COLOR.band, 0, (fi + 1) * fh, 0);
+  }
+  box(g, w + 1.4, 0.4, d + 1.4, COLOR.roof, 0, h + 0.2, 0);
+  const sw = 2.2, sy = -0.14, st = 0.05;
+  for (const s of [1, -1]) box(g, w + 2 * sw, st, sw, COLOR.walkway, 0, sy, s * (halfD + sw / 2));
+  for (const ex of [1, -1]) box(g, sw, st, d + 2 * sw, COLOR.walkway, ex * (w / 2 + sw / 2), sy, 0);
+}
+
+/* a wide banner across the top of the front. Also the plate the learner
+   updates when they name the building. Returns the plate. */
+function addTopBanner(g, h, halfD, text) {
+  const plate = label(g, text, 9.6, 2.4,
+    { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 256 });
+  plate.position.set(0, h + 1.2, halfD + 0.12);
+  return plate;
+}
+const BANNER_OPTS = { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 256 };
+
+/* one front façade: RFLOORS x 5 doors. Each cell is either a number (shown)
+   or a [value, mask] pair (blank — mask is the partial string, e.g. '710_'). */
+function buildRowFacade(g, floorsData, raycastList, blankStates) {
+  const surf = RHALF_D + 0.05, plateZ = RHALF_D + 0.10;
+  for (let fi = 0; fi < RFLOORS; fi++) {
+    const base = fi * RFH;
+    RDOORX.forEach((dx, di) => {
+      const cell = floorsData[fi][di];
+      const isBlank = Array.isArray(cell);
+      const value = isBlank ? cell[0] : cell;
+      const door = box(g, 1.25, 2.05, 0.14, COLOR.door, dx, base + 1.05, surf);
+      if (!isBlank) {
+        const plate = label(g, String(value), 1.95, 0.92);
+        plate.position.set(dx, base + 2.55, plateZ);
+      } else {
+        const plate = label(g, cell[1], 1.95, 0.92, { fg: '#c0392b' });
+        plate.position.set(dx, base + 2.55, plateZ);
+        const bstate = { value, solved: false, plate, options: makeBigOptions(value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
+    });
+    for (const wx of [-7.2, -2.4, 2.4, 7.2]) {
+      box(g, 1.2, 1.4, 0.05, COLOR.trim, wx, base + 1.55, surf);
+      box(g, 1.0, 1.15, 0.06, COLOR.glass, wx, base + 1.55, surf + 0.03, { roughness: 0.3, metalness: 0.1 });
+    }
+  }
+  // open 2nd-floor landing + a straight stair clear of the doors at the right end
+  box(g, RW, 0.16, 1.5, COLOR.balcony, 0, RFH - 0.06, RHALF_D + 0.78);
+  const z = RHALF_D + 1.05;
+  for (let i = 0; i < 11; i++) {
+    const t = i / 10;
+    box(g, 0.8, 0.12, 1.25, COLOR.step,
+      THREE.MathUtils.lerp(12.4, 10.6, t),
+      THREE.MathUtils.lerp(0.12, RFH - 0.05, t), z);
+  }
+}
+
+/* reading-order arrows for the row example: along floor 1, then up to floor 2 */
+function addRowArrows(g) {
+  const z = RHALF_D + 1.35, y1 = 2.95, y2 = RFH + 2.95;
+  arrow(g, new THREE.Vector3(RDOORX[0], y1, z), new THREE.Vector3(RDOORX[4], y1, z), COLOR.arrow);
+  arrow(g, new THREE.Vector3(RDOORX[4], y1, z), new THREE.Vector3(RDOORX[0], y2, z), COLOR.arrow);
+  arrow(g, new THREE.Vector3(RDOORX[0], y2, z), new THREE.Vector3(RDOORX[4], y2, z), COLOR.arrow);
+}
+
+/* ============================================================
+   PART 4 — 4-story block numbered around the front AND back.
+   ============================================================ */
+
+/* unit = building*1000 + floor*100 + suffix.
+   front: door0 -> 2f-1, door1 -> 2f+7   (odd suffixes)
+   back:  door0 -> 2f,   door1 -> 2f+8   (even suffixes) */
+function blockUnit(building, isFront, fi, di) {
+  const f = fi + 1;
+  const suffix = isFront ? (di === 0 ? 2 * f - 1 : 2 * f + 7)
+                         : (di === 0 ? 2 * f     : 2 * f + 8);
+  return building * 1000 + f * 100 + suffix;
+}
+
+/* one façade (front s=1 / back s=-1), 4 floors x 2 doors.
+   getCell(fi, di) -> { value, mask|null } */
+function buildBlockFacade(g, s, isFront, getCell, raycastList, blankStates) {
+  const surf = s * (BHALF_D + 0.05), plateZ = s * (BHALF_D + 0.10);
+  const yaw = s > 0 ? 0 : Math.PI;
+  const leftX = isFront ? -BDOORX : BDOORX;
+  const rightX = isFront ? BDOORX : -BDOORX;
+  for (let fi = 0; fi < BFLOORS; fi++) {
+    const base = fi * BFH;
+    for (const sd of [{ x: leftX, di: 0 }, { x: rightX, di: 1 }]) {
+      const cell = getCell(fi, sd.di);
+      const door = box(g, 1.3, 2.05, 0.14, COLOR.door, sd.x, base + 1.05, surf);
+      if (cell.mask === null) {
+        const plate = label(g, String(cell.value), 2.05, 0.95);
+        plate.position.set(sd.x, base + 2.55, plateZ);
+        plate.rotation.y = yaw;
+      } else {
+        const plate = label(g, cell.mask, 2.05, 0.95, { fg: '#c0392b' });
+        plate.position.set(sd.x, base + 2.55, plateZ);
+        plate.rotation.y = yaw;
+        const bstate = { value: cell.value, solved: false, plate, options: makeBigOptions(cell.value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
+    }
+    for (const wx of [-6.6, 6.6]) {
+      box(g, 1.3, 1.5, 0.05, COLOR.trim, wx, base + 1.55, surf);
+      box(g, 1.05, 1.25, 0.06, COLOR.glass, wx, base + 1.55, surf + s * 0.03, { roughness: 0.3, metalness: 0.1 });
+    }
+    if (fi > 0) box(g, BW, 0.16, 1.5, COLOR.balcony, 0, base - 0.06, s * (BHALF_D + 0.8));
+  }
+}
+
+/* switchback stair on the right end serving the upper landings */
+function buildBlockAccess(g) {
+  const flight = (x, z0, z1, y0, y1, n = 6) => {
+    const dz = (z1 - z0) / n;
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n;
+      box(g, 1.3, 0.12, Math.abs(dz) + 0.02, COLOR.step, x, y0 + (y1 - y0) * t, z0 + dz * (i + 0.5));
+    }
+  };
+  const landing = (x, yc, zc) => box(g, 2.6, 0.14, 1.4, COLOR.balcony, x, yc - 0.07, zc);
+  const zF = BHALF_D + 0.9, zB = -1.4, xA = BW / 2 + 0.2, xB = BW / 2 + 1.6;
+  for (let t = 0; t < BFLOORS - 1; t++) {
+    const yFloor = t * BFH, yMid = t * BFH + BFH / 2, yNext = (t + 1) * BFH;
+    landing(xA, yFloor, zF);
+    flight(xA, zF - 0.7, zB + 0.7, yFloor, yMid);
+    landing(xB, yMid, zB);
+    flight(xB, zB + 0.7, zF - 0.7, yMid, yNext);
+  }
+  landing(xA, (BFLOORS - 1) * BFH, zF);
+}
+
+/* the building label on both ends so it reads from the front or the back */
+function addBlockSideSigns(g, text) {
+  for (const ex of [1, -1]) {
+    const sign = label(g, text, 4.2, 1.05,
+      { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 120px sans-serif', w: 1024, h: 256 });
+    sign.position.set(ex * (BW / 2 + 0.06), BH * 0.62, 0);
+    sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
+  }
+}
+
+/* up-arrow + floor badges showing the floor digit climbing 1 -> 4 */
+function addBlockArrows(g) {
+  const x = -BW / 2 - 1.0, z = BHALF_D + 1.5;
+  arrow(g, new THREE.Vector3(x - 1.1, 1.6, z), new THREE.Vector3(x - 1.1, BH - 0.9, z), COLOR.arrow);
+  for (let fi = 0; fi < BFLOORS; fi++) {
+    const b = label(g, String(fi + 1), 0.95, 0.95,
+      { bg: 'rgba(20,24,30,0.85)', fg: '#ffd54a', font: 'bold 240px sans-serif' });
+    b.position.set(x, fi * BFH + 2.55, z + 0.02);
+  }
+}
+
 /* ---- ground + road (shared) ---- */
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(SPAN * 4, D * 8),
   new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1 }));
@@ -419,9 +600,29 @@ const STAGES = [
     suffixes: [21, 22, 23], blanks: [222] },                                           // 1 blank
   { part: 2, type: 'tower', kind: 'quiz', label: 'C', difficulty: 'Medium',
     suffixes: [35, 36, 37], blanks: [236, 335, 437, 137] },                            // 4 blanks
-  { part: 2, type: 'tower', kind: 'quiz', label: 'D', difficulty: 'Difficult',
-    suffixes: [47, 48, 49],                                                            // only floor 1 + 348 shown
-    blanks: [247, 248, 249, 347, 349, 447, 448, 449] },                                // 8 blanks
+
+  // ---- PART 3 — 4-5 digit units; the leading digit(s) name the building ----
+  { part: 3, type: 'row', kind: 'example', label: 'A', building: 1,
+    floors: [[1101, 1103, 1105, 1107, 1109],
+             [1202, 1204, 1206, 1208, 1210]] },
+  { part: 3, type: 'row', kind: 'quiz', label: 'B', building: 7,
+    floors: [[7101, [7103, '710_'], [7105, '71_5'], [7107, '7_07'], [7109, '_109']],
+             [7202, 7204, 7206, 7208, 7210]],
+    chooseBuilding: true, buildingOptions: [7, 1, 71, 17] },
+  { part: 3, type: 'row', kind: 'quiz', label: 'C', building: 13,
+    floors: [[[13117, '1_117'], [13119, '13_19'], [13121, '131_1'], [13123, '1312_'], 13125],
+             [[13217, '132__'], [13219, '132_9'], [13221, '13__1'], [13223, '1__23'], [13225, '__225']]],
+    chooseBuilding: true, buildingOptions: [13, 1, 131, 3] },
+
+  // ---- PART 4 — front + back, 4 floors, a unique pattern per building ----
+  { part: 4, type: 'block', kind: 'example', building: 10 },
+  { part: 4, type: 'block', kind: 'quiz', building: 19,
+    blanks: {                                          // value -> partial mask shown
+      19101: '1_101', 19109: '19_09', 19203: '1920_', 19211: '__211',
+      19305: '193__', 19407: '19_07', 19415: '19_15',
+      19102: '191__', 19110: '191__', 19204: '19___', 19212: '19___',
+      19306: '19___', 19314: '19___',
+    } },
 ];
 
 function makeOptions(correct) {
@@ -446,11 +647,30 @@ function shuffle(a) {
   return a;
 }
 
+/* distractors for the big 4-5 digit units: nudge the suffix (±2,±4),
+   the floor digit (±100) or the building (±1000) so wrong answers stay
+   tempting and on-pattern. */
+function makeBigOptions(correct) {
+  const pool = [];
+  for (const d of [-2, 2, -4, 4, -6, 6, -100, 100, -200, 200, -1000, 1000]) {
+    const n = correct + d;
+    if (n > 0 && n !== correct) pool.push(n);
+  }
+  shuffle(pool);
+  const distract = [];
+  for (const n of pool) {
+    if (distract.length >= 3) break;
+    if (!distract.includes(n)) distract.push(n);
+  }
+  return shuffle([correct, ...distract]);
+}
+
 function buildStageGroup(i) {
   const st = STAGES[i];
   const g = new THREE.Group();
   scene.add(g);
   const raycastList = [], blankStates = [];
+  let buildingState = null;
 
   if (st.type === 'tower') {
     buildTowerShell(g, st.label);
@@ -466,6 +686,33 @@ function buildStageGroup(i) {
         return { type: blankSet.has(v) ? 'blank' : 'num', value: v };
       }, raycastList, blankStates);
     }
+  } else if (st.type === 'row') {
+    buildSlabShell(g, RW, RD, RFLOORS, RFH);
+    const named = st.kind === 'example' || !st.chooseBuilding;
+    const banner = addTopBanner(g, RH, RHALF_D, named ? `Building ${st.building}` : 'Building #');
+    buildRowFacade(g, st.floors, raycastList, blankStates);
+    if (st.kind === 'example') addRowArrows(g);
+    if (st.kind === 'quiz' && st.chooseBuilding) {
+      buildingState = {
+        value: st.building, solved: false, plate: banner,
+        options: shuffle([...st.buildingOptions]),
+        header: 'Which building is this?<small>Read the leading digit(s)</small>',
+        solvedText: v => `Building ${v}`, plateOpts: BANNER_OPTS,
+      };
+    }
+  } else if (st.type === 'block') {
+    buildSlabShell(g, BW, BD, BFLOORS, BFH);
+    buildBlockAccess(g);
+    addTopBanner(g, BH, BHALF_D, `Building ${st.building}`);
+    addBlockSideSigns(g, `Building ${st.building}`);
+    const blanksMap = st.blanks || {};
+    const cell = (isFront, fi, di) => {
+      const value = blockUnit(st.building, isFront, fi, di);
+      return { value, mask: blanksMap[value] || null };
+    };
+    buildBlockFacade(g, 1, true, (fi, di) => cell(true, fi, di), raycastList, blankStates);
+    buildBlockFacade(g, -1, false, (fi, di) => cell(false, fi, di), raycastList, blankStates);
+    if (st.kind === 'example') addBlockArrows(g);
   } else {
     buildShell(g, st.number);
     if (st.kind === 'example') {
@@ -484,7 +731,7 @@ function buildStageGroup(i) {
     }
   }
 
-  g.userData = { raycastList, blankStates };
+  g.userData = { raycastList, blankStates, buildingState };
   return g;
 }
 
@@ -494,6 +741,7 @@ function buildStageGroup(i) {
 const ui = {
   prompt: document.getElementById('prompt'),
   quiz: document.getElementById('quiz'),
+  qhead: document.getElementById('qhead'),
   qopts: document.getElementById('qopts'),
   qmsg: document.getElementById('qmsg'),
   back: document.getElementById('back'),
@@ -513,6 +761,19 @@ const EXAMPLE2_PROMPT =
   'The last two digits stay the same as you go <b>straight up</b> a column. ' +
   'Notice every unit on floor 3 starts with <b>3</b>. Drag to look around, and when you have it, <b>click Ready</b>.';
 
+const EXAMPLE3_PROMPT =
+  '<b>Part 3 — the building number.</b> Larger complexes use <b>4- and 5-digit</b> unit numbers, ' +
+  'and the <b>leading digit(s) tell you the building</b>. Here every unit starts with <b>1</b>, so this is ' +
+  '<b>Building 1</b> — after the building comes the <b>floor</b>, then the door. On the next buildings you will ' +
+  '<b>fill in the missing numbers</b>, then <b>choose the correct building number</b>. ' +
+  'Drag to look around, and when you are ready, <b>click Ready</b>.';
+
+const EXAMPLE4_PROMPT =
+  '<b>Part 4 — everything at once.</b> This last course is the toughest: it uses <b>everything so far</b>, and ' +
+  '<b>each building has its own pattern</b>. The units wrap around <b>both the front and the back</b> — the front ' +
+  'doors and the doors directly <b>behind</b> them. Study how the numbers climb on <b>Building 10</b>, then ' +
+  '<b>drag to spin around</b> and check the back. When you are ready, <b>click Ready</b>.';
+
 const groups = {};
 const celebrated = new Set();
 let currentIndex = -1, currentStage = null;
@@ -526,6 +787,12 @@ function frameStage(st) {
   if (st.type === 'tower') {
     camera.position.set(7, TH * 0.5, 38);
     controls.target.set(0, TH * 0.42, 0);
+  } else if (st.type === 'row') {
+    camera.position.set(0, RH * 0.85, 32);
+    controls.target.set(0, RH * 0.5, 0);
+  } else if (st.type === 'block') {
+    camera.position.set(10, BH * 0.5, 42);
+    controls.target.set(0, BH * 0.42, 0);
   } else {
     camera.position.set(5, H * 0.6, 25);
     controls.target.set(0, H * 0.45, 0);
@@ -533,9 +800,16 @@ function frameStage(st) {
   controls.update();
 }
 
+function doorsSolved() {
+  const ud = groups[currentIndex]?.userData;
+  return !!ud && ud.blankStates.length > 0 && ud.blankStates.every(s => s.solved);
+}
 function allSolved() {
-  const states = groups[currentIndex]?.userData.blankStates || [];
-  return states.length > 0 && states.every(s => s.solved);
+  const ud = groups[currentIndex]?.userData;
+  if (!ud) return false;
+  const doorsDone = ud.blankStates.every(s => s.solved);
+  const bldDone = !ud.buildingState || ud.buildingState.solved;
+  return (ud.blankStates.length > 0 || ud.buildingState) && doorsDone && bldDone;
 }
 
 function showStage(i) {
@@ -552,16 +826,25 @@ function showStage(i) {
   controls.autoRotate = false;
 
   if (currentStage.kind === 'example') {
-    const isP2 = currentStage.part === 2;
-    ui.prompt.innerHTML = isP2 ? EXAMPLE2_PROMPT : EXAMPLE_PROMPT;
-    ui.continueBtn.textContent = isP2 ? 'Ready ▸' : 'Continue ▸';
+    const p = currentStage.part;
+    ui.prompt.innerHTML = p === 4 ? EXAMPLE4_PROMPT : p === 3 ? EXAMPLE3_PROMPT
+      : p === 2 ? EXAMPLE2_PROMPT : EXAMPLE_PROMPT;
+    ui.continueBtn.textContent = p > 1 ? 'Ready ▸' : 'Continue ▸';
     ui.continueBtn.classList.remove('hidden');
     if (currentIndex > 0) ui.back.classList.remove('hidden');
   } else {
-    ui.prompt.innerHTML = currentStage.part === 2
-      ? `<b>Building ${currentStage.label} · ${currentStage.difficulty}</b> — the first digit is the floor. ` +
-        `Click a door marked <b>?</b>, then pick its correct unit number on the right.`
-      : `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
+    const p = currentStage.part;
+    if (p === 2)
+      ui.prompt.innerHTML = `<b>Building ${currentStage.label} · ${currentStage.difficulty}</b> — the first digit is the floor. ` +
+        `Click a door marked <b>?</b>, then pick its correct unit number on the right.`;
+    else if (p === 3)
+      ui.prompt.innerHTML = `<b>Building ${currentStage.label}</b> — fill in the missing unit numbers, then name the building. ` +
+        `Click a door showing a <b>partial number</b> and pick the full number on the right.`;
+    else if (p === 4)
+      ui.prompt.innerHTML = `<b>Building ${currentStage.building}</b> — numbers wrap around the front <i>and</i> back. ` +
+        `<b>Drag to spin around</b>, then click any door showing a <b>partial number</b> and pick the full unit.`;
+    else
+      ui.prompt.innerHTML = `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
         `Click a door marked <b>?</b>, then pick its correct unit number from the options on the right.`;
     ui.back.classList.remove('hidden');
   }
@@ -569,14 +852,27 @@ function showStage(i) {
 
   frameStage(currentStage);
 
-  // revisiting an already-finished building: show its Next button (no confetti)
-  if (currentStage.kind === 'quiz' && allSolved()) showNext();
+  if (currentStage.kind === 'quiz') resumeQuizState();
+}
+
+/* re-entering a quiz: pick up where the learner left off (door blanks, then
+   the building-number step, then the Next button) */
+function resumeQuizState() {
+  const ud = groups[currentIndex].userData;
+  if (!ud.blankStates.every(s => s.solved)) return;   // still has doors to fill
+  if (ud.buildingState && !ud.buildingState.solved) {
+    ui.prompt.innerHTML = `All units filled in — now <b>choose the building number</b>.`;
+    openQuiz(ud.buildingState);
+  } else {
+    showNext();   // already finished (no confetti on a revisit)
+  }
 }
 
 /* ---- quiz interaction ---- */
 function openQuiz(bstate) {
   if (bstate.solved) return;
   activeBlank = bstate;
+  ui.qhead.innerHTML = bstate.header || 'Which unit is this?<small>Pick the number that fits the pattern</small>';
   ui.qopts.innerHTML = '';
   bstate.options.forEach((val, idx) => {
     const btn = document.createElement('button');
@@ -594,7 +890,9 @@ function chooseOption(bstate, val, btn) {
   if (bstate !== activeBlank || bstate.solved) return;
   if (val === bstate.value) {
     bstate.solved = true;
-    setPlateText(bstate.plate, String(bstate.value));
+    setPlateText(bstate.plate,
+      bstate.solvedText ? bstate.solvedText(val) : String(val),
+      bstate.plateOpts || {});
     btn.classList.add('right');
     [...ui.qopts.children].forEach(b => b.disabled = true);
     ui.qmsg.textContent = '✓ Correct!';
@@ -615,7 +913,13 @@ function closeQuiz() {
 }
 
 function checkComplete() {
-  if (!allSolved()) return;
+  if (!doorsSolved()) return;
+  const bs = groups[currentIndex].userData.buildingState;
+  if (bs && !bs.solved) {                     // all units in — now name the building
+    ui.prompt.innerHTML = `Nice — every unit is filled in. Now <b>choose the building number</b>.`;
+    openQuiz(bs);
+    return;
+  }
   if (!celebrated.has(currentIndex)) {
     celebrated.add(currentIndex);
     fireConfetti();
@@ -627,7 +931,7 @@ function showNext() {
   const isLast = currentIndex === STAGES.length - 1;
   const nextStage = STAGES[currentIndex + 1];
   if (isLast) ui.next.textContent = 'Start Over ▸';
-  else if (nextStage && nextStage.kind === 'example') ui.next.textContent = 'Next: Part 2 ▸';
+  else if (nextStage && nextStage.kind === 'example') ui.next.textContent = `Next: Part ${nextStage.part} ▸`;
   else ui.next.textContent = 'Next Building ▸';
   ui.next.classList.remove('hidden');
 }
