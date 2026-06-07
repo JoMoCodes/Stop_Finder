@@ -167,34 +167,36 @@ const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
 const BH = BFLOORS * BFH, BHALF_D = BD / 2;
 const BDOORX = 3.6;                            // door offset from centre
 
-/* ---- Part 5: a building with NO floor digit. The unit number is a single
-   running count that snakes around the whole building, so floor 1 owns both
-   the lowest numbers (601-608) AND the highest (617-620), while the smaller
-   upper floors carry the middle of the range (609-612, 613-616). A 3-story
-   front "tower" plus a single-story annex at the back. Doors line the long
-   LEFT and RIGHT faces; the learner walks around with the view buttons. */
-const SQW = 12, SQHW = SQW / 2, SQFH = 3.2, SQFLOORS = 3, SQH = SQFLOORS * SQFH;
-const SQ_TFRONT = 6.5, SQ_TBACK = -6.5;        // tower front / back face z
-const SQ_ABACK = -13.5;                         // annex back face z
-const SQ_TD = SQ_TFRONT - SQ_TBACK;             // tower depth (13)
-const SQ_TCZ = (SQ_TFRONT + SQ_TBACK) / 2;      // tower centre z (0)
-const SQ_AD = SQ_TBACK - SQ_ABACK;              // annex depth (7)
-const SQ_ACZ = (SQ_TBACK + SQ_ABACK) / 2;       // annex centre z (-10)
+/* ---- Part 5: a uniform 3-story block shown as an OPEN DOLLHOUSE (no roof, no
+   outer shell). The unit number is a single running count with NO floor digit,
+   so floor 1 owns both the lowest numbers AND the highest. Doors sit around the
+   perimeter facing OUT, so each side's doors read straight-on from its nav
+   button. Floor 1 is fully occupied (left 1-4, right 17-20, back 5-6, front
+   7-8); floors 2-3 have only front/back pairs. A central hallway runs
+   front->back on every floor. ---- */
+const SQW = 12, SQHW = SQW / 2;          // width  (X, left <-> right)
+const SQD = 22, SQHD = SQD / 2;          // depth  (Z, front <-> back)
+const SQFH = 3.2, SQFLOORS = 3, SQH = SQFLOORS * SQFH;
 
-/* door slots: { d:door#, f:floorIndex 0-2, s:side -1 left/+1 right, z, annex }.
-   The path snakes down one wall to the back and up the other to the front —
-   the same hand on every floor — and the annex (17-20) continues that loop. */
+/* door slots: { d:door#, f:floorIndex 0-2, face:'L'|'R'|'F'|'B', a:position
+   along that wall (z for L/R, x for F/B) }. Left counts up toward the back;
+   right counts up from the back to the front. */
 const SQ_LAYOUT = [
-  { d: 1, f: 0, s: -1, z:  5.0 }, { d: 2, f: 0, s: -1, z:  1.7 },
-  { d: 3, f: 0, s: -1, z: -1.7 }, { d: 4, f: 0, s: -1, z: -5.0 },
-  { d: 5, f: 0, s:  1, z: -5.0 }, { d: 6, f: 0, s:  1, z: -1.7 },
-  { d: 7, f: 0, s:  1, z:  1.7 }, { d: 8, f: 0, s:  1, z:  5.0 },
-  { d: 9, f: 1, s: -1, z: -5.0 }, { d: 10, f: 1, s: 1, z: -5.0 },
-  { d: 11, f: 1, s: 1, z: 5.0 }, { d: 12, f: 1, s: -1, z: 5.0 },
-  { d: 13, f: 2, s: -1, z: -5.0 }, { d: 14, f: 2, s: 1, z: -5.0 },
-  { d: 15, f: 2, s: 1, z: 5.0 }, { d: 16, f: 2, s: -1, z: 5.0 },
-  { d: 17, f: 0, s: -1, z: -8.2, annex: true }, { d: 18, f: 0, s: -1, z: -11.8, annex: true },
-  { d: 19, f: 0, s:  1, z: -11.8, annex: true }, { d: 20, f: 0, s: 1, z: -8.2, annex: true },
+  // floor 1 left wall (front -> back) = 1..4
+  { d: 1, f: 0, face: 'L', a:  7.5 }, { d: 2, f: 0, face: 'L', a:  2.5 },
+  { d: 3, f: 0, face: 'L', a: -2.5 }, { d: 4, f: 0, face: 'L', a: -7.5 },
+  // floor 1 back wall 5,6 ; front wall 7,8
+  { d: 5, f: 0, face: 'B', a: -3 }, { d: 6, f: 0, face: 'B', a: 3 },
+  { d: 7, f: 0, face: 'F', a: -3 }, { d: 8, f: 0, face: 'F', a: 3 },
+  // floor 2 back 9,10 ; front 11,12
+  { d: 9, f: 1, face: 'B', a: -3 }, { d: 10, f: 1, face: 'B', a: 3 },
+  { d: 11, f: 1, face: 'F', a: -3 }, { d: 12, f: 1, face: 'F', a: 3 },
+  // floor 3 back 13,14 ; front 15,16
+  { d: 13, f: 2, face: 'B', a: -3 }, { d: 14, f: 2, face: 'B', a: 3 },
+  { d: 15, f: 2, face: 'F', a: -3 }, { d: 16, f: 2, face: 'F', a: 3 },
+  // floor 1 right wall (back -> front) = 17..20
+  { d: 17, f: 0, face: 'R', a: -7.5 }, { d: 18, f: 0, face: 'R', a: -2.5 },
+  { d: 19, f: 0, face: 'R', a:  2.5 }, { d: 20, f: 0, face: 'R', a:  7.5 },
 ];
 
 /* ============================================================ */
@@ -614,84 +616,81 @@ function addBlockSideSigns(g, text) {
 }
 
 /* ============================================================
-   PART 5 — sequential numbering with NO floor digit.
+   PART 5 — running count with NO floor digit, shown as an open dollhouse.
    ============================================================ */
 
-/* the 3-story tower + 1-story back annex, plus roof/bands/sidewalks, a few
-   windows, and the building number on every face (front, back, both sides) */
-function buildSeqShell(g, number) {
-  for (let fi = 0; fi < SQFLOORS; fi++) {                       // tower
-    box(g, SQW, SQFH, SQ_TD, fi % 2 ? COLOR.siding : COLOR.brick, 0, fi * SQFH + SQFH / 2, SQ_TCZ);
-    box(g, SQW + 0.15, 0.16, SQ_TD + 0.15, COLOR.band, 0, (fi + 1) * SQFH, SQ_TCZ);
+/* one apartment "stall" open to the central hallway: a back (inner) wall and
+   two side walls, kept lower than the floor so you can see in over them. The
+   door + plate are added separately, on the perimeter side, facing out. */
+function buildSeqRoom(g, face, a, base, color) {
+  const RD = 3.2, h = 2.5, t = 0.16, w = 4.0;   // depth inward, height, thickness, width
+  if (face === 'L' || face === 'R') {
+    const sx = face === 'L' ? -1 : 1;
+    for (const dz of [-w / 2, w / 2])                            // side walls
+      box(g, RD, h, t, color, sx * (SQHW - RD / 2), base + h / 2, a + dz);
+    box(g, t, h, w, color, sx * (SQHW - RD), base + h / 2, a);   // inner wall
+  } else {
+    const sz = face === 'F' ? 1 : -1;
+    for (const dx of [-w / 2, w / 2])                            // side walls
+      box(g, t, h, RD, color, a + dx, base + h / 2, sz * (SQHD - RD / 2));
+    box(g, w, h, t, color, a, base + h / 2, sz * (SQHD - RD));   // inner wall
   }
-  box(g, SQW + 1.4, 0.4, SQ_TD + 1.4, COLOR.roof, 0, SQH + 0.2, SQ_TCZ);
-
-  box(g, SQW, SQFH, SQ_AD, COLOR.brick, 0, SQFH / 2, SQ_ACZ);   // annex (ground only)
-  box(g, SQW + 0.15, 0.16, SQ_AD + 0.15, COLOR.band, 0, SQFH, SQ_ACZ);
-  box(g, SQW + 1.4, 0.4, SQ_AD + 1.4, COLOR.roof, 0, SQFH + 0.2, SQ_ACZ);
-
-  const sw = 2.0, sy = -0.14, st = 0.05;                        // sidewalks
-  const totalD = SQ_TFRONT - SQ_ABACK, czAll = (SQ_TFRONT + SQ_ABACK) / 2;
-  for (const ex of [1, -1]) box(g, sw, st, totalD + 2 * sw, COLOR.walkway, ex * (SQHW + sw / 2), sy, czAll);
-  box(g, SQW + 2 * sw, st, sw, COLOR.walkway, 0, sy, SQ_TFRONT + sw / 2);
-  box(g, SQW + 2 * sw, st, sw, COLOR.walkway, 0, sy, SQ_ABACK - sw / 2);
-
-  // a few windows to fill the bare middle of the upper floors and the front
-  for (let fi = 1; fi < SQFLOORS; fi++) for (const ex of [1, -1]) {
-    box(g, 0.05, 1.4, 1.6, COLOR.trim, ex * (SQHW + 0.02), fi * SQFH + 1.55, 0);
-    box(g, 0.06, 1.15, 1.3, COLOR.glass, ex * (SQHW + 0.04), fi * SQFH + 1.55, 0, { roughness: 0.3, metalness: 0.1 });
-  }
-  for (let fi = 0; fi < SQFLOORS; fi++) for (const fx of [-3.6, 3.6]) {
-    box(g, 1.5, 1.4, 0.05, COLOR.trim, fx, fi * SQFH + 1.6, SQ_TFRONT + 0.02);
-    box(g, 1.25, 1.15, 0.06, COLOR.glass, fx, fi * SQFH + 1.6, SQ_TFRONT + 0.04, { roughness: 0.3, metalness: 0.1 });
-  }
-
-  // building number — front banner, a sign high on each long side (clear of the
-  // doors at z=±5 and the centre window), and a banner on the annex back
-  const front = label(g, `Building ${number}`, 9.0, 2.2, BANNER_OPTS);
-  front.position.set(0, SQH + 1.1, SQ_TFRONT + 0.12);
-  for (const ex of [1, -1]) {
-    const side = label(g, `Building ${number}`, 2.6, 0.95, BANNER_OPTS);
-    side.position.set(ex * (SQHW + 0.07), SQH - 0.7, 2.5);
-    side.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
-  }
-  const back = label(g, `Building ${number}`, 6.0, 1.4, BANNER_OPTS);
-  back.position.set(0, SQFH + 0.9, SQ_ABACK - 0.12);
-  back.rotation.y = Math.PI;
 }
 
-/* the ground-floor hallway that "leads to the back": a recessed dark entry
-   portal centred on the front, and a matching opening at the annex back, so
-   the breezeway reads as running straight through the building */
-function buildSeqHall(g) {
-  const hallW = 2.6;
-  box(g, hallW, SQFH * 0.9, 0.5, 0x20242c, 0, SQFH * 0.46, SQ_TFRONT - 0.02);   // front entry
-  box(g, hallW, SQFH * 0.9, 0.5, 0x20242c, 0, SQFH * 0.46, SQ_ABACK + 0.02);    // back exit
-  box(g, hallW + 0.6, 0.45, 1.4, COLOR.canopy, 0, SQFH * 0.95, SQ_TFRONT + 0.4); // entry canopy
+/* floor plates, the central front->back hallway, corner columns, edge rails,
+   sidewalk, and the building number on every face + the roof */
+function buildSeqStructure(g, number) {
+  for (let fi = 0; fi < SQFLOORS; fi++)                          // floor plates (kept inside the door plates so they never clip them)
+    box(g, SQW + 0.2, 0.25, SQD + 0.2, COLOR.balcony, 0, fi * SQFH - 0.125, 0);
+  for (let fi = 0; fi < SQFLOORS; fi++)                          // hallway runner
+    box(g, 4.8, 0.06, SQD - 1.2, COLOR.walkway, 0, fi * SQFH + 0.04, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])            // corner columns
+    box(g, 0.4, SQH, 0.4, COLOR.roof, sx * (SQHW + 0.12), SQH / 2, sz * (SQHD + 0.12));
+  for (let fi = 1; fi < SQFLOORS; fi++) for (const sx of [-1, 1]) // door-less side rails up top
+    box(g, 0.25, 0.5, SQD, COLOR.balcony, sx * SQHW, fi * SQFH + 0.25, 0);
+  box(g, SQW + 5, 0.05, SQD + 5, COLOR.walkway, 0, -0.26, 0);    // sidewalk
+
+  // building number — a banner high on each side face (those faces have no
+  // upper-floor doors, so it stays clear), plus a rooftop sign for front/back
+  for (const sx of [-1, 1]) {
+    const b = label(g, `Building ${number}`, 11.0, 1.3, BANNER_OPTS);
+    b.position.set(sx * (SQHW + 0.25), SQH - 0.5, 0);
+    b.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+  // rooftop sign on a post (double-sided so it reads from the front and back)
+  box(g, 0.3, 1.6, 0.3, COLOR.roof, 0, SQH + 0.8, -2);
+  for (const yaw of [0, Math.PI]) {
+    const s = label(g, `Building ${number}`, 7.0, 1.7, BANNER_OPTS);
+    s.position.set(0, SQH + 2.3, -2);
+    s.rotation.y = yaw;
+  }
 }
 
-/* light exterior walkway ledges along the upper-floor sides (implies access
-   to the doors without occluding any of the unit plates) */
-function buildSeqAccess(g) {
-  for (let fi = 1; fi < SQFLOORS; fi++) for (const ex of [1, -1])
-    box(g, 1.2, 0.16, SQ_TD - 1.5, COLOR.balcony, ex * (SQHW + 0.6), fi * SQFH - 0.06, SQ_TCZ);
-}
-
-/* place all 20 doors. getUnit(door#) -> { value, mask|null } (mask = the
-   partial string to show on a blank, e.g. '12__'). Doors face outward. */
+/* place all 20 doors (+ their stalls). getUnit(door#) -> { value, mask|null }
+   (mask = the partial string to show on a blank, e.g. '12__'). Doors face out. */
 function buildSeqFacade(g, getUnit, raycastList, blankStates) {
   for (const slot of SQ_LAYOUT) {
-    const base = slot.f * SQFH, yaw = slot.s > 0 ? Math.PI / 2 : -Math.PI / 2;
-    const u = getUnit(slot.d);
-    const door = box(g, 0.16, 2.05, 1.2, COLOR.door, slot.s * (SQHW + 0.02), base + 1.05, slot.z);
-    if (u.mask === null) {
-      const plate = label(g, String(u.value), 1.95, 0.92);
-      plate.position.set(slot.s * (SQHW + 0.10), base + 2.55, slot.z);
-      plate.rotation.y = yaw;
+    const base = slot.f * SQFH;
+    buildSeqRoom(g, slot.face, slot.a, base, slot.f % 2 ? COLOR.siding : COLOR.brick);
+
+    let x, z, yaw, dw, dd, px, pz;
+    if (slot.face === 'L' || slot.face === 'R') {
+      const sx = slot.face === 'L' ? -1 : 1;
+      x = sx * (SQHW + 0.02); z = slot.a; yaw = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+      dw = 0.16; dd = 1.2; px = sx * (SQHW + 0.12); pz = slot.a;
     } else {
-      const plate = label(g, u.mask, 1.95, 0.92, { fg: '#c0392b' });
-      plate.position.set(slot.s * (SQHW + 0.10), base + 2.55, slot.z);
-      plate.rotation.y = yaw;
+      const sz = slot.face === 'F' ? 1 : -1;
+      x = slot.a; z = sz * (SQHD + 0.02); yaw = sz > 0 ? 0 : Math.PI;
+      dw = 1.2; dd = 0.16; px = slot.a; pz = sz * (SQHD + 0.12);
+    }
+
+    const u = getUnit(slot.d);
+    const door = box(g, dw, 2.05, dd, COLOR.door, x, base + 1.05, z);
+    const plate = label(g, u.mask === null ? String(u.value) : u.mask, 1.95, 0.92,
+      u.mask === null ? {} : { fg: '#c0392b' });
+    plate.position.set(px, base + 2.55, pz);
+    plate.rotation.y = yaw;
+    if (u.mask !== null) {
       const bstate = { value: u.value, solved: false, plate, options: makeBigOptions(u.value) };
       plate.userData.bstate = bstate;
       door.userData.bstate = bstate;
@@ -851,13 +850,11 @@ function buildStageGroup(i) {
     buildBlockFacade(g, -1, false, (fi, di) => cell(false, fi, di), raycastList, blankStates);
     // no arrows or floor badges here — the learner figures out the pattern
   } else if (st.type === 'seq') {
-    buildSeqShell(g, st.building);
-    buildSeqHall(g);
-    buildSeqAccess(g);
+    buildSeqStructure(g, st.building);
     const blanksMap = st.blanks || {};
     buildSeqFacade(g, d => ({ value: st.base + d, mask: blanksMap[d] || null }),
       raycastList, blankStates);
-    // no floor signs, no arrows — the learner discovers there is no floor digit
+    // open dollhouse, no roof — the learner discovers there is no floor digit
   } else {
     buildShell(g, st.number);
     if (st.kind === 'example') {
@@ -924,10 +921,11 @@ const EXAMPLE4_PROMPT =
 
 const EXAMPLE5_PROMPT =
   '<b>Part 5 — no floor digit.</b> In some buildings the <b>floor numbers don\'t exist</b> in the unit number — ' +
-  'the units are just a <b>single running count</b> that snakes around the whole building. <b>Building 6</b> runs ' +
-  '601 → 620, so the ground floor holds the <b>lowest</b> numbers (601-608) <i>and</i> the <b>highest</b> (617-620); ' +
-  'no digit tells you the floor. Use the <b>Front / Back / Left / Right</b> buttons to walk around — or drag to look ' +
-  'and pinch to zoom — then <b>click Ready</b>.';
+  'the units are just a <b>single running count</b> around the building, one floor after another. This open ' +
+  '<b>dollhouse</b> view shows every apartment off the central hallway. <b>Building 6</b> runs 601 → 620, so ' +
+  'floor 1 holds the <b>lowest</b> numbers <i>and</i> the <b>highest</b> (617-620); no digit tells you the floor. ' +
+  'Use the <b>Front / Back / Left / Right</b> buttons to walk around — or drag to look and pinch to zoom — then ' +
+  '<b>click Ready</b>.';
 
 const groups = {};
 const celebrated = new Set();
@@ -949,8 +947,8 @@ function frameStage(st) {
     camera.position.set(10, BH * 0.5, 42);
     controls.target.set(0, BH * 0.42, 0);
   } else if (st.type === 'seq') {
-    camera.position.set(-26, SQH * 0.9, 22);
-    controls.target.set(0, SQH * 0.45, -3);
+    camera.position.set(-30, 11, 34);
+    controls.target.set(0, 4.5, 0);
   } else {
     camera.position.set(5, H * 0.6, 25);
     controls.target.set(0, H * 0.45, 0);
@@ -958,13 +956,13 @@ function frameStage(st) {
   controls.update();
 }
 
-/* the Front/Back/Left/Right buttons for the Part 5 building */
+/* the Front/Back/Left/Right buttons for the Part 5 dollhouse */
 function setSeqView(view) {
-  const yT = SQH * 0.45;
-  if (view === 'front')      { camera.position.set(0, SQH * 0.85, 26);   controls.target.set(0, yT, -1); }
-  else if (view === 'back')  { camera.position.set(0, SQH * 0.85, -34);  controls.target.set(0, yT, -8); }
-  else if (view === 'left')  { camera.position.set(-30, SQH * 0.7, -3);  controls.target.set(0, yT, -3); }
-  else if (view === 'right') { camera.position.set(30, SQH * 0.7, -3);   controls.target.set(0, yT, -3); }
+  const yT = 4.5;
+  if (view === 'front')      { camera.position.set(0, 9, 38);   controls.target.set(0, yT, 0); }
+  else if (view === 'back')  { camera.position.set(0, 9, -38);  controls.target.set(0, yT, 0); }
+  else if (view === 'left')  { camera.position.set(-40, 9, 0);  controls.target.set(0, yT, 0); }
+  else if (view === 'right') { camera.position.set(40, 9, 0);   controls.target.set(0, yT, 0); }
   controls.update();
 }
 
