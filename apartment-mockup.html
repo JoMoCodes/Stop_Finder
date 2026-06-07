@@ -489,11 +489,11 @@ function addRowArrows(g) {
 
 /* unit = building*1000 + floor*100 + suffix.
    front: door0 -> 2f-1, door1 -> 2f+7   (odd suffixes)
-   back:  door0 -> 2f,   door1 -> 2f+8   (even suffixes) */
+   back:  door0 -> 2f+8, door1 -> 2f     (even suffixes, swapped L<->R) */
 function blockUnit(building, isFront, fi, di) {
   const f = fi + 1;
   const suffix = isFront ? (di === 0 ? 2 * f - 1 : 2 * f + 7)
-                         : (di === 0 ? 2 * f     : 2 * f + 8);
+                         : (di === 0 ? 2 * f + 8 : 2 * f);
   return building * 1000 + f * 100 + suffix;
 }
 
@@ -563,17 +563,6 @@ function addBlockSideSigns(g, text) {
   }
 }
 
-/* up-arrow + floor badges showing the floor digit climbing 1 -> 4 */
-function addBlockArrows(g) {
-  const x = -BW / 2 - 1.0, z = BHALF_D + 1.5;
-  arrow(g, new THREE.Vector3(x - 1.1, 1.6, z), new THREE.Vector3(x - 1.1, BH - 0.9, z), COLOR.arrow);
-  for (let fi = 0; fi < BFLOORS; fi++) {
-    const b = label(g, String(fi + 1), 0.95, 0.95,
-      { bg: 'rgba(20,24,30,0.85)', fg: '#ffd54a', font: 'bold 240px sans-serif' });
-    b.position.set(x, fi * BFH + 2.55, z + 0.02);
-  }
-}
-
 /* ---- ground + road (shared) ---- */
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(SPAN * 4, D * 8),
   new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1 }));
@@ -611,7 +600,7 @@ const STAGES = [
     chooseBuilding: true, buildingOptions: [7, 1, 71, 17] },
   { part: 3, type: 'row', kind: 'quiz', label: 'C', building: 13,
     floors: [[[13117, '1_117'], [13119, '13_19'], [13121, '131_1'], [13123, '1312_'], 13125],
-             [[13217, '132__'], [13219, '132_9'], [13221, '13__1'], [13223, '1__23'], [13225, '__225']]],
+             [[13218, '132__'], [13220, '132_0'], [13222, '13__2'], [13224, '1__24'], [13226, '__226']]],
     chooseBuilding: true, buildingOptions: [13, 1, 131, 3] },
 
   // ---- PART 4 — front + back, 4 floors, a unique pattern per building ----
@@ -712,7 +701,7 @@ function buildStageGroup(i) {
     };
     buildBlockFacade(g, 1, true, (fi, di) => cell(true, fi, di), raycastList, blankStates);
     buildBlockFacade(g, -1, false, (fi, di) => cell(false, fi, di), raycastList, blankStates);
-    if (st.kind === 'example') addBlockArrows(g);
+    // no arrows or floor badges here — the learner figures out the pattern
   } else {
     buildShell(g, st.number);
     if (st.kind === 'example') {
