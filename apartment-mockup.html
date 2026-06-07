@@ -43,6 +43,17 @@
     z-index: 10; display: flex; align-items: center; gap: 10px;
   }
 
+  /* left-side "walk around" buttons (Part 5) */
+  #viewbar {
+    position: fixed; top: 50%; left: 22px; transform: translateY(-50%);
+    z-index: 11; display: flex; flex-direction: column; gap: 8px; width: 130px;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #viewbar .vbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 2px; }
+  #viewbar button.vbtn { padding: 10px 14px; font-size: 15px; text-align: center; }
+
   /* right-side quiz panel */
   #quiz {
     position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
@@ -81,6 +92,15 @@
   <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that fits the pattern</small></div>
   <div id="qopts"></div>
   <div id="qmsg"></div>
+</div>
+
+<!-- Part 5 navigation: jump the camera to each face of the building -->
+<div id="viewbar" class="hidden">
+  <div class="vbtitle">Walk around</div>
+  <button class="ghost vbtn" data-view="front">Front</button>
+  <button class="ghost vbtn" data-view="back">Back</button>
+  <button class="ghost vbtn" data-view="left">Left</button>
+  <button class="ghost vbtn" data-view="right">Right</button>
 </div>
 
 <div id="bottombar">
@@ -146,6 +166,36 @@ const RDOORX = [-9.6, -4.8, 0, 4.8, 9.6];
 const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
 const BH = BFLOORS * BFH, BHALF_D = BD / 2;
 const BDOORX = 3.6;                            // door offset from centre
+
+/* ---- Part 5: a building with NO floor digit. The unit number is a single
+   running count that snakes around the whole building, so floor 1 owns both
+   the lowest numbers (601-608) AND the highest (617-620), while the smaller
+   upper floors carry the middle of the range (609-612, 613-616). A 3-story
+   front "tower" plus a single-story annex at the back. Doors line the long
+   LEFT and RIGHT faces; the learner walks around with the view buttons. */
+const SQW = 12, SQHW = SQW / 2, SQFH = 3.2, SQFLOORS = 3, SQH = SQFLOORS * SQFH;
+const SQ_TFRONT = 6.5, SQ_TBACK = -6.5;        // tower front / back face z
+const SQ_ABACK = -13.5;                         // annex back face z
+const SQ_TD = SQ_TFRONT - SQ_TBACK;             // tower depth (13)
+const SQ_TCZ = (SQ_TFRONT + SQ_TBACK) / 2;      // tower centre z (0)
+const SQ_AD = SQ_TBACK - SQ_ABACK;              // annex depth (7)
+const SQ_ACZ = (SQ_TBACK + SQ_ABACK) / 2;       // annex centre z (-10)
+
+/* door slots: { d:door#, f:floorIndex 0-2, s:side -1 left/+1 right, z, annex }.
+   The path snakes down one wall to the back and up the other to the front —
+   the same hand on every floor — and the annex (17-20) continues that loop. */
+const SQ_LAYOUT = [
+  { d: 1, f: 0, s: -1, z:  5.0 }, { d: 2, f: 0, s: -1, z:  1.7 },
+  { d: 3, f: 0, s: -1, z: -1.7 }, { d: 4, f: 0, s: -1, z: -5.0 },
+  { d: 5, f: 0, s:  1, z: -5.0 }, { d: 6, f: 0, s:  1, z: -1.7 },
+  { d: 7, f: 0, s:  1, z:  1.7 }, { d: 8, f: 0, s:  1, z:  5.0 },
+  { d: 9, f: 1, s: -1, z: -5.0 }, { d: 10, f: 1, s: 1, z: -5.0 },
+  { d: 11, f: 1, s: 1, z: 5.0 }, { d: 12, f: 1, s: -1, z: 5.0 },
+  { d: 13, f: 2, s: -1, z: -5.0 }, { d: 14, f: 2, s: 1, z: -5.0 },
+  { d: 15, f: 2, s: 1, z: 5.0 }, { d: 16, f: 2, s: -1, z: 5.0 },
+  { d: 17, f: 0, s: -1, z: -8.2, annex: true }, { d: 18, f: 0, s: -1, z: -11.8, annex: true },
+  { d: 19, f: 0, s:  1, z: -11.8, annex: true }, { d: 20, f: 0, s: 1, z: -8.2, annex: true },
+];
 
 /* ============================================================ */
 const app = document.getElementById('app');
@@ -563,6 +613,94 @@ function addBlockSideSigns(g, text) {
   }
 }
 
+/* ============================================================
+   PART 5 — sequential numbering with NO floor digit.
+   ============================================================ */
+
+/* the 3-story tower + 1-story back annex, plus roof/bands/sidewalks, a few
+   windows, and the building number on every face (front, back, both sides) */
+function buildSeqShell(g, number) {
+  for (let fi = 0; fi < SQFLOORS; fi++) {                       // tower
+    box(g, SQW, SQFH, SQ_TD, fi % 2 ? COLOR.siding : COLOR.brick, 0, fi * SQFH + SQFH / 2, SQ_TCZ);
+    box(g, SQW + 0.15, 0.16, SQ_TD + 0.15, COLOR.band, 0, (fi + 1) * SQFH, SQ_TCZ);
+  }
+  box(g, SQW + 1.4, 0.4, SQ_TD + 1.4, COLOR.roof, 0, SQH + 0.2, SQ_TCZ);
+
+  box(g, SQW, SQFH, SQ_AD, COLOR.brick, 0, SQFH / 2, SQ_ACZ);   // annex (ground only)
+  box(g, SQW + 0.15, 0.16, SQ_AD + 0.15, COLOR.band, 0, SQFH, SQ_ACZ);
+  box(g, SQW + 1.4, 0.4, SQ_AD + 1.4, COLOR.roof, 0, SQFH + 0.2, SQ_ACZ);
+
+  const sw = 2.0, sy = -0.14, st = 0.05;                        // sidewalks
+  const totalD = SQ_TFRONT - SQ_ABACK, czAll = (SQ_TFRONT + SQ_ABACK) / 2;
+  for (const ex of [1, -1]) box(g, sw, st, totalD + 2 * sw, COLOR.walkway, ex * (SQHW + sw / 2), sy, czAll);
+  box(g, SQW + 2 * sw, st, sw, COLOR.walkway, 0, sy, SQ_TFRONT + sw / 2);
+  box(g, SQW + 2 * sw, st, sw, COLOR.walkway, 0, sy, SQ_ABACK - sw / 2);
+
+  // a few windows to fill the bare middle of the upper floors and the front
+  for (let fi = 1; fi < SQFLOORS; fi++) for (const ex of [1, -1]) {
+    box(g, 0.05, 1.4, 1.6, COLOR.trim, ex * (SQHW + 0.02), fi * SQFH + 1.55, 0);
+    box(g, 0.06, 1.15, 1.3, COLOR.glass, ex * (SQHW + 0.04), fi * SQFH + 1.55, 0, { roughness: 0.3, metalness: 0.1 });
+  }
+  for (let fi = 0; fi < SQFLOORS; fi++) for (const fx of [-3.6, 3.6]) {
+    box(g, 1.5, 1.4, 0.05, COLOR.trim, fx, fi * SQFH + 1.6, SQ_TFRONT + 0.02);
+    box(g, 1.25, 1.15, 0.06, COLOR.glass, fx, fi * SQFH + 1.6, SQ_TFRONT + 0.04, { roughness: 0.3, metalness: 0.1 });
+  }
+
+  // building number — front banner, a sign high on each long side (clear of the
+  // doors at z=±5 and the centre window), and a banner on the annex back
+  const front = label(g, `Building ${number}`, 9.0, 2.2, BANNER_OPTS);
+  front.position.set(0, SQH + 1.1, SQ_TFRONT + 0.12);
+  for (const ex of [1, -1]) {
+    const side = label(g, `Building ${number}`, 2.6, 0.95, BANNER_OPTS);
+    side.position.set(ex * (SQHW + 0.07), SQH - 0.7, 2.5);
+    side.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+  const back = label(g, `Building ${number}`, 6.0, 1.4, BANNER_OPTS);
+  back.position.set(0, SQFH + 0.9, SQ_ABACK - 0.12);
+  back.rotation.y = Math.PI;
+}
+
+/* the ground-floor hallway that "leads to the back": a recessed dark entry
+   portal centred on the front, and a matching opening at the annex back, so
+   the breezeway reads as running straight through the building */
+function buildSeqHall(g) {
+  const hallW = 2.6;
+  box(g, hallW, SQFH * 0.9, 0.5, 0x20242c, 0, SQFH * 0.46, SQ_TFRONT - 0.02);   // front entry
+  box(g, hallW, SQFH * 0.9, 0.5, 0x20242c, 0, SQFH * 0.46, SQ_ABACK + 0.02);    // back exit
+  box(g, hallW + 0.6, 0.45, 1.4, COLOR.canopy, 0, SQFH * 0.95, SQ_TFRONT + 0.4); // entry canopy
+}
+
+/* light exterior walkway ledges along the upper-floor sides (implies access
+   to the doors without occluding any of the unit plates) */
+function buildSeqAccess(g) {
+  for (let fi = 1; fi < SQFLOORS; fi++) for (const ex of [1, -1])
+    box(g, 1.2, 0.16, SQ_TD - 1.5, COLOR.balcony, ex * (SQHW + 0.6), fi * SQFH - 0.06, SQ_TCZ);
+}
+
+/* place all 20 doors. getUnit(door#) -> { value, mask|null } (mask = the
+   partial string to show on a blank, e.g. '12__'). Doors face outward. */
+function buildSeqFacade(g, getUnit, raycastList, blankStates) {
+  for (const slot of SQ_LAYOUT) {
+    const base = slot.f * SQFH, yaw = slot.s > 0 ? Math.PI / 2 : -Math.PI / 2;
+    const u = getUnit(slot.d);
+    const door = box(g, 0.16, 2.05, 1.2, COLOR.door, slot.s * (SQHW + 0.02), base + 1.05, slot.z);
+    if (u.mask === null) {
+      const plate = label(g, String(u.value), 1.95, 0.92);
+      plate.position.set(slot.s * (SQHW + 0.10), base + 2.55, slot.z);
+      plate.rotation.y = yaw;
+    } else {
+      const plate = label(g, u.mask, 1.95, 0.92, { fg: '#c0392b' });
+      plate.position.set(slot.s * (SQHW + 0.10), base + 2.55, slot.z);
+      plate.rotation.y = yaw;
+      const bstate = { value: u.value, solved: false, plate, options: makeBigOptions(u.value) };
+      plate.userData.bstate = bstate;
+      door.userData.bstate = bstate;
+      raycastList.push(plate, door);
+      blankStates.push(bstate);
+    }
+  }
+}
+
 /* ---- ground + road (shared) ---- */
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(SPAN * 4, D * 8),
   new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1 }));
@@ -611,6 +749,16 @@ const STAGES = [
       19305: '193__', 19407: '19_07', 19415: '19_15',
       19102: '191__', 19110: '191__', 19204: '19___', 19212: '19___',
       19306: '19___', 19314: '19___',
+    } },
+
+  // ---- PART 5 — no floor digit: one running count around the building ----
+  // unit(door#) = base + door#  →  Bld 6 runs 601-620, Bld 12 runs 1231-1250.
+  { part: 5, type: 'seq', kind: 'example', building: 6, base: 600 },
+  { part: 5, type: 'seq', kind: 'quiz', building: 12, base: 1230,
+    blanks: {                                          // door# -> partial mask shown
+      1: '12__', 2: '12__', 6: '123_', 7: '123_',
+      10: '____', 11: '____', 13: '____', 14: '____', 15: '____', 16: '____',
+      17: '12__', 19: '12__', 20: '12__',
     } },
 ];
 
@@ -702,6 +850,14 @@ function buildStageGroup(i) {
     buildBlockFacade(g, 1, true, (fi, di) => cell(true, fi, di), raycastList, blankStates);
     buildBlockFacade(g, -1, false, (fi, di) => cell(false, fi, di), raycastList, blankStates);
     // no arrows or floor badges here — the learner figures out the pattern
+  } else if (st.type === 'seq') {
+    buildSeqShell(g, st.building);
+    buildSeqHall(g);
+    buildSeqAccess(g);
+    const blanksMap = st.blanks || {};
+    buildSeqFacade(g, d => ({ value: st.base + d, mask: blanksMap[d] || null }),
+      raycastList, blankStates);
+    // no floor signs, no arrows — the learner discovers there is no floor digit
   } else {
     buildShell(g, st.number);
     if (st.kind === 'example') {
@@ -736,7 +892,10 @@ const ui = {
   back: document.getElementById('back'),
   continueBtn: document.getElementById('continue'),
   next: document.getElementById('next'),
+  viewbar: document.getElementById('viewbar'),
 };
+for (const btn of ui.viewbar.querySelectorAll('button[data-view]'))
+  btn.onclick = () => setSeqView(btn.dataset.view);
 
 const EXAMPLE_PROMPT =
   'This is a common <b>number layout</b> you can find at most <b>apartment buildings</b>. ' +
@@ -763,6 +922,13 @@ const EXAMPLE4_PROMPT =
   'doors and the doors directly <b>behind</b> them. Study how the numbers climb on <b>Building 10</b>, then ' +
   '<b>drag to spin around</b> and check the back. When you are ready, <b>click Ready</b>.';
 
+const EXAMPLE5_PROMPT =
+  '<b>Part 5 — no floor digit.</b> In some buildings the <b>floor numbers don\'t exist</b> in the unit number — ' +
+  'the units are just a <b>single running count</b> that snakes around the whole building. <b>Building 6</b> runs ' +
+  '601 → 620, so the ground floor holds the <b>lowest</b> numbers (601-608) <i>and</i> the <b>highest</b> (617-620); ' +
+  'no digit tells you the floor. Use the <b>Front / Back / Left / Right</b> buttons to walk around — or drag to look ' +
+  'and pinch to zoom — then <b>click Ready</b>.';
+
 const groups = {};
 const celebrated = new Set();
 let currentIndex = -1, currentStage = null;
@@ -782,10 +948,23 @@ function frameStage(st) {
   } else if (st.type === 'block') {
     camera.position.set(10, BH * 0.5, 42);
     controls.target.set(0, BH * 0.42, 0);
+  } else if (st.type === 'seq') {
+    camera.position.set(-26, SQH * 0.9, 22);
+    controls.target.set(0, SQH * 0.45, -3);
   } else {
     camera.position.set(5, H * 0.6, 25);
     controls.target.set(0, H * 0.45, 0);
   }
+  controls.update();
+}
+
+/* the Front/Back/Left/Right buttons for the Part 5 building */
+function setSeqView(view) {
+  const yT = SQH * 0.45;
+  if (view === 'front')      { camera.position.set(0, SQH * 0.85, 26);   controls.target.set(0, yT, -1); }
+  else if (view === 'back')  { camera.position.set(0, SQH * 0.85, -34);  controls.target.set(0, yT, -8); }
+  else if (view === 'left')  { camera.position.set(-30, SQH * 0.7, -3);  controls.target.set(0, yT, -3); }
+  else if (view === 'right') { camera.position.set(30, SQH * 0.7, -3);   controls.target.set(0, yT, -3); }
   controls.update();
 }
 
@@ -816,7 +995,7 @@ function showStage(i) {
 
   if (currentStage.kind === 'example') {
     const p = currentStage.part;
-    ui.prompt.innerHTML = p === 4 ? EXAMPLE4_PROMPT : p === 3 ? EXAMPLE3_PROMPT
+    ui.prompt.innerHTML = p === 5 ? EXAMPLE5_PROMPT : p === 4 ? EXAMPLE4_PROMPT : p === 3 ? EXAMPLE3_PROMPT
       : p === 2 ? EXAMPLE2_PROMPT : EXAMPLE_PROMPT;
     ui.continueBtn.textContent = p > 1 ? 'Ready ▸' : 'Continue ▸';
     ui.continueBtn.classList.remove('hidden');
@@ -832,12 +1011,19 @@ function showStage(i) {
     else if (p === 4)
       ui.prompt.innerHTML = `<b>Building ${currentStage.building}</b> — numbers wrap around the front <i>and</i> back. ` +
         `<b>Drag to spin around</b>, then click any door showing a <b>partial number</b> and pick the full unit.`;
+    else if (p === 5)
+      ui.prompt.innerHTML = `<b>Building ${currentStage.building}</b> — floor numbers don't exist here; the units just count up around the building. ` +
+        `<b>Find the pattern and fill in the blanks.</b> Use the <b>Front / Back / Left / Right</b> buttons to navigate, ` +
+        `drag to look around, and pinch to zoom. Click a door with a <b>partial number</b> and pick the full unit.`;
     else
       ui.prompt.innerHTML = `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
         `Click a door marked <b>?</b>, then pick its correct unit number from the options on the right.`;
     ui.back.classList.remove('hidden');
   }
   ui.prompt.classList.remove('hidden');
+
+  if (currentStage.type === 'seq') ui.viewbar.classList.remove('hidden');
+  else ui.viewbar.classList.add('hidden');
 
   frameStage(currentStage);
 
