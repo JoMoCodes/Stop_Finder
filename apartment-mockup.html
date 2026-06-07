@@ -54,6 +54,21 @@
   #viewbar .vbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 2px; }
   #viewbar button.vbtn { padding: 10px 14px; font-size: 15px; text-align: center; }
 
+  /* top-left "jump to part" menu */
+  #jumpbar {
+    position: fixed; top: 16px; left: 16px; z-index: 11;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #jumpbar .jbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 8px; }
+  #jumpbar .jbtns { display: flex; gap: 6px; }
+  #jumpbar button.jbtn {
+    width: 34px; height: 34px; padding: 0; font-size: 15px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
+
   /* right-side quiz panel */
   #quiz {
     position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
@@ -101,6 +116,18 @@
   <button class="ghost vbtn" data-view="back">Back</button>
   <button class="ghost vbtn" data-view="left">Left</button>
   <button class="ghost vbtn" data-view="right">Right</button>
+</div>
+
+<!-- jump menu: skip to the first building of any part -->
+<div id="jumpbar">
+  <div class="jbtitle">Jump to part</div>
+  <div class="jbtns">
+    <button class="ghost jbtn" data-part="1">1</button>
+    <button class="ghost jbtn" data-part="2">2</button>
+    <button class="ghost jbtn" data-part="3">3</button>
+    <button class="ghost jbtn" data-part="4">4</button>
+    <button class="ghost jbtn" data-part="5">5</button>
+  </div>
 </div>
 
 <div id="bottombar">
@@ -167,13 +194,13 @@ const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
 const BH = BFLOORS * BFH, BHALF_D = BD / 2;
 const BDOORX = 3.6;                            // door offset from centre
 
-/* ---- Part 5: a uniform 3-story block shown as an OPEN DOLLHOUSE (no roof, no
-   outer shell). The unit number is a single running count with NO floor digit,
-   so floor 1 owns both the lowest numbers AND the highest. Doors sit around the
-   perimeter facing OUT, so each side's doors read straight-on from its nav
-   button. Floor 1 is fully occupied (left 1-4, right 17-20, back 5-6, front
-   7-8); floors 2-3 have only front/back pairs. A central hallway runs
-   front->back on every floor. ---- */
+/* ---- Part 5: a uniform 3-story block with solid outer walls and an open
+   central hallway running front->back (no roof). The unit number is a single
+   running count with NO floor digit, so floor 1 owns both the lowest numbers
+   AND the highest. Doors sit around the perimeter facing OUT, so each side's
+   doors read straight-on from its nav button. Floor 1 is fully occupied (left
+   1-4, right 17-20, back 5-6, front 7-8); floors 2-3 have only front/back
+   pairs. A central hallway runs front->back on every floor. ---- */
 const SQW = 12, SQHW = SQW / 2;          // width  (X, left <-> right)
 const SQD = 22, SQHD = SQD / 2;          // depth  (Z, front <-> back)
 const SQFH = 3.2, SQFLOORS = 3, SQH = SQFLOORS * SQFH;
@@ -637,8 +664,28 @@ function buildSeqRoom(g, face, a, base, color) {
   }
 }
 
-/* floor plates, the central front->back hallway, corner columns, edge rails,
-   sidewalk, and the building number on every face + the roof */
+/* exterior walls — solid on every floor and side EXCEPT a full-height slot
+   down the middle of the front and back faces, so the central hallway is the
+   only thing you can see straight through. Doors sit proud of these walls
+   (the wall is recessed just inside the perimeter) so their plates stay clear. */
+function buildSeqWalls(g) {
+  const t = 0.2;                          // wall thickness
+  const hallHalf = 2.4;                   // half-width of the central hallway opening
+  const panelW = SQHW - hallHalf;         // width of each front/back panel beside the slot
+  const panelCX = (SQHW + hallHalf) / 2;  // its centre on X
+  for (let fi = 0; fi < SQFLOORS; fi++) {
+    const yc = fi * SQFH + SQFH / 2;
+    const color = fi % 2 ? COLOR.siding : COLOR.brick;
+    for (const sx of [-1, 1])                                    // left + right (full)
+      box(g, t, SQFH, SQD, color, sx * (SQHW - t / 2), yc, 0);
+    for (const sz of [-1, 1])                                    // front + back (slotted)
+      for (const cx of [-panelCX, panelCX])
+        box(g, panelW, SQFH, t, color, cx, yc, sz * (SQHD - t / 2));
+  }
+}
+
+/* floor plates, the central front->back hallway, exterior walls, corner
+   columns, sidewalk, and the building number on every face + the roof sign */
 function buildSeqStructure(g, number) {
   for (let fi = 0; fi < SQFLOORS; fi++)                          // floor plates (kept inside the door plates so they never clip them)
     box(g, SQW + 0.2, 0.25, SQD + 0.2, COLOR.balcony, 0, fi * SQFH - 0.125, 0);
@@ -646,8 +693,7 @@ function buildSeqStructure(g, number) {
     box(g, 4.8, 0.06, SQD - 1.2, COLOR.walkway, 0, fi * SQFH + 0.04, 0);
   for (const sx of [-1, 1]) for (const sz of [-1, 1])            // corner columns
     box(g, 0.4, SQH, 0.4, COLOR.roof, sx * (SQHW + 0.12), SQH / 2, sz * (SQHD + 0.12));
-  for (let fi = 1; fi < SQFLOORS; fi++) for (const sx of [-1, 1]) // door-less side rails up top
-    box(g, 0.25, 0.5, SQD, COLOR.balcony, sx * SQHW, fi * SQFH + 0.25, 0);
+  buildSeqWalls(g);                                              // outer walls (hallway slot left open front + back)
   box(g, SQW + 5, 0.05, SQD + 5, COLOR.walkway, 0, -0.26, 0);    // sidewalk
 
   // building number — a banner high on each side face (those faces have no
@@ -854,7 +900,7 @@ function buildStageGroup(i) {
     const blanksMap = st.blanks || {};
     buildSeqFacade(g, d => ({ value: st.base + d, mask: blanksMap[d] || null }),
       raycastList, blankStates);
-    // open dollhouse, no roof — the learner discovers there is no floor digit
+    // walled building, hallway open front->back — read the doors around the outside
   } else {
     buildShell(g, st.number);
     if (st.kind === 'example') {
@@ -894,6 +940,13 @@ const ui = {
 for (const btn of ui.viewbar.querySelectorAll('button[data-view]'))
   btn.onclick = () => setSeqView(btn.dataset.view);
 
+// jump-to-part menu: skip straight to the first (example) building of any part
+const partStart = {};
+STAGES.forEach((s, idx) => { if (!(s.part in partStart)) partStart[s.part] = idx; });
+const jumpBtns = [...document.querySelectorAll('#jumpbar button[data-part]')];
+for (const btn of jumpBtns)
+  btn.onclick = () => showStage(partStart[Number(btn.dataset.part)]);
+
 const EXAMPLE_PROMPT =
   'This is a common <b>number layout</b> you can find at most <b>apartment buildings</b>. ' +
   'The units count up in order — the <b>yellow arrows</b> show the direction the pattern flows. ' +
@@ -921,11 +974,11 @@ const EXAMPLE4_PROMPT =
 
 const EXAMPLE5_PROMPT =
   '<b>Part 5 — no floor digit.</b> In some buildings the <b>floor numbers don\'t exist</b> in the unit number — ' +
-  'the units are just a <b>single running count</b> around the building, one floor after another. This open ' +
-  '<b>dollhouse</b> view shows every apartment off the central hallway. <b>Building 6</b> runs 601 → 620, so ' +
-  'floor 1 holds the <b>lowest</b> numbers <i>and</i> the <b>highest</b> (617-620); no digit tells you the floor. ' +
-  'Use the <b>Front / Back / Left / Right</b> buttons to walk around — or drag to look and pinch to zoom — then ' +
-  '<b>click Ready</b>.';
+  'the units are just a <b>single running count</b> around the building, one floor after another. Walk around the ' +
+  'outside and read the door numbers off each wall; only the <b>central hallway</b> sees straight through. ' +
+  '<b>Building 6</b> runs 601 → 620, so floor 1 holds the <b>lowest</b> numbers <i>and</i> the <b>highest</b> ' +
+  '(617-620); no digit tells you the floor. Use the <b>Front / Back / Left / Right</b> buttons to walk around — ' +
+  'or drag to look and pinch to zoom — then <b>click Ready</b>.';
 
 const groups = {};
 const celebrated = new Set();
@@ -981,6 +1034,7 @@ function allSolved() {
 function showStage(i) {
   currentIndex = i;
   currentStage = STAGES[i];
+  for (const b of jumpBtns) b.classList.toggle('active', Number(b.dataset.part) === currentStage.part);
   if (!groups[i]) groups[i] = buildStageGroup(i);
   for (const k in groups) groups[k].visible = (Number(k) === i);
   blanks = groups[i].userData.raycastList;
