@@ -47,10 +47,11 @@ Structure top-to-bottom:
 - **Flow:** `showStage` / `showNext` / `resetCourse` / `frameStage` drive the
   Back/Continue/Next buttons; `fireConfetti` on completion.
 
-The four parts teach progressively: **(1)** sequential numbering on a 2-story
+The five parts teach progressively: **(1)** sequential numbering on a 2-story
 4-plex → **(2)** 3-digit units where the first digit = floor → **(3)** 4–5 digit
 units where leading digit(s) = building → **(4)** everything combined, numbered
-around both the front and back faces.
+around both the front and back faces → **(5)** a single running count around
+all four faces of one building — no floor digit at all.
 
 ## Previewing
 It's a static site, but the import map uses ES modules, so open it over HTTP
