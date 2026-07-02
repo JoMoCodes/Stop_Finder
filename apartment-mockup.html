@@ -554,14 +554,6 @@ function buildRowFacade(g, floorsData, raycastList, blankStates) {
   }
 }
 
-/* reading-order arrows for the row example: along floor 1, then up to floor 2 */
-function addRowArrows(g) {
-  const z = RHALF_D + 1.35, y1 = 2.95, y2 = RFH + 2.95;
-  arrow(g, new THREE.Vector3(RDOORX[0], y1, z), new THREE.Vector3(RDOORX[4], y1, z), COLOR.arrow);
-  arrow(g, new THREE.Vector3(RDOORX[4], y1, z), new THREE.Vector3(RDOORX[0], y2, z), COLOR.arrow);
-  arrow(g, new THREE.Vector3(RDOORX[0], y2, z), new THREE.Vector3(RDOORX[4], y2, z), COLOR.arrow);
-}
-
 /* ============================================================
    PART 4 — 4-story block numbered around the front AND back.
    ============================================================ */
@@ -870,7 +862,6 @@ function buildStageGroup(i) {
     const named = st.kind === 'example' || !st.chooseBuilding;
     const banner = addTopBanner(g, RH, RHALF_D, named ? `Building ${st.building}` : 'Building #');
     buildRowFacade(g, st.floors, raycastList, blankStates);
-    if (st.kind === 'example') addRowArrows(g);
     if (st.kind === 'quiz' && st.chooseBuilding) {
       buildingState = {
         value: st.building, solved: false, plate: banner,
