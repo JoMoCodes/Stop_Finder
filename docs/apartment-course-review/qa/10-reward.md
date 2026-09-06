@@ -29,19 +29,22 @@ plate-scale tracing, progress-bar mid-stage state, and finale timing.
 - Jump-bar caption: `Part N · Building i of 14` on every one of the 14
   stages in both runs, exact string match.
 - Button vocabulary: stage 3 → `Next: Part 2 ▸`, stage 5 → `Next ▸`,
-  stage 13 → `Start over ▸`; every example stage's `#continue` reads
-  `Next ▸`. All exact matches.
-- Finale: two-cannon burst confirmed (254-particle delta above), dialog
-  shown ~900 ms after the last confetti under normal motion (not yet
-  visible at ~100 ms, visible by ~800 ms) and **instantly** under
-  `prefers-reduced-motion: reduce` (already visible at ~100 ms). Escape
-  closes it in both modes.
+  stage 13 reached only after all other 13 stages were solved → `Start over ▸`;
+  every example stage's `#continue` reads `Next ▸`. All exact matches.
+- Finale: since the 52+-solve run finishes every stage in order, stage 13's
+  own solve is the one that brings `completed.size` to 14, so the
+  two-cannon burst (254-particle delta above, replacing stage 13's own
+  per-building burst) and `#finale` land there — dialog shown ~900 ms after
+  the last confetti under normal motion (not yet visible at ~100 ms,
+  visible by ~800 ms) and **instantly** under `prefers-reduced-motion:
+  reduce` (already visible at ~100 ms). Escape closes it in both modes.
+  `finaleShown` guards it firing more than once.
 - Reduced motion: confirmed `REDUCED()` reports true, mini-burst delta is
   exactly 0 on every solve, plate scale never leaves 1 (tint-only), dot and
   progress bar still update, finale still appears (instantly).
-- Start over: `completed`/`celebrated` sets empty, `currentIndex` back to
-  0, progress bar fully cleared (`segsDone:0`), `#finale` hidden — in both
-  motion modes.
+- Start over: `completed`/`celebrated` sets empty, `finaleShown` reset to
+  false, `currentIndex` back to 0, progress bar fully cleared
+  (`segsDone:0`), `#finale` hidden — in both motion modes.
 - Revisit: after finishing stages 1–2 and pressing Back, stage 2 shows
   both solved dots, `#next` visible reading `Next ▸`, and `celebrated`
   unchanged (`[1,2]`) — no confetti re-fired on a revisit.

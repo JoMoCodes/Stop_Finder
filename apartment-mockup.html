@@ -2024,20 +2024,22 @@ function checkComplete(bstate) {
     openQuiz(bs);
     return;
   }
-  const isLast = currentIndex === STAGES.length - 1;
+  markStageComplete(currentIndex);          // completed Set is the source of truth
   if (!celebrated.has(currentIndex)) {
     celebrated.add(currentIndex);
-    fireConfetti(isLast ? 'cannons' : '');
-    if (isLast) showFinale();
+    if (completed.size === STAGES.length) fireFinale();   // this stage finished the course
+    else fireConfetti('');
   }
-  markStageComplete(currentIndex);
   showNext();
 }
 
 function showNext() {
   const isLast = currentIndex === STAGES.length - 1;
   const nextStage = STAGES[currentIndex + 1];
-  if (isLast) ui.next.textContent = 'Start over ▸';
+  if (isLast) {
+    const fi = firstIncomplete();
+    ui.next.textContent = fi === -1 ? 'Start over ▸' : `Finish Part ${STAGES[fi].part} ▸`;
+  }
   else if (nextStage && nextStage.kind === 'example') ui.next.textContent = `Next: Part ${nextStage.part} ▸`;
   else ui.next.textContent = 'Next ▸';
   ui.next.classList.remove('hidden');
@@ -2111,8 +2113,22 @@ function updateProgress() {
 function markStageComplete(i) { completed.add(i); updateProgress(); }
 document.addEventListener('stagechange', updateProgress);
 
+/* lowest stage not yet in `completed`, or -1 once every stage is — jumping
+   between parts is allowed, so "next" isn't always currentIndex + 1 */
+function firstIncomplete() {
+  for (let i = 0; i < STAGES.length; i++) if (!completed.has(i)) return i;
+  return -1;
+}
+
 /* ---- end-of-course summary ---- */
 const finaleEl = document.getElementById('finale');
+let finaleShown = false;   // once per run, however the last stage got finished
+function fireFinale() {
+  if (finaleShown) return;
+  finaleShown = true;
+  fireConfetti('cannons');
+  showFinale();
+}
 function showFinale() {
   if (!finaleEl) return;
   const open = () => finaleEl.classList.remove('hidden');
@@ -2140,14 +2156,23 @@ function resetCourse() {
   }
   celebrated.clear();
   completed.clear();
+  finaleShown = false;
   hideFinale();
 }
 
-ui.continueBtn.onclick = () => { markStageComplete(currentIndex); showStage(currentIndex + 1); };
+ui.continueBtn.onclick = () => {
+  markStageComplete(currentIndex);
+  if (completed.size === STAGES.length) fireFinale();   // an example stage can finish the course too
+  showStage(currentIndex + 1);
+};
 ui.back.onclick = () => showStage(Math.max(0, currentIndex - 1));
 ui.next.onclick = () => {
   if (currentIndex < STAGES.length - 1) showStage(currentIndex + 1);
-  else { hideFinale(); resetCourse(); showStage(0); } // "Start over" — fresh run from Part 1
+  else {
+    const fi = firstIncomplete();
+    if (fi === -1) { hideFinale(); resetCourse(); showStage(0); } // "Start over" — fresh run from Part 1
+    else showStage(fi);                                           // jump to the first part still unfinished
+  }
 };
 
 /* ---- click a blank door/plate to open its options ---- */

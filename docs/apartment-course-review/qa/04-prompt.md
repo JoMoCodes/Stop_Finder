@@ -12,8 +12,10 @@ after-last-door state) plus clean single-purpose screenshots at 1440×900 and
   exactly as the `PROMPTS` table specifies (headline + body structure intact).
 - Button vocabulary correct at **every** runtime moment across all 14 stages:
   `#continue` is always `Next ▸`, `#next` correctly cycles `Next ▸` /
-  `Next: Part N ▸` / `Start over ▸`, `#back` is always `◀ Back`. Grep of the
-  whole file finds zero occurrences of "Ready" anywhere.
+  `Next: Part N ▸` / `Start over ▸` (on the last stage, once every stage is
+  complete) / `Finish Part N ▸` (on the last stage while a stage is still
+  incomplete), `#back` is always `◀ Back`. Grep of the whole file finds zero
+  occurrences of "Ready" anywhere.
 - Stage 0, 1440×900: body wraps to exactly 2 lines; `.ptitle` is amber
   `rgb(255,217,160)` (#ffd9a0) at 17px.
 - Stage 08: "partial number" is followed by "71▢5 — one digit missing" (both
