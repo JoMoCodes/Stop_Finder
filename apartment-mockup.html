@@ -74,29 +74,52 @@
   /* right-side quiz panel */
   #quiz {
     position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
-    width: 224px; z-index: 11;
+    width: 248px; z-index: 11;
     background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
     border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
-    padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    padding: 38px 16px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
   #quiz .qhead { color: #eef2f6; font-weight: 600; margin-bottom: 12px; text-align: center; }
-  #quiz .qhead small { display: block; color: #9fb0c0; font-weight: 400; font-size: 12px; margin-top: 2px; }
+  #quiz .qhead small { display: block; color: #9fb0c0; font-weight: 400; font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  #qclose {
+    position: absolute; top: 5px; right: 6px; width: 32px; height: 32px; padding: 0;
+    border-radius: 50%; font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #qkey {
+    display: flex; gap: 10px; justify-content: center; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .06em; color: #9fb0c0; margin: -6px 0 10px;
+  }
   #qopts { display: flex; flex-direction: column; gap: 8px; }
   button.opt {
     background: rgba(255,255,255,0.08); color: #eef2f6;
     border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+    display: flex; align-items: center; gap: 10px; min-height: 48px;
     padding: 10px 14px; font-size: 16px; font-weight: 600; text-align: left;
-    box-shadow: none;
+    line-height: 1.5; box-shadow: none;
+    transition: background .12s, transform .12s, border-color .12s;
   }
-  button.opt:hover { background: rgba(255,255,255,0.16); transform: none; }
-  button.opt .ltr { display: inline-block; width: 22px; color: #ffd9a0; }
-  button.opt.wrong { background: rgba(229,57,53,0.25); border-color: rgba(229,57,53,0.6); animation: shake .3s; }
+  button.opt:hover { transform: none; }
+  button.opt:hover:not(:disabled) {
+    background: rgba(255,255,255,0.16); transform: translateX(3px);
+    border-color: rgba(255,217,160,0.6);
+  }
+  button.opt .ltr { width: 22px; color: #9fb0c0; font-weight: 500; }
+  button.opt .num {
+    font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum"; letter-spacing: .02em;
+  }
+  .pl + .pl { margin-left: .14em; }              /* hairline gap between digit places */
+  .pl-building { color: var(--c-building, #f28c6a); }
+  .pl-floor    { color: var(--c-floor, #7cc4ff); }
+  .pl-door     { color: var(--c-door, #eef2f6); }
+  button.opt.wrong { background: rgba(229,57,53,0.32); border-color: rgba(229,57,53,0.75); animation: shake .42s; }
   button.opt.right { background: rgba(87,201,126,0.28); border-color: rgba(87,201,126,0.7); }
   button.opt:disabled { cursor: default; }
-  #qmsg { margin-top: 12px; text-align: center; font-size: 13px; min-height: 16px; }
+  #qmsg { margin-top: 12px; text-align: center; font-size: 14px; min-height: 20px; line-height: 1.4; }
   #qmsg.ok { color: #7ee0a0; }
   #qmsg.bad { color: #ff9a8a; }
-  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
 </style>
 </head>
 <body>
@@ -106,7 +129,9 @@
 
 <!-- right-side multiple-choice panel -->
 <div id="quiz" class="hidden">
-  <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that fits the pattern</small></div>
+  <button id="qclose" class="ghost" aria-label="Close">×</button>
+  <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that matches the pattern</small></div>
+  <div id="qkey" class="hidden"><span class="pl pl-building">building</span><span class="pl pl-floor">floor</span><span class="pl pl-door">door</span></div>
   <div id="qopts"></div>
   <div id="qmsg"></div>
 </div>
@@ -1384,25 +1409,129 @@ function resumeQuizState() {
 }
 
 /* ---- quiz interaction ---- */
+/* ---- quiz panel: option formatting, feedback, auto-close ---- */
+
+/* one short rule per part, appended after a second wrong pick on the same blank */
+const RULE_BY_PART = {
+  1: 'Doors count on in order.',
+  2: 'First digit = floor.',
+  3: 'Leading digits = building.',
+  4: 'Building, then floor, then door.',
+  5: 'One count runs around the whole building.',
+};
+
+/* which kind of question is open: the stage type, or 'building' for the
+   name-the-building step */
+function quizType(bstate) {
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (ud && ud.buildingState === bstate) return 'building';
+  return currentStage ? currentStage.type : 'plex';
+}
+
+/* digit places of a unit number -> [{text, place}].
+   Doc 09 owns splitPlaces(); until it lands we split locally so the colours
+   still teach. When it exists, it wins. */
+function quizPlaces(val, type) {
+  const s = String(val);
+  if (typeof splitPlaces === 'function') {
+    const segs = splitPlaces(s, type);
+    if (segs && segs.length) return segs;
+  }
+  if (type === 'building') return [{ text: s, place: 'building' }];
+  if (type === 'tower' && s.length >= 3)
+    return [{ text: s.slice(0, -2), place: 'floor' },
+            { text: s.slice(-2), place: 'door' }];
+  if ((type === 'row' || type === 'block') && s.length >= 4)
+    return [{ text: s.slice(0, -3), place: 'building' },
+            { text: s.slice(-3, -2), place: 'floor' },
+            { text: s.slice(-2), place: 'door' }];
+  if (type === 'seq' && s.length >= 3)
+    return [{ text: s.slice(0, -2), place: 'building' },
+            { text: s.slice(-2), place: 'door' }];
+  return [{ text: s, place: 'door' }];
+}
+
+function optionHTML(idx, val, type) {
+  const segs = quizPlaces(val, type);
+  return `<span class="ltr">${'abcd'[idx]}</span><span class="num">` +
+    segs.map(sg => `<span class="pl pl-${sg.place}">${sg.text}</span>`).join('') + '</span>';
+}
+
+/* the digit key above the options: one chip per place actually in play */
+function renderQuizKey(type, segs) {
+  const key = document.getElementById('qkey');
+  if (!key) return;
+  const show = type === 'building' || type === 'tower' || type === 'row' ||
+               type === 'block' || type === 'seq';
+  if (!show) { key.classList.add('hidden'); return; }
+  const places = [];
+  for (const sg of segs) if (!places.includes(sg.place)) places.push(sg.place);
+  key.innerHTML = places.map(pl => `<span class="pl pl-${pl}">${pl}</span>`).join('');
+  key.classList.remove('hidden');
+}
+
+/* why the pick was wrong, in <= 12 words — never reveals the answer */
+function explainWrong(chosen, correct, type) {
+  if (type === 'building') return 'Look at the digits every unit shares.';
+  if (type === 'plex') return 'Count on from the door next to it.';
+  if (type === 'seq') return 'No floor digit here — count on from the nearest known door.';
+  const a = quizPlaces(chosen, type), b = quizPlaces(correct, type);
+  const at = pl => { const sg = a.find(x => x.place === pl); return sg ? sg.text : null; };
+  const bt = pl => { const sg = b.find(x => x.place === pl); return sg ? sg.text : null; };
+  if (type === 'tower') {
+    if (at('floor') !== bt('floor')) return 'Right column, wrong floor — the first digit is the floor.';
+    if (at('door') !== bt('door')) return 'Right floor — count along the doors again.';
+  } else if (type === 'row' || type === 'block') {
+    if (at('building') !== bt('building')) return 'Right floor and door — check the leading digits: the building.';
+    if (at('floor') !== bt('floor')) return 'Right building, wrong floor.';
+    if (at('door') !== bt('door')) return 'Right building and floor — count the doors again.';
+  }
+  return 'Not quite — read the pattern again.';
+}
+
+/* auto-close after a correct answer: fast, but never taken from someone who is
+   still hovering or keyboard-focused inside the panel (and then never re-armed) */
+let quizCloseTimer = null;
+function cancelAutoClose() {
+  if (quizCloseTimer !== null) { clearTimeout(quizCloseTimer); quizCloseTimer = null; }
+}
+function armAutoClose(bstate) {
+  cancelAutoClose();
+  quizCloseTimer = setTimeout(() => {
+    quizCloseTimer = null;
+    if (activeBlank && activeBlank !== bstate) return;   // another question took over
+    const reading = ui.quiz.matches(':hover') || ui.quiz.contains(document.activeElement);
+    if (reading) return;                                 // still being read — stays put
+    closeQuiz();
+  }, 1100);
+}
+
+document.getElementById('qclose').onclick = () => closeQuiz();
+
 function openQuiz(bstate) {
   if (bstate.solved) return;
+  cancelAutoClose();
   activeBlank = bstate;
-  ui.qhead.innerHTML = bstate.header || 'Which unit is this?<small>Pick the number that fits the pattern</small>';
+  const type = quizType(bstate);
+  ui.qhead.innerHTML = bstate.header || 'Which unit is this?<small>Pick the number that matches the pattern</small>';
+  renderQuizKey(type, quizPlaces(bstate.value, type));
   ui.qopts.innerHTML = '';
   bstate.options.forEach((val, idx) => {
     const btn = document.createElement('button');
     btn.className = 'opt';
-    btn.innerHTML = `<span class="ltr">${'abcd'[idx]})</span> ${val}`;
-    btn.onclick = () => chooseOption(bstate, val, btn);
+    btn.innerHTML = optionHTML(idx, val, type);
+    btn.onclick = ev => chooseOption(bstate, val, btn, ev);
     ui.qopts.appendChild(btn);
   });
   ui.qmsg.textContent = '';
   ui.qmsg.className = '';
   ui.quiz.classList.remove('hidden');
+  document.dispatchEvent(new CustomEvent('quizopen', { detail: { bstate } }));
 }
 
-function chooseOption(bstate, val, btn) {
+function chooseOption(bstate, val, btn, ev) {
   if (bstate !== activeBlank || bstate.solved) return;
+  const type = quizType(bstate);
   if (val === bstate.value) {
     bstate.solved = true;
     setPlateText(bstate.plate,
@@ -1410,21 +1539,30 @@ function chooseOption(bstate, val, btn) {
       bstate.plateOpts || {});
     btn.classList.add('right');
     [...ui.qopts.children].forEach(b => b.disabled = true);
-    ui.qmsg.textContent = '✓ Correct!';
+    ui.qmsg.textContent = `✓ Correct — ${val}`;
     ui.qmsg.className = 'ok';
-    setTimeout(() => { if (!activeBlank || activeBlank.solved) closeQuiz(); }, 650);
-    checkComplete();
+    // a mouse click leaves focus on the option; drop it so the auto-close
+    // "still reading" test only holds for real keyboard users
+    if (ev && ev.detail > 0 && document.activeElement === btn) btn.blur();
+    checkComplete(bstate);
+    if (activeBlank === bstate) armAutoClose(bstate);
   } else {
     btn.disabled = true;
     btn.classList.add('wrong');
-    ui.qmsg.textContent = 'Not quite — try again.';
+    bstate.wrongCount = (bstate.wrongCount || 0) + 1;
+    let msg = explainWrong(val, bstate.value, type);
+    const rule = currentStage && RULE_BY_PART[currentStage.part];
+    if (bstate.wrongCount >= 2 && rule) msg += ' ' + rule;
+    ui.qmsg.textContent = msg;
     ui.qmsg.className = 'bad';
   }
 }
 
 function closeQuiz() {
+  cancelAutoClose();
   activeBlank = null;
   ui.quiz.classList.add('hidden');
+  document.dispatchEvent(new CustomEvent('quizclose', { detail: {} }));
 }
 
 function checkComplete() {
