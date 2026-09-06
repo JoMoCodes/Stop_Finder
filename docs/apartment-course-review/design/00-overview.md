@@ -102,7 +102,7 @@ All events are `CustomEvent`s dispatched on `document`.
 - **CSS variables with fallbacks**: `var(--c-floor, #7cc4ff)`. Doc 09 defines them; everyone else consumes with a fallback.
 - **Reduced motion**: every doc that animates (02, 05, 08, 10) checks `matchMedia('(prefers-reduced-motion: reduce)').matches` itself. Doc 07 only adds the CSS blanket and *verifies*.
 - **No new `ui.*` properties.** No renaming of existing ids (`continue`, `next`, `back`, `quiz`, …).
-- **Button vocabulary (docs 04 + 10 must agree)**: `#continue` is always `Next ▸`; `#next` is `Next ▸`, or `Next: Part N ▸` when the next stage is an example, or `Start over ▸` on the last stage; `#back` is `◀ Back`. Prompts say "press **Next**".
+- **Button vocabulary (docs 04 + 10 must agree)**: `#continue` is always `Next ▸`; `#next` is `Next ▸`, or `Next: Part N ▸` when the next stage is an example, or — on the last stage — `Start over ▸` once every stage is complete, else `Finish Part N ▸` (jumping to the first incomplete stage); `#back` is `◀ Back`. Prompts say "press **Next**".
 - **Digit-place colours (docs 03/04/05/09/10 must agree)**: building `#f28c6a`, floor `#7cc4ff`, door `#eef2f6`, reading-order/path `#ffd54a`. Plates in 3D stay monochrome (dark on white); colours appear in the quiz options, the prompt, the digit keys and the badges.
 - **Constraints are absolute**: one file, no build, no npm, Three.js from the existing import map only, `.nojekyll` stays, works over `python3 -m http.server`.
 
