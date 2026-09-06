@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Stop Finder — Apartment Number Course</title>
 <style>
   :root { color-scheme: dark; }
@@ -12,15 +12,38 @@
   canvas { display: block; }
   .hidden { display: none !important; }
 
+  /* ---- accessibility (doc 07) ----------------------------------------
+     Contrast verified against the panel background #14181e (WCAG relative
+     luminance).  No colour changes were needed:
+       amber   #ffd9a0 on panel ......... 13.3 : 1  AA/AAA
+       grey    #9fb0c0 on panel (12 px) .  8.0 : 1  AA
+       success #7ee0a0 on panel ......... 11.1 : 1  AA/AAA
+       error   #ff9a8a on panel ..........  8.7 : 1  AA/AAA
+       blank   #c0392b on the white plate   5.4 : 1  AA
+       text    #08130c on green #57c97e ..  9.1 : 1  AA/AAA
+       doc 09  #f28c6a / #7cc4ff on panel   7.6 / 9.8 : 1  AA
+     -------------------------------------------------------------------- */
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  button:focus-visible, canvas:focus-visible, [tabindex]:focus-visible { outline:3px solid #ffd54a; outline-offset:2px; box-shadow:0 0 0 6px rgba(20,24,30,.9); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    button.opt.wrong { animation:none !important; }
+  }
+
   /* top prompt */
   #prompt {
     position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-    width: min(760px, calc(100% - 32px));
-    background: rgba(20, 24, 30, 0.86); backdrop-filter: blur(6px);
+    width: min(680px, calc(100% - 32px));
+    background: rgba(20, 24, 30, 0.9); backdrop-filter: blur(6px);
     color: #eef2f6; border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 14px; padding: 16px 20px; line-height: 1.55; font-size: 15px;
-    box-shadow: 0 10px 34px rgba(0,0,0,0.4); z-index: 10; text-align: center;
+    border-radius: 14px; padding: 14px 20px 15px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.4); z-index: 10; text-align: left;
   }
+  #prompt .ptitle { color: #ffd9a0; font-weight: 700; font-size: 17px; line-height: 1.3; margin-bottom: 4px; }
+  #prompt .pbody  { color: #dfe6ee; font-size: 15px; line-height: 1.5; }
+  #prompt .pbody b { color: #ffd9a0; font-weight: 600; }
+  #prompt .pbody i { font-style: normal; color: #eef2f6; text-decoration: underline dotted; }
+  #prompt .pbody .nb { white-space: nowrap; }
   #prompt b { color: #ffd9a0; }
 
   /* buttons */
@@ -36,11 +59,40 @@
     border: 1px solid rgba(255,255,255,0.20); font-weight: 500; padding: 11px 20px;
   }
   button.ghost:hover { background: rgba(255,255,255,0.18); }
+  #viewbar button.vbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
+  #resetview { position: fixed; right: 22px; bottom: 80px; z-index: 11; padding: 9px 14px; font-size: 14px; }
 
   /* bottom button bar */
   #bottombar {
     position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
     z-index: 10; display: flex; align-items: center; gap: 10px;
+  }
+
+  /* 08 — discoverability: per-building chip, first-run hint, help button */
+  #doorsleft {
+    position: fixed; top: 16px; right: 16px; z-index: 11; padding: 9px 14px; border-radius: 999px;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.14);
+    color: #eef2f6; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #doorsleft b { color: #ffd54a; }
+  #doorsleft.done { color: #7ee0a0; }
+
+  #draghint {
+    position: fixed; left: 50%; bottom: 104px; transform: translateX(-50%);
+    width: min(440px, calc(100% - 32px)); display: flex; gap: 14px; align-items: center;
+    padding: 12px 16px; border-radius: 14px; background: rgba(20,24,30,0.92);
+    border: 1px solid rgba(255,213,74,0.45); color: #eef2f6; font-size: 14px; line-height: 1.45;
+    z-index: 12; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    opacity: 0; transition: opacity .3s ease; pointer-events: none;
+  }
+  #draghint.show { opacity: 1; }
+  #draghint b { color: #ffd9a0; }
+  #draghint svg { width: 64px; flex: none; }
+
+  #helpbtn {
+    position: fixed; right: 22px; bottom: 28px; width: 40px; height: 40px; padding: 0;
+    border-radius: 50%; font-size: 18px; z-index: 11;
+    display: flex; align-items: center; justify-content: center;
   }
 
   /* left-side "walk around" buttons (Part 5) */
@@ -52,7 +104,16 @@
     padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
   #viewbar .vbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 2px; }
-  #viewbar button.vbtn { padding: 10px 14px; font-size: 15px; text-align: center; }
+  #viewbar button.vbtn { padding: 10px 14px; font-size: 15px; text-align: center; min-height: 44px; }
+
+  /* digit-place palette: one colour per place, shared by every part */
+  :root { --c-building:#f28c6a; --c-floor:#7cc4ff; --c-door:#eef2f6; --c-path:#ffd54a; }
+  .pl-building{color:var(--c-building)} .pl-floor{color:var(--c-floor)} .pl-door{color:var(--c-door)}
+
+  /* Part 5 top-down mini-map */
+  #minimap{position:fixed;left:22px;bottom:28px;z-index:11;width:132px;padding:10px;border-radius:14px;background:rgba(20,24,30,.9);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  #minimap svg{display:block;width:100%}
+  #minimap .mmnote{color:#9fb0c0;font-size:10px;text-align:center;margin-top:4px}
 
   /* top-left "jump to part" menu */
   #jumpbar {
@@ -62,55 +123,216 @@
     padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
   #jumpbar .jbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 8px; }
-  #jumpbar .jbtns { display: flex; gap: 6px; }
+  #jumpbar .jbtns { display: flex; gap: 8px; }
   #jumpbar button.jbtn {
-    width: 34px; height: 34px; padding: 0; font-size: 15px; border-radius: 50%;
+    width: 40px; height: 40px; padding: 0; font-size: 15px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
   }
   #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
 
+  /* course progress: one segment per building */
+  #progress { display: flex; gap: 3px; margin-top: 8px; height: 6px; }
+  #progress .seg { flex: 1; border-radius: 3px; background: rgba(255,255,255,0.18); }
+  #progress .seg.done { background: #57c97e; }
+  #progress .seg.now { background: #ffd9a0; }
+  #progress .seg.part { margin-left: 6px; }
+
+  /* end-of-course summary */
+  #finale {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100% - 32px)); padding: 24px 26px; border-radius: 18px;
+    background: rgba(20,24,30,0.94); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.16); color: #eef2f6; z-index: 40;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  #finale h2 { margin: 0 0 12px; color: #ffd9a0; font-size: 22px; }
+  #finale ol { margin: 0 0 14px; padding-left: 22px; line-height: 1.6; }
+  #finale p { color: #dfe6ee; margin: 0 0 18px; }
+  #finale div { display: flex; gap: 10px; flex-wrap: wrap; }
+
   /* right-side quiz panel */
   #quiz {
     position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
-    width: 224px; z-index: 11;
+    width: 248px; z-index: 11;
     background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
     border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
-    padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    padding: 38px 16px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
   #quiz .qhead { color: #eef2f6; font-weight: 600; margin-bottom: 12px; text-align: center; }
-  #quiz .qhead small { display: block; color: #9fb0c0; font-weight: 400; font-size: 12px; margin-top: 2px; }
+  #quiz .qhead small { display: block; color: #9fb0c0; font-weight: 400; font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  #qclose {
+    position: absolute; top: 5px; right: 6px; width: 32px; height: 32px; padding: 0;
+    border-radius: 50%; font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #qkey {
+    display: flex; gap: 10px; justify-content: center; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .06em; color: #9fb0c0; margin: -6px 0 10px;
+  }
   #qopts { display: flex; flex-direction: column; gap: 8px; }
   button.opt {
     background: rgba(255,255,255,0.08); color: #eef2f6;
     border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+    display: flex; align-items: center; gap: 10px; min-height: 48px;
     padding: 10px 14px; font-size: 16px; font-weight: 600; text-align: left;
-    box-shadow: none;
+    line-height: 1.5; box-shadow: none;
+    transition: background .12s, transform .12s, border-color .12s;
   }
-  button.opt:hover { background: rgba(255,255,255,0.16); transform: none; }
-  button.opt .ltr { display: inline-block; width: 22px; color: #ffd9a0; }
-  button.opt.wrong { background: rgba(229,57,53,0.25); border-color: rgba(229,57,53,0.6); animation: shake .3s; }
+  button.opt:hover { transform: none; }
+  button.opt:hover:not(:disabled) {
+    background: rgba(255,255,255,0.16); transform: translateX(3px);
+    border-color: rgba(255,217,160,0.6);
+  }
+  button.opt .ltr { width: 22px; color: #9fb0c0; font-weight: 500; }
+  button.opt .num {
+    font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum"; letter-spacing: .02em;
+  }
+  .pl + .pl { margin-left: .14em; }              /* hairline gap between digit places */
+  .pl-building { color: var(--c-building, #f28c6a); }
+  .pl-floor    { color: var(--c-floor, #7cc4ff); }
+  .pl-door     { color: var(--c-door, #eef2f6); }
+  button.opt.wrong { background: rgba(229,57,53,0.32); border-color: rgba(229,57,53,0.75); animation: shake .42s; }
   button.opt.right { background: rgba(87,201,126,0.28); border-color: rgba(87,201,126,0.7); }
   button.opt:disabled { cursor: default; }
-  #qmsg { margin-top: 12px; text-align: center; font-size: 13px; min-height: 16px; }
+  #qmsg { margin-top: 12px; text-align: center; font-size: 14px; min-height: 20px; line-height: 1.4; }
   #qmsg.ok { color: #7ee0a0; }
   #qmsg.bad { color: #ff9a8a; }
-  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+  /* ============================================================
+     RESPONSIVE / MOBILE LAYOUT (design 06)
+     Overrides only — every rule below lives inside a media query so
+     the base (desktop) rules owned by the other docs stay untouched.
+     ============================================================ */
+
+  /* --- coarse pointers anywhere: minimum tap targets --- */
+  @media (pointer: coarse) {
+    button { min-height: 44px; }
+    #jumpbar button.jbtn { width: 44px; height: 44px; }
+    button.opt { min-height: 52px; }
+    #qclose { width: 44px; height: 44px; }
+  }
+
+  /* --- tablets 641-1024px: desktop layout holds, quiz just tucks in --- */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    #quiz { right: 12px; width: 248px; }
+    /* the centred prompt is full-bleed at this width, so drop the jump bar below it */
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); }
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); }
+  }
+
+  /* --- phones, portrait --- */
+  @media (max-width: 640px) {
+    #prompt { top: 8px; left: 8px; right: 8px; width: auto; transform: none; padding: 10px 12px 11px;
+      max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; }
+    #prompt .ptitle { font-size: 16px; }
+    #prompt .pbody { font-size: 15px; }
+
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+    #jumpbar .jbtns { gap: 8px; }
+    #progress { margin-top: 6px; }
+
+    /* stacked under the jump bar so the two never collide on narrow phones */
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px); right: 8px; left: auto; }
+
+    #bottombar { bottom: 12px; gap: 8px; width: calc(100% - 16px); justify-content: center; }
+    #bottombar button { padding: 12px 18px; font-size: 15px; min-height: 46px; }
+
+    #viewbar { top: auto; bottom: 70px; left: 8px; transform: none;
+      flex-direction: row; width: auto; gap: 6px; padding: 8px; }
+    #viewbar .vbtitle { display: none; }
+    #viewbar button.vbtn { min-width: 60px; min-height: 44px; padding: 10px 6px; font-size: 14px; }
+
+    #helpbtn   { right: 8px; bottom: auto; top: calc(var(--prompt-h, 140px) + 16px + 74px + 50px); left: auto; width: 44px; height: 44px; }
+    #resetview { right: 8px; bottom: 122px; left: auto; padding: 0; width: 44px; height: 44px; }
+    #resetview .rv-label { display: none; }
+    #minimap   { right: 8px; bottom: 166px; left: auto; top: auto; width: 88px; }
+    #draghint  { left: 8px; right: 8px; width: auto; top: 46%; bottom: auto; transform: none; }
+
+    #quiz { top: auto; bottom: 0; left: 0; right: 0; width: auto; transform: none; z-index: 30;
+      border-radius: 16px 16px 0 0; border-bottom: none; max-height: 60vh; overflow-y: auto;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); }
+    #qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button.opt { min-height: 56px; display: flex; align-items: center; justify-content: center; }
+    button.opt .ltr { display: none; }
+    button.opt .num { font-size: 24px; }
+    #qclose { width: 44px; height: 44px; top: 4px; right: 4px; }
+    #finale { inset: 0; border-radius: 0; }
+  }
+
+  /* --- very small phones: keep the Part 5 mini-map clear of the doors-left chip --- */
+  @media (max-width: 360px) {
+    #minimap { width: 72px; bottom: 150px; }
+    #minimap .mmnote { display: none; }
+  }
+
+  /* --- phones, landscape --- */
+  @media (max-height: 520px) and (orientation: landscape) {
+    #prompt { top: 8px; left: 8px; right: auto; transform: none; width: min(52vw, 460px);
+      max-height: 44vh; overflow-y: auto; padding: 8px 12px; }
+    #prompt .ptitle { font-size: 14px; }
+    #prompt .pbody { font-size: 13px; }
+
+    #jumpbar { top: auto; bottom: 8px; left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+
+    #bottombar { bottom: 8px; left: auto; right: 8px; transform: none; }
+    #bottombar button { padding: 9px 16px; font-size: 14px; }
+
+    #viewbar { top: auto; bottom: 8px; left: 284px; transform: none;
+      flex-direction: row; width: auto; padding: 8px; gap: 6px; }
+    #viewbar .vbtitle { display: none; }
+    #viewbar button.vbtn { min-width: 56px; min-height: 44px; padding: 8px 6px; font-size: 13px; }
+
+    #quiz { top: 8px; bottom: 8px; right: 8px; left: auto; width: 236px;
+      max-height: none; transform: none; border-radius: 14px; overflow-y: auto; }
+    #qopts { display: flex; flex-direction: column; }
+
+    #minimap { right: 252px; top: 8px; bottom: auto; left: auto; width: 88px; }
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); left: 8px; right: auto; }
+    #draghint { left: 8px; right: auto; width: min(52vw, 460px); top: calc(var(--prompt-h, 140px) + 60px); bottom: auto; transform: none; }
+    #helpbtn { display: none; }
+    #resetview { right: 8px; bottom: 112px; left: auto; padding: 0; width: 44px; height: 44px; }
+    #resetview .rv-label { display: none; }
+  }
 </style>
 </head>
 <body>
+<!-- end-of-course summary (shown after the last building) -->
+<div id="finale" class="hidden" role="dialog" aria-labelledby="ftitle">
+  <h2 id="ftitle">You read all 14 buildings</h2>
+  <ol>
+    <li><b>Count in order</b> — 101, 102, 103…</li>
+    <li><b class="pl-floor">First digit = floor</b> — <span class="pl-floor">2</span><span class="pl-door">29</span></li>
+    <li><b class="pl-building">Leading digits = building</b> — <span class="pl-building">13</span><span class="pl-floor">1</span><span class="pl-door">17</span></li>
+    <li><b>Front and back</b> — the count carries on behind</li>
+    <li><b>No floor digit</b> — one running count round the building</li>
+  </ol>
+  <p>Next time you're at a new building, look for the pattern before you ring a bell.</p>
+  <div><button id="fagain">Start over ▸</button><button id="fclose" class="ghost">Keep looking around</button></div>
+</div>
+
 <div id="app"></div>
 
-<div id="prompt"></div>
+<!-- screen-reader text for the 3D scene, and a keyboard route to every blank door -->
+<p id="scene-desc" class="sr-only"></p>
+<div id="doorlist" class="sr-only" role="group" aria-label="Doors to fill in"></div>
+
+<div id="prompt" aria-live="polite" aria-atomic="true"></div>
 
 <!-- right-side multiple-choice panel -->
-<div id="quiz" class="hidden">
-  <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that fits the pattern</small></div>
+<div id="quiz" class="hidden" role="dialog" aria-labelledby="qhead">
+  <button id="qclose" class="ghost" aria-label="Close">×</button>
+  <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that matches the pattern</small></div>
+  <div id="qkey" class="hidden"><span class="pl pl-building">building</span><span class="pl pl-floor">floor</span><span class="pl pl-door">door</span></div>
   <div id="qopts"></div>
-  <div id="qmsg"></div>
+  <div id="qmsg" aria-live="assertive" aria-atomic="true"></div>
 </div>
 
 <!-- Part 5 navigation: jump the camera to each face of the building -->
-<div id="viewbar" class="hidden">
+<div id="viewbar" class="hidden" role="group" aria-label="Walk around the building">
   <div class="vbtitle">Walk around</div>
   <button class="ghost vbtn" data-view="front">Front</button>
   <button class="ghost vbtn" data-view="back">Back</button>
@@ -118,23 +340,46 @@
   <button class="ghost vbtn" data-view="right">Right</button>
 </div>
 
+<!-- Part 5: top-down map of the 20-door loop, with "you are here" -->
+<div id="minimap" class="hidden" aria-hidden="true"><svg viewBox="0 0 132 200"></svg><div class="mmnote">9–16 upstairs, back &amp; front</div></div>
+
 <!-- jump menu: skip to the first building of any part -->
-<div id="jumpbar">
+<div id="jumpbar" role="navigation" aria-label="Jump to part">
   <div class="jbtitle">Jump to part</div>
   <div class="jbtns">
-    <button class="ghost jbtn" data-part="1">1</button>
-    <button class="ghost jbtn" data-part="2">2</button>
-    <button class="ghost jbtn" data-part="3">3</button>
-    <button class="ghost jbtn" data-part="4">4</button>
-    <button class="ghost jbtn" data-part="5">5</button>
+    <button class="ghost jbtn" data-part="1" aria-label="Part 1: numbers count up in order">1</button>
+    <button class="ghost jbtn" data-part="2" aria-label="Part 2: first digit is the floor">2</button>
+    <button class="ghost jbtn" data-part="3" aria-label="Part 3: leading digits name the building">3</button>
+    <button class="ghost jbtn" data-part="4" aria-label="Part 4: numbers wrap front and back">4</button>
+    <button class="ghost jbtn" data-part="5" aria-label="Part 5: one running count, no floor digit">5</button>
   </div>
+  <div id="progress" aria-hidden="true"></div>
 </div>
 
-<div id="bottombar">
-  <button id="back" class="ghost hidden">◀ Back</button>
-  <button id="continue" class="hidden">Continue ▸</button>
-  <button id="next" class="hidden">Next Building ▸</button>
+<!-- 08 — how many doors are left on this building, plus the controls hint -->
+<div id="doorsleft" class="hidden" aria-live="polite"></div>
+
+<div id="draghint" class="hidden" role="status">
+  <svg viewBox="0 0 64 40" aria-hidden="true" fill="none" stroke="#ffd54a" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <path d="M27 37v-6.5l-4.6-5.1a2.6 2.6 0 0 1 3.7-3.7l1.9 1.9V10.5a2.4 2.4 0 0 1 4.8 0v8.2" />
+    <path d="M32.8 19.6a2.4 2.4 0 0 1 4.8 0v1.8" />
+    <path d="M37.6 21.4a2.4 2.4 0 0 1 4.8 0v8.3a7 7 0 0 1-2 4.9V37" />
+    <path d="M15 16.5 9.5 22l5.5 5.5" /><path d="M9.5 22h8.5" />
+    <path d="M49 16.5 54.5 22 49 27.5" /><path d="M54.5 22H46" />
+  </svg>
+  <div><b>Drag</b> to look around · <b>Scroll / pinch</b> to zoom · Click a door marked <b>?</b> to answer</div>
 </div>
+
+<button id="helpbtn" class="ghost" aria-label="How to use the controls">?</button>
+
+<div id="bottombar" role="group" aria-label="Course navigation">
+  <button id="back" class="ghost hidden">◀ Back</button>
+  <button id="continue" class="hidden">Next ▸</button>
+  <button id="next" class="hidden">Next ▸</button>
+</div>
+
+<button id="resetview" class="ghost hidden" aria-label="Reset the camera to the default view">↺ <span class="rv-label">Reset view</span></button>
 
 <script type="importmap">
 {
@@ -162,13 +407,29 @@ const CONFIG = {
 };
 
 const COLOR = {
-  ground: 0x86996a, walkway: 0xbdb8ad, road: 0x8c8c8c,
+  ground: 0x86996a, walkway: 0xbdb8ad, road: 0x7d8792,
   brick: 0xc7b29a, siding: 0xb0493a, band: 0xe7dcc4,
   roof: 0x4a3b30, canopy: 0xe9ddc4,
-  door: 0x4f8d5a, glass: 0x3a4654, trim: 0xe9ddc4,
+  door: 0x5b9d66, glass: 0x46586e, trim: 0xe9ddc4,
   balcony: 0xcfc7b6, step: 0xcfc7b6, sky: 0xbfd9ec,
   arrow: 0xffd54a,
 };
+
+/* ---- one colour per digit place, used by the digit keys, badges, quiz and
+   prompt so the same place always looks the same across all five parts ---- */
+const PLACE_COLORS = { building: '#f28c6a', floor: '#7cc4ff', door: '#eef2f6', path: '#ffd54a' };
+
+/* split a unit string into its digit places for a stage type; masks ('_', '▢')
+   keep their position, so a partial number colours the same way a full one does. */
+function splitPlaces(str, type) {
+  const n = str.length;
+  if (type === 'building') return [{ text: str, place: 'building' }];
+  if (type === 'tower' && n === 3) return [{ text: str[0], place: 'floor' }, { text: str.slice(1), place: 'door' }];
+  if ((type === 'row' || type === 'block') && n >= 4)
+    return [{ text: str.slice(0, n - 3), place: 'building' }, { text: str[n - 3], place: 'floor' }, { text: str.slice(n - 2), place: 'door' }];
+  if (type === 'seq' && n >= 3) return [{ text: str.slice(0, n - 2), place: 'building' }, { text: str.slice(n - 2), place: 'door' }];
+  return [{ text: str, place: 'door' }];                 // plex and anything unexpected
+}
 
 const W = CONFIG.width, D = CONFIG.depth, FH = CONFIG.floorHeight;
 const H = CONFIG.floors * FH, HALF_D = D / 2, SPAN = W + CONFIG.gap;
@@ -234,36 +495,172 @@ scene.background = new THREE.Color(COLOR.sky);
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 3000);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+/* no tone mapping on purpose: it would shift plate colours (MeshBasicMaterial is tone-mapped too) */
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 app.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI * 0.49;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;                       // panning is how buildings get lost
+controls.minPolarAngle = 0.18;                    // no straight-down "map" view
+controls.maxPolarAngle = Math.PI * 0.49;          // never under the ground
+controls.minDistance = 8;
+controls.maxDistance = 95;
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 0.9));
-const sun = new THREE.DirectionalLight(0xfff4e0, 1.05);
-sun.position.set(SPAN, H * 2.5, HALF_D + SPAN);
-scene.add(sun);
-scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+const hemi = new THREE.HemisphereLight(0xfff5e6, 0x7a7466, 0.6);   // warm sky, warm-grey bounce
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1dc, 1.5);   // tuned so a sunlit brick wall matches the old render within +-6 %
+sun.position.set(18, 30, 26);          // front-right, high: shadows fall down-left, doors read as recessed
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
+sun.shadow.camera.left = -34; sun.shadow.camera.right = 34;
+sun.shadow.camera.top = 34;   sun.shadow.camera.bottom = -34;   // buildings are centred on origin; +-34 covers the 24-wide row + stairs
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+
+/* ---- sky dome (vertex-coloured inverted sphere) + distance fog ---- */
+const skyGeo = new THREE.SphereGeometry(900, 32, 16);
+{
+  const col = [], top = new THREE.Color(0x6fa3d6), hor = new THREE.Color(0xdfe9ef), c = new THREE.Color();
+  const pos = skyGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const t = THREE.MathUtils.clamp(pos.getY(i) / 900, 0, 1);     // 0 at/below horizon, 1 overhead
+    c.copy(hor).lerp(top, Math.pow(t, 0.6)); col.push(c.r, c.g, c.b);
+  }
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+}
+const sky = new THREE.Mesh(skyGeo,
+  new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false }));
+scene.add(sky);
+scene.background = null;
+scene.fog = new THREE.Fog(0xdfe9ef, 140, 420);   // fades the enlarged ground into the horizon; plates (<45 units) untouched
 
 /* ---- helpers ---- */
+/* per-role roughness so surfaces don't all read as the same plastic */
+const ROUGH = new Map([[COLOR.brick, .88], [COLOR.siding, .86], [COLOR.door, .95], [COLOR.roof, .72],
+                       [COLOR.step, .9], [COLOR.balcony, .9], [COLOR.walkway, .95], [COLOR.canopy, .9]]);
 function box(parent, w, h, d, color, x, y, z, opts = {}) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...opts }));
+    new THREE.MeshStandardMaterial({ color, roughness: ROUGH.get(color) ?? 0.92, ...opts }));
+  m.castShadow = true; m.receiveShadow = true;
   m.position.set(x, y, z);
   parent.add(m);
   return m;
 }
+/* ---- plate / sign typography ----
+   One font stack for every number in the scene, numerals that fill their
+   plate, and a blank style that reads without colour (dashed frame + hollow
+   boxes where digits are missing). */
+const PLATE_FONT = '"Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif';
+const PLATE_FG = '#16202b', PLATE_BG = 'rgba(255,255,255,0.96)';
+const BLANK_FG = '#c0392b';                 // 5.4:1 on the white plate
+const BLANK_ON_DARK = '#ffd9a0';            // same cue on the dark banner
+const BLANK_DASH = { width: 14, dash: [40, 26], inset: 22 };   // in 1024-px canvas units
+
+/* is this CSS colour dark? accepts #rgb, #rrggbb, rgb() and rgba() */
+function isDarkBg(css) {
+  if (!css) return false;
+  let r = 255, g = 255, b = 255;
+  const m = /rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(css);
+  if (m) { r = +m[1]; g = +m[2]; b = +m[3]; }
+  else if (css[0] === '#') {
+    const hx = css.slice(1), t = hx.length === 3 ? hx.replace(/./g, c => c + c) : hx;
+    r = parseInt(t.slice(0, 2), 16); g = parseInt(t.slice(2, 4), 16); b = parseInt(t.slice(4, 6), 16);
+  }
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
+}
+
+/* a hollow rounded box standing in for one missing digit, baseline-aligned */
+function drawDigitBox(ctx, x, baselineY, adv, cap, color) {
+  const bw = adv * 0.84, bh = cap * 0.78, r = Math.min(bw, bh) * 0.18;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, cap * 0.09);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x + (adv - bw) / 2, baselineY - bh, bw, bh, r);
+  else ctx.rect(x + (adv - bw) / 2, baselineY - bh, bw, bh);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function makeTextTexture(text, opts = {}) {
-  const { w = 512, h = 256, bg = 'rgba(255,255,255,0.95)', fg = '#16202b', font = 'bold 170px sans-serif' } = opts;
+  const s = String(text);
+  const isBlank = /[?_]/.test(s);
+  const wide = s.length > 3;                                  // 4-5 digit units get more pixels
+  const { w = wide ? 768 : 512, h = wide ? 384 : 256,
+    bg = PLATE_BG, fg = PLATE_FG, font = 'bold 170px sans-serif' } = opts;
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
-  ctx.fillStyle = fg; ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, w / 2, h / 2);
-  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8; return tex;
+
+  /* keep the caller's weight and size, always force our own family */
+  const fm = /^\s*(.*?)(\d+(?:\.\d+)?)px\s/.exec(font);
+  const weight = fm ? fm[1].trim() : 'bold';
+  const base = fm ? parseFloat(fm[2]) : 170;
+  const fontAt = px => `${weight} ${px}px ${PLATE_FONT}`.trim();
+
+  /* the dashed blank frame, and the room it leaves for the text */
+  const k = w / 1024, dashLw = BLANK_DASH.width * k, dashInset = BLANK_DASH.inset * k + dashLw / 2;
+  const pad = isBlank ? dashInset + dashLw : 0;
+  const availW = w - 2 * pad, availH = h - 2 * pad;
+
+  /* fit to the plate: <= 86 % of the width, cap height <= 72 % of the height,
+     never more than 1.35x the size the caller asked for (scaled with the
+     canvas, so a 768x384 plate is not left with small numerals) */
+  const probe = s.replace(/_/g, '0');                         // a box takes a digit's room
+  ctx.font = fontAt(100);
+  const pm = ctx.measureText(probe);
+  const wPer = (pm.width || 50) / 100;
+  const ascPer = (pm.actualBoundingBoxAscent || 72) / 100;
+  const descPer = (pm.actualBoundingBoxDescent || 0) / 100;
+  const px = Math.max(8, Math.min(0.86 * availW / wPer, 0.72 * availH / ascPer,
+    0.88 * availH / (ascPer + descPer), 1.35 * base * (h / 256)));
+  ctx.font = fontAt(px);
+  const dm = ctx.measureText('0');
+  const cap = dm.actualBoundingBoxAscent || px * 0.72;         // digit cap height
+  const asc = ascPer * px, desc = descPer * px;
+  const baselineY = (h - (asc + desc)) / 2 + asc;              // centre the ink, not the em
+  const blankFg = isDarkBg(bg) ? BLANK_ON_DARK : BLANK_FG;
+
+  if (isBlank) {                                              // dashed frame = still missing
+    ctx.save();
+    ctx.strokeStyle = blankFg; ctx.lineWidth = dashLw;
+    ctx.setLineDash(BLANK_DASH.dash.map(d => d * k));
+    ctx.strokeRect(dashInset, dashInset, w - 2 * dashInset, h - 2 * dashInset);
+    ctx.restore();
+  }
+
+  ctx.textBaseline = 'alphabetic';
+  if (isBlank) {                                              // glyph by glyph: '_' -> box
+    ctx.textAlign = 'left';
+    const adv = ch => ctx.measureText(ch === '_' ? '0' : ch).width;
+    const chars = Array.from(s);
+    let x = (w - chars.reduce((t, ch) => t + adv(ch), 0)) / 2;
+    for (const ch of chars) {
+      const a = adv(ch);
+      if (ch === '_') drawDigitBox(ctx, x, baselineY, a, cap, blankFg);
+      else { ctx.fillStyle = ch === '?' ? blankFg : fg; ctx.fillText(ch, x, baselineY); }
+      x += a;
+    }
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = fg;
+    ctx.fillText(s, w / 2, baselineY);
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
 }
 function label(parent, text, pw, ph, texOpts = {}) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
@@ -273,17 +670,18 @@ function label(parent, text, pw, ph, texOpts = {}) {
 function setPlateText(plate, text, texOpts = {}) {
   plate.material.map.dispose();
   plate.material.map = makeTextTexture(text, texOpts);
+  plate.material.color.set('#ffffff');   // drop any hover tint on solve
   plate.material.needsUpdate = true;
 }
 
 /* ---- a bright, readable 3D arrow from -> to ---- */
-function arrow(parent, from, to, color) {
+function arrow(parent, from, to, color, radius = 0.08) {
   const dir = to.clone().sub(from);
   const len = dir.length();
   const shaftLen = Math.max(0.05, len - 0.6);
   const grp = new THREE.Group();
   const mat = new THREE.MeshBasicMaterial({ color });
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, shaftLen, 12), mat);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, shaftLen, 12), mat);
   shaft.position.y = shaftLen / 2;
   const head = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.6, 16), mat);
   head.position.y = shaftLen + 0.3;
@@ -363,9 +761,9 @@ function buildShell(g, number) {
   for (const ex of [1, -1]) box(g, sw, st, D + 2 * sw, COLOR.walkway, ex * (W / 2 + sw / 2), sy, 0);
 
   for (const ex of [1, -1]) {
-    const sign = label(g, String(number), 2.4, 2.4, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 320px sans-serif' });
+    const sign = label(g, String(number), 2.4, 2.4, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 320px sans-serif', w: 512, h: 512 });
     sign.position.set(ex * (W / 2 + 0.06), H * 0.6, 0);
-    sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
+    sign.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
   }
 }
 
@@ -377,6 +775,10 @@ function addArrows(g) {
   arrow(g, new THREE.Vector3(xl, yb, z), new THREE.Vector3(xr, yb, z), COLOR.arrow); // 1st -> 2nd
   arrow(g, new THREE.Vector3(xr, yb, z), new THREE.Vector3(xl, yt, z), COLOR.arrow); // wrap up
   arrow(g, new THREE.Vector3(xl, yt, z), new THREE.Vector3(xr, yt, z), COLOR.arrow); // 3rd -> 4th
+  // …and the count keeps going round the right end onto the back façade
+  const xe = W / 2 + 0.7;   // bend exactly at the roof corner so it reads as one arrow
+  arrow(g, new THREE.Vector3(xr, yt, z), new THREE.Vector3(xe, yt, z), COLOR.arrow);
+  arrow(g, new THREE.Vector3(xe, yt, z), new THREE.Vector3(xe, yt, -HALF_D - 0.6), COLOR.arrow);
 }
 
 /* ============================================================
@@ -403,9 +805,9 @@ function buildTowerShell(g, txt) {
 
   // building identifier — a LETTER, so it can't be mistaken for the floor digit
   for (const ex of [1, -1]) {
-    const sign = label(g, txt, 2.6, 2.6, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 300px sans-serif' });
+    const sign = label(g, txt, 2.6, 2.6, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 300px sans-serif', w: 512, h: 512 });
     sign.position.set(ex * (TW / 2 + 0.06), TH * 0.62, 0);
-    sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
+    sign.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
   }
 }
 
@@ -440,20 +842,85 @@ function buildTowerAccess(g) {
 }
 
 /* big up-arrow + floor badges on the left: shows the first digit climbing 1->4 */
-function addTowerArrows(g) { 
-  const x = -TW / 2 - 0.9, z = THALF_D + 1.6; 
-  
-  // 1. Create a specific X coordinate for the arrow (subtract more to move it left)
-  const arrowX = x - 2; 
-  
-  // 2. Use 'arrowX' instead of 'x' here
-  arrow(g, new THREE.Vector3(arrowX, 1.6, z), new THREE.Vector3(arrowX, TH - 0.9, z), COLOR.arrow); 
-  
-  // The labels will stay in their original position because they still use 'x'
-  for (let fi = 0; fi < TFLOORS; fi++) { 
-    const b = label(g, String(fi + 1), 1.0, 1.0, { bg: 'rgba(20,24,30,0.85)', fg: '#ffd54a', font: 'bold 240px sans-serif' }); 
-    b.position.set(x, fi * TFH + 2.55, z + 0.02); 
-  } 
+function addTowerArrows(g) {
+  const x = -TW / 2 - 0.9, z = THALF_D + 1.6;
+
+  // the climb arrow sits just left of the badges — close enough to read as one cue
+  const arrowX = x - 1.4;
+  arrow(g, new THREE.Vector3(arrowX, 1.6, z), new THREE.Vector3(arrowX, TH - 0.9, z), COLOR.arrow, 0.1);
+
+  // blue = floor: the badges teach the colour here, where floor is the only rule
+  for (let fi = 0; fi < TFLOORS; fi++) {
+    const b = label(g, String(fi + 1), 1.15, 1.15, { bg: 'rgba(20,24,30,0.85)', fg: PLACE_COLORS.floor, font: 'bold 240px sans-serif' });
+    b.position.set(x, fi * TFH + 2.55, z + 0.02);
+  }
+}
+
+/* ---- digit key: a small sign that spells out which part of the number is
+   which place. Draws its own canvas (place colours + captions). ----
+   segments: [[text, 'building'|'floor'|'door'], …] */
+function addPlaceKey(g, segments, x, y, z) {
+  const CW = 1024, CH = 256;
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+  const r = 26;
+  ctx.fillStyle = 'rgba(20,24,30,0.92)';
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(CW - r, 0); ctx.quadraticCurveTo(CW, 0, CW, r);
+  ctx.lineTo(CW, CH - r); ctx.quadraticCurveTo(CW, CH, CW - r, CH);
+  ctx.lineTo(r, CH); ctx.quadraticCurveTo(0, CH, 0, CH - r);
+  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath(); ctx.fill();
+
+  const digitFont = 'bold 150px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  const capFont = 'bold 46px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  const gap = 150 * 0.14;
+  const cols = segments.map(([text, place]) => {
+    ctx.font = digitFont; const dw = ctx.measureText(text).width;
+    ctx.font = capFont; const cw = ctx.measureText(place.toUpperCase()).width;
+    return { text, place, w: Math.max(dw, cw) };
+  });
+  let total = 0;
+  cols.forEach((col, i) => { total += col.w + (i ? gap : 0); });
+  let cx = (CW - total) / 2;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const col of cols) {
+    const mid = cx + col.w / 2;
+    ctx.fillStyle = PLACE_COLORS[col.place] || PLACE_COLORS.door;
+    ctx.font = digitFont; ctx.fillText(col.text, mid, 98);
+    ctx.font = capFont; ctx.fillText(col.place.toUpperCase(), mid, 194);
+    cx += col.w + gap;
+  }
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.3),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  m.position.set(x, y, z);
+  g.add(m);
+  return m;
+}
+
+/* Part 3 example: the anatomy of 1 1 09 + blue floor badges on the left end */
+function addRowGuides(g) {
+  addPlaceKey(g, [['1', 'building'], ['1', 'floor'], ['09', 'door']],
+    RW / 2 - 3.2, RH + 0.95, RHALF_D + 0.12);
+  for (let fi = 0; fi < 2; fi++) {
+    const b = label(g, String(fi + 1), 1.0, 1.0,
+      { bg: 'rgba(20,24,30,0.85)', fg: PLACE_COLORS.floor, font: 'bold 240px sans-serif' });
+    b.position.set(-RW / 2 - 1.0, fi * RFH + 2.55, RHALF_D + 0.6);
+  }
+}
+
+/* Part 4 example: the key for 10 1 01 + the front->back / back->front loop */
+function addBlockGuides(g) {
+  // clear of the 9.6-wide banner (its right edge is x = 4.8), still on the roof line
+  addPlaceKey(g, [['10', 'building'], ['1', 'floor'], ['01', 'door']],
+    BW / 2 - 0.4, BH + 0.95, BHALF_D + 0.12);
+  const y = 2.55;
+  // short outward hooks at both ends: a full front-to-back trace foreshortens to a dot from the
+  // default camera, so instead say "the count continues round this corner" on each side
+  const xl = -BW / 2 - 0.9, xr = BW / 2 + 3.0;   // right hook clears the stair (x <= BW/2 + 2.3)
+  arrow(g, new THREE.Vector3(xl, y, BHALF_D - 0.6), new THREE.Vector3(xl - 1.3, y, BHALF_D + 1.6), COLOR.arrow, 0.14);
+  arrow(g, new THREE.Vector3(xr, y, BHALF_D - 0.6), new THREE.Vector3(xr + 1.3, y, BHALF_D + 1.6), COLOR.arrow, 0.14);
 }
 
 
@@ -507,12 +974,13 @@ function buildSlabShell(g, w, d, floors, fh) {
 /* a wide banner across the top of the front. Also the plate the learner
    updates when they name the building. Returns the plate. */
 function addTopBanner(g, h, halfD, text) {
-  const plate = label(g, text, 9.6, 2.4,
-    { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 256 });
-  plate.position.set(0, h + 1.2, halfD + 0.12);
+  const plate = label(g, text, 9.6, 2.0, BANNER_OPTS);
+  plate.position.set(0, h + 1.9, halfD + 0.12);
+  for (const ex of [1, -1])                    // posts: the sign stands on the roof slab
+    box(g, 0.16, 0.9, 0.16, COLOR.roof, ex * 4.2, h + 0.45, halfD + 0.05);
   return plate;
 }
-const BANNER_OPTS = { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 256 };
+const BANNER_OPTS = { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 214 };
 
 /* one front façade: RFLOORS x 5 doors. Each cell is either a number (shown)
    or a [value, mask] pair (blank — mask is the partial string, e.g. '710_'). */
@@ -630,7 +1098,7 @@ function addBlockSideSigns(g, text) {
     const sign = label(g, text, 4.2, 1.05,
       { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 120px sans-serif', w: 1024, h: 256 });
     sign.position.set(ex * (BW / 2 + 0.06), BH * 0.62, 0);
-    sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
+    sign.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
   }
 }
 
@@ -691,12 +1159,14 @@ function buildSeqStructure(g, number) {
 
   // building number over the front and back, and mid-height on each side
   for (const sz of [1, -1]) {
-    const b = label(g, `Building ${number}`, 9.6, 2.4, BANNER_OPTS);
-    b.position.set(0, SQH + 1.2, sz * (SQHD + 0.12));
+    const b = label(g, `Building ${number}`, 9.6, 2.0, BANNER_OPTS);
+    b.position.set(0, SQH + 1.9, sz * (SQHD + 0.12));
     b.rotation.y = sz > 0 ? 0 : Math.PI;
+    for (const ex of [1, -1])
+      box(g, 0.16, 0.9, 0.16, COLOR.roof, ex * 4.2, SQH + 0.45, sz * (SQHD + 0.05));
   }
   for (const sx of [1, -1]) {
-    const sign = label(g, `Building ${number}`, 4.2, 1.05,
+    const sign = label(g, `Building ${number}`, 5.0, 1.25,
       { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 120px sans-serif', w: 1024, h: 256 });
     sign.position.set(sx * (SQHW + 0.12), SQH * 0.62, 0);
     sign.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -736,13 +1206,38 @@ function buildSeqFacade(g, getUnit, raycastList, blankStates) {
 }
 
 /* ---- ground + road (shared) ---- */
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(SPAN * 4, D * 8),
-  new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1 }));
-ground.rotation.x = -Math.PI / 2; ground.position.y = -0.17; scene.add(ground);
+/* sub-perceptual ground noise (<= 4 % lightness per cell) so the plane isn't a flat swatch.
+   The map multiplies the material colour, so the cells are near-white: the result is
+   COLOR.ground varied by +-4 % lightness, never a second copy of the ground hue. */
+function makeGroundNoise() {
+  const S = 256, CELL = 8;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  for (let y = 0; y < S; y += CELL) for (let x = 0; x < S; x += CELL) {
+    const v = Math.round(255 * (1 - 0.04 * Math.random()));   // 0.96..1.00 of full: darkens by at most 4 %
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(x, y, CELL, CELL);
+  }
+  /* blur the cell grid away: a soft mottle, never a visible checker */
+  ctx.filter = 'blur(6px)'; ctx.drawImage(c, 0, 0); ctx.filter = 'none';
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(60, 60);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800),
+  new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1, map: makeGroundNoise() }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.17;
+ground.receiveShadow = true; scene.add(ground);
 
-const road = new THREE.Mesh(new THREE.PlaneGeometry(SPAN + 24, 6),
+const road = new THREE.Mesh(new THREE.PlaneGeometry(800, 6),
   new THREE.MeshStandardMaterial({ color: COLOR.road, roughness: 1 }));
-road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, HALF_D + 5.4); scene.add(road);
+road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, HALF_D + 5.4);
+road.receiveShadow = true; scene.add(road);
+
+/* kerb strips either side of the road */
+for (const s of [-1, 1]) box(scene, 800, 0.08, 0.35, COLOR.walkway, 0, -0.11, HALF_D + 5.4 + s * 3.2);
 
 /* ============================================================
    course stages
@@ -860,8 +1355,9 @@ function buildStageGroup(i) {
   } else if (st.type === 'row') {
     buildSlabShell(g, RW, RD, RFLOORS, RFH);
     const named = st.kind === 'example' || !st.chooseBuilding;
-    const banner = addTopBanner(g, RH, RHALF_D, named ? `Building ${st.building}` : 'Building #');
+    const banner = addTopBanner(g, RH, RHALF_D, named ? `Building ${st.building}` : 'Building ?');
     buildRowFacade(g, st.floors, raycastList, blankStates);
+    if (st.kind === 'example') addRowGuides(g);
     if (st.kind === 'quiz' && st.chooseBuilding) {
       buildingState = {
         value: st.building, solved: false, plate: banner,
@@ -882,7 +1378,7 @@ function buildStageGroup(i) {
     };
     buildBlockFacade(g, 1, true, (fi, di) => cell(true, fi, di), raycastList, blankStates);
     buildBlockFacade(g, -1, false, (fi, di) => cell(false, fi, di), raycastList, blankStates);
-    // no arrows or floor badges here — the learner figures out the pattern
+    if (st.kind === 'example') addBlockGuides(g);
   } else if (st.type === 'seq') {
     buildSeqStructure(g, st.building);
     const blanksMap = st.blanks || {};
@@ -928,6 +1424,118 @@ const ui = {
 for (const btn of ui.viewbar.querySelectorAll('button[data-view]'))
   btn.onclick = () => setSeqView(btn.dataset.view);
 
+/* ============================================================
+   Part 5 mini-map — the 20-door loop seen from above. Shows the
+   direction reversal on the right wall, which wall the camera is
+   looking at, and where the camera is standing.
+   world x -> svg x, world z -> svg y (front = bottom edge).
+   ============================================================ */
+const mmBox = document.getElementById('minimap');
+const mmSvg = mmBox && mmBox.querySelector('svg');
+const MM_NS = 'http://www.w3.org/2000/svg';
+const MM = { cx: 66, cy: 100, s: 5, rx: 52, ry: 88 };   // 5 svg px per world unit
+const mmX = wx => MM.cx + wx * MM.s;
+const mmY = wz => MM.cy + wz * MM.s;
+
+function mmNode(tag, attrs) {
+  const n = document.createElementNS(MM_NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  mmSvg.appendChild(n);
+  return n;
+}
+function mmLine(x1, y1, x2, y2, stroke, w) {
+  return mmNode('line', { x1, y1, x2, y2, stroke, 'stroke-width': w, 'stroke-linecap': 'round' });
+}
+function mmText(x, y, str, anchor) {
+  const t = mmNode('text', { x, y, 'text-anchor': anchor, fill: 'var(--c-door, #eef2f6)', 'font-size': 11,
+    'font-family': 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' });
+  t.textContent = str;
+  return t;
+}
+/* a reading-order arrow with a solid head */
+function mmArrow(x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len, head = 6;
+  const c = 'var(--c-path, #ffd54a)';
+  mmLine(x1, y1, x2 - ux * head, y2 - uy * head, c, 2);
+  const px = -uy, py = ux;
+  mmNode('polygon', { fill: c, points:
+    `${x2},${y2} ${x2 - ux * head + px * 3.4},${y2 - uy * head + py * 3.4} ${x2 - ux * head - px * 3.4},${y2 - uy * head - py * 3.4}` });
+}
+
+function mmDraw(st, az) {
+  while (mmSvg.firstChild) mmSvg.removeChild(mmSvg.firstChild);
+  const L = mmX(-SQHW), R = mmX(SQHW), B = mmY(-SQHD), F = mmY(SQHD);
+
+  // the building footprint
+  mmNode('rect', { x: L, y: B, width: R - L, height: F - B, fill: 'none', stroke: '#9fb0c0', 'stroke-width': 1.5 });
+
+  // which wall is facing the camera (0 = front, +pi/2 = right)
+  const q = Math.round(az / (Math.PI / 2));
+  const face = ['back', 'left', 'front', 'right', 'back'][Math.max(0, Math.min(4, q + 2))];
+  const hl = 'var(--c-path, #ffd54a)';
+  if (face === 'front') mmLine(L, F, R, F, hl, 3);
+  else if (face === 'back') mmLine(L, B, R, B, hl, 3);
+  else if (face === 'left') mmLine(L, B, L, F, hl, 3);
+  else mmLine(R, B, R, F, hl, 3);
+
+  // reading order: up the left wall, across the back, across the front, DOWN the right
+  mmArrow(mmX(-SQHW) + 8, mmY(7.5), mmX(-SQHW) + 8, mmY(-7.5));
+  mmArrow(mmX(-3), mmY(-SQHD) + 8, mmX(3), mmY(-SQHD) + 8);
+  mmArrow(mmX(-3), mmY(SQHD) - 8, mmX(3), mmY(SQHD) - 8);
+  mmArrow(mmX(SQHW) - 8, mmY(-7.5), mmX(SQHW) - 8, mmY(7.5));
+
+  // one tick + number per ground-floor door
+  const solved = new Set();
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (ud) for (const b of ud.blankStates) if (b.solved) solved.add(b.value);
+  const blanksMap = st.blanks || {};
+  for (const slot of SQ_LAYOUT) {
+    if (slot.f !== 0) continue;
+    const value = st.base + slot.d;
+    const text = (blanksMap[slot.d] && !solved.has(value)) ? '?' : String(value);
+    if (slot.face === 'L' || slot.face === 'R') {
+      const y = mmY(slot.a), out = slot.face === 'L' ? -1 : 1, x = slot.face === 'L' ? L : R;
+      mmLine(x, y, x + out * 5, y, '#9fb0c0', 1.5);
+      mmText(x + out * 8, y + 4, text, slot.face === 'L' ? 'end' : 'start');
+    } else {
+      const x = mmX(slot.a), out = slot.face === 'F' ? 1 : -1, y = slot.face === 'F' ? F : B;
+      mmLine(x, y, x, y + out * 5, '#9fb0c0', 1.5);
+      mmText(x, y + out * 16 + (out > 0 ? 0 : 4), text, 'middle');
+    }
+  }
+
+  // "you are here" wedge, pointing back at the building
+  const px = MM.cx + Math.sin(az) * MM.rx, py = MM.cy + Math.cos(az) * MM.ry;
+  const d = Math.hypot(MM.cx - px, MM.cy - py) || 1;
+  const ux = (MM.cx - px) / d, uy = (MM.cy - py) / d, nx = -uy, ny = ux;
+  mmNode('polygon', { fill: '#ffd9a0', points:
+    `${px + ux * 7},${py + uy * 7} ${px + nx * 4.5},${py + ny * 4.5} ${px - nx * 4.5},${py - ny * 4.5}` });
+}
+
+let mmSig = null;
+function mmSync(force) {
+  if (!mmSvg) return;
+  try {
+    const st = currentStage;
+    const on = !!st && st.type === 'seq';
+    mmBox.classList.toggle('hidden', !on);
+    if (!on) { mmSig = null; return; }
+    const az = controls.getAzimuthalAngle();
+    let n = 0;
+    const ud = groups[currentIndex] && groups[currentIndex].userData;
+    if (ud) for (const b of ud.blankStates) if (b.solved) n++;
+    const sig = currentIndex + '|' + n + '|' + Math.round(az * 40);
+    if (!force && sig === mmSig) return;
+    mmSig = sig;
+    mmDraw(st, az);
+  } catch (e) { /* stage state not ready yet */ }
+}
+document.addEventListener('stagechange', () => mmSync(true));
+document.addEventListener('blanksolved', () => mmSync(true));
+controls.addEventListener('change', () => mmSync());
+(function mmLoop() { mmSync(); requestAnimationFrame(mmLoop); })();
+
 // jump-to-part menu: skip straight to the first (example) building of any part
 const partStart = {};
 STAGES.forEach((s, idx) => { if (!(s.part in partStart)) partStart[s.part] = idx; });
@@ -935,38 +1543,90 @@ const jumpBtns = [...document.querySelectorAll('#jumpbar button[data-part]')];
 for (const btn of jumpBtns)
   btn.onclick = () => showStage(partStart[Number(btn.dataset.part)]);
 
-const EXAMPLE_PROMPT =
-  'This is a common <b>number layout</b> you can find at most <b>apartment buildings</b>. ' +
-  'The units count up in order — the <b>yellow arrows</b> show the direction the pattern flows. ' +
-  'Drag to look around and <b>memorize the pattern</b>, then on the next buildings you will ' +
-  '<b>fill in the missing unit numbers</b>. When you are ready, <b>click Continue</b>.';
+// responsive: publish the prompt banner's rendered height so phone layouts can sit below it
+// offsetHeight is the border box, so the same constant works at every padding size
+new ResizeObserver(([e]) => document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px'))
+  .observe(document.getElementById('prompt'));
 
-const EXAMPLE2_PROMPT =
-  '<b>Part 2 — the first digit.</b> Taller buildings use <b>3-digit unit numbers</b>. ' +
-  'The trick: the <b>first digit tells you the floor</b> — floor 1 is 1__, floor 2 is 2__, and so on. ' +
-  'The last two digits stay the same as you go <b>straight up</b> a column. ' +
-  'Notice every unit on floor 3 starts with <b>3</b>. Drag to look around, and when you have it, <b>click Ready</b>.';
+/* ---- prompt banner copy: one amber headline + a short plain-language body ----
+   `short` is used on phones (<=640px) so the banner stays above the building. */
+const plSpan = (cls, txt) => `<span class="pl pl-${cls}">${txt}</span>`;
 
-const EXAMPLE3_PROMPT =
-  '<b>Part 3 — the building number.</b> Larger complexes use <b>4- and 5-digit</b> unit numbers, ' +
-  'and the <b>leading digit(s) tell you the building</b>. Here every unit starts with <b>1</b>, so this is ' +
-  '<b>Building 1</b> — after the building comes the <b>floor</b>, then the door. On the next buildings you will ' +
-  '<b>fill in the missing numbers</b>, then <b>choose the correct building number</b>. ' +
-  'Drag to look around, and when you are ready, <b>click Ready</b>.';
+const PROMPTS = {
+  p1example: {
+    title: 'Part 1 · Numbers count up in order',
+    body:  'Ground floor 101, 102 — upstairs 103, 104 — then it continues round the back (<span class="nb">105–108</span>). ' +
+           'The <b>yellow arrows</b> show the reading order. <b>Drag</b> to look around.',
+    short: '101, 102 downstairs; 103, 104 upstairs. Follow the <b>yellow arrows</b>. Drag to look.',
+  },
+  p1quiz: {
+    title: n => `Building ${n} · Follow the same pattern`,
+    body:  'Click a door marked <b>?</b>, then pick the number that continues the count.',
+  },
+  p2example: {
+    title: 'Part 2 · The first digit is the floor',
+    body:  'Floor 1 is ' + plSpan('floor', '1') + '__, floor 2 is ' + plSpan('floor', '2') + '__, and so on. ' +
+           'Straight up a column only the first digit changes.',
+    short: 'Floor 1 = 1__, floor 2 = 2__. Up a column, only the first digit changes.',
+  },
+  p2quiz: {
+    title: (n, d) => `Building ${n} · ${d} — floor digit first`,
+    body:  'Click a door marked <b>?</b>. Read its floor first, then its column.',
+  },
+  p3example: {
+    title: 'Part 3 · Leading digits name the building',
+    body:  'Every unit here starts with <b>1</b>, so this is Building 1. Then the floor, then the door: ' +
+           plSpan('building', '1') + '·' + plSpan('floor', '1') + '·' + plSpan('door', '09') + '.',
+    short: 'Building · floor · door: ' + plSpan('building', '1') + '·' + plSpan('floor', '1') + '·' + plSpan('door', '09') +
+           '. Every unit starts with 1 — Building 1.',
+  },
+  p3quiz: {
+    title: n => `Building ${n} · Fill the doors`,
+    body:  'Click a door with a <b>partial number</b> (like 71▢5 — one digit missing) and pick the full number. ' +
+           'When every door is done, the roof sign asks for the building.',
+    short: 'Click a <b>partial number</b> (like 71▢5), pick the full one. Then name the building.',
+  },
+  p4example: {
+    title: 'Part 4 · Numbers wrap front and back',
+    body:  'Each front door has a door directly <b>behind</b> it, and the count carries on there. ' +
+           'Study the front, then <b>drag</b> to spin round and check the back.',
+    short: 'The count continues on the doors <b>behind</b>. Drag to spin and check the back.',
+  },
+  p4quiz: {
+    title: n => `Building ${n} · Front and back`,
+    body:  'Drag to spin the building. Click a door with a <b>partial number</b> and pick the full unit.',
+  },
+  p5example: {
+    title: 'Part 5 · No floor digit — one running count',
+    body:  n => `Building ${n} counts <span class="nb">601 → 620</span> around the outside, floor by floor. ` +
+           'Floor 1 holds the lowest (601) <i>and</i> the highest (<span class="nb">617–620</span>). ' +
+           'Use <b>Front / Back / Left / Right</b> to walk round.',
+    short: '<span class="nb">601 → 620</span> runs round the building. Floor 1 has 601 <i>and</i> <span class="nb">617–620</span>. Walk round with the buttons.',
+  },
+  p5quiz: {
+    title: n => `Building ${n} · One running count`,
+    body:  'Walk round with the buttons. Click a door with a <b>partial number</b> and pick the full unit.',
+  },
+  nameBuilding: {
+    title: 'All doors filled ✓',
+    body:  'Now click the <b>roof sign</b> and choose the building number.',
+  },
+};
 
-const EXAMPLE4_PROMPT =
-  '<b>Part 4 — everything at once.</b> This last course is the toughest: it uses <b>everything so far</b>, and ' +
-  '<b>each building has its own pattern</b>. The units wrap around <b>both the front and the back</b> — the front ' +
-  'doors and the doors directly <b>behind</b> them. Study how the numbers climb on <b>Building 10</b>, then ' +
-  '<b>drag to spin around</b> and check the back. When you are ready, <b>click Ready</b>.';
+/* pick the row for a stage and fill in its building label / difficulty */
+function promptFor(st) {
+  const row = PROMPTS[`p${st.part}${st.kind === 'example' ? 'example' : 'quiz'}`] || PROMPTS.p1quiz;
+  const n = st.label ?? st.building ?? st.number;
+  const d = st.difficulty;
+  const val = v => (typeof v === 'function' ? v(n, d) : v);
+  return { title: val(row.title), body: val(row.body), short: val(row.short) };
+}
 
-const EXAMPLE5_PROMPT =
-  '<b>Part 5 — no floor digit.</b> In some buildings the <b>floor numbers don\'t exist</b> in the unit number — ' +
-  'the units are just a <b>single running count</b> around the building, one floor after another. Walk around the ' +
-  'outside and read the door numbers off each wall. ' +
-  '<b>Building 6</b> runs 601 → 620, so floor 1 holds the <b>lowest</b> numbers <i>and</i> the <b>highest</b> ' +
-  '(617-620); no digit tells you the floor. Use the <b>Front / Back / Left / Right</b> buttons to walk around — ' +
-  'or drag to look and pinch to zoom — then <b>click Ready</b>.';
+/* render headline + body into #prompt; phones get the shorter body when there is one */
+function setPrompt({ title, body, short }) {
+  const useShort = short && matchMedia('(max-width: 640px)').matches;
+  ui.prompt.innerHTML = `<div class="ptitle">${title}</div><div class="pbody">${useShort ? short : body}</div>`;
+}
 
 const groups = {};
 const celebrated = new Set();
@@ -977,33 +1637,164 @@ let activeBlank = null; // blank whose options are open
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+/* ---- camera framing -------------------------------------------------
+   One canonical desktop pose per stage type. Portrait phones back the
+   camera off and widen the lens so the whole building still fits, rather
+   than making the learner pinch-zoom on every stage. ---- */
+const POSES = {
+  tower: { pos: [7, TH * 0.5, 38],  tgt: [0, TH * 0.42, 0] },
+  row:   { pos: [0, RH * 0.85, 32], tgt: [0, RH * 0.5, 0] },
+  block: { pos: [10, BH * 0.5, 42], tgt: [0, BH * 0.42, 0] },
+  // low enough that the walkway lips don't clip the floor-1 plates
+  seq:   { pos: [-30, 9, 34],       tgt: [0, 4.5, 0] },
+  plex:  { pos: [5, H * 0.6, 25],   tgt: [0, H * 0.45, 0] },
+};
+const SEQ_VIEWS = {
+  front: [0, 9, 38], back: [0, 9, -38], left: [-40, 9, 0], right: [40, 9, 0],
+};
+const SEQ_VIEW_TARGET = [0, 4.5, 0];
+/* tuned at 390x844: the Part 3 row keeps all five doors plus the stair on
+   screen with ~7% margin each side */
+const PORTRAIT_BACKOFF = 1.55;
+
+const MOVE_MS = 350;      // stage change + walk-around buttons
+const RESET_MS = 450;     // Reset view chip
+const INTRO_MS = 1400;    // one-time "this rotates" swing
+const INTRO_HOLD_MS = 300;
+const INTRO_SWING_DEG = -18;
+
+const reduceMotionMQ = matchMedia('(prefers-reduced-motion: reduce)');
+function prefersReducedMotion() { return reduceMotionMQ.matches; }
+
+function poseFor(st) {
+  const p = POSES[st && st.type] || POSES.plex;
+  const pos = new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2]);
+  const tgt = new THREE.Vector3(p.tgt[0], p.tgt[1], p.tgt[2]);
+  // portrait: pull straight back along the view ray, keeping the framing
+  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  return { pos, tgt };
+}
+
+/* portrait phones widen the lens so a 24-wide row still fits across */
+function applyViewportFov() {
+  const fov = camera.aspect < 1 ? Math.min(74, 50 / Math.sqrt(camera.aspect)) : 50;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+}
+
+/* ---- eased camera moves --------------------------------------------
+   Cubic ease-out on its own rAF loop. Controls are disabled while the
+   camera is in flight; a new call cancels the one in progress. Under
+   reduced motion every move becomes an instant cut. ---- */
+let flyRAF = 0, flying = false, flySeq = 0;
+
+function flyTo(pos, tgt, ms = MOVE_MS) {
+  flySeq++;
+  if (flyRAF) { cancelAnimationFrame(flyRAF); flyRAF = 0; }
+  if (prefersReducedMotion()) ms = 0;
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  const land = () => {
+    flyRAF = 0; flying = false;
+    camera.position.copy(pos); controls.target.copy(tgt);
+    controls.enabled = true; controls.update();
+    updateResetChip();
+  };
+  if (ms <= 0 || (p0.distanceTo(pos) < 1e-3 && t0.distanceTo(tgt) < 1e-3)) { land(); return; }
+  flying = true; controls.enabled = false;
+  const t0ms = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0ms) / ms);
+    const e = 1 - Math.pow(1 - k, 3);          // ease-out, no overshoot
+    camera.position.lerpVectors(p0, pos, e);
+    controls.target.lerpVectors(t0, tgt, e);
+    controls.update();
+    if (k < 1) flyRAF = requestAnimationFrame(step);
+    else land();
+  };
+  flyRAF = requestAnimationFrame(step);
+}
+
+/* one-time swing on the very first framing: start 18 degrees off the
+   resting pose and glide in, so "the building rotates" is shown, not told */
+let introRunning = false;
+function introSwing(pos, tgt) {
+  if (prefersReducedMotion()) { flyTo(pos, tgt, 0); return; }
+  const sph = new THREE.Spherical().setFromVector3(pos.clone().sub(tgt));
+  sph.theta += THREE.MathUtils.degToRad(INTRO_SWING_DEG);
+  const from = new THREE.Vector3().setFromSpherical(sph).add(tgt);
+  introRunning = true;                         // the chip must not flash during the swing
+  flyTo(from, tgt, 0);
+  const seq = flySeq;                          // abandon if anything else moves the camera
+  setTimeout(() => {
+    if (flySeq !== seq) { introRunning = false; return; }
+    flyTo(pos, tgt, INTRO_MS);
+    setTimeout(() => { introRunning = false; updateResetChip(); }, INTRO_MS + 60);
+  }, INTRO_HOLD_MS);
+}
+
+let firstFrame = true;
 function frameStage(st) {
-  if (st.type === 'tower') {
-    camera.position.set(7, TH * 0.5, 38);
-    controls.target.set(0, TH * 0.42, 0);
-  } else if (st.type === 'row') {
-    camera.position.set(0, RH * 0.85, 32);
-    controls.target.set(0, RH * 0.5, 0);
-  } else if (st.type === 'block') {
-    camera.position.set(10, BH * 0.5, 42);
-    controls.target.set(0, BH * 0.42, 0);
-  } else if (st.type === 'seq') {
-    camera.position.set(-30, 9, 34);      // low enough that the walkway lips don't clip the floor-1 plates
-    controls.target.set(0, 4.5, 0);
-  } else {
-    camera.position.set(5, H * 0.6, 25);
-    controls.target.set(0, H * 0.45, 0);
-  }
-  controls.update();
+  applyViewportFov();
+  markSeqViewButton(null);          // a stage change is not one of the walk-around views
+  const { pos, tgt } = poseFor(st);
+  if (firstFrame) { firstFrame = false; introSwing(pos, tgt); }
+  else flyTo(pos, tgt, MOVE_MS);
 }
 
 /* the Front/Back/Left/Right buttons for the Part 5 dollhouse */
 function setSeqView(view) {
-  const yT = 4.5;
-  if (view === 'front')      { camera.position.set(0, 9, 38);   controls.target.set(0, yT, 0); }
-  else if (view === 'back')  { camera.position.set(0, 9, -38);  controls.target.set(0, yT, 0); }
-  else if (view === 'left')  { camera.position.set(-40, 9, 0);  controls.target.set(0, yT, 0); }
-  else if (view === 'right') { camera.position.set(40, 9, 0);   controls.target.set(0, yT, 0); }
+  const v = SEQ_VIEWS[view];
+  if (!v) return;
+  const tgt = new THREE.Vector3(SEQ_VIEW_TARGET[0], SEQ_VIEW_TARGET[1], SEQ_VIEW_TARGET[2]);
+  const pos = new THREE.Vector3(v[0], v[1], v[2]);
+  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  markSeqViewButton(view);
+  flyTo(pos, tgt, MOVE_MS);
+}
+
+function markSeqViewButton(view) {
+  for (const b of document.querySelectorAll('#viewbar button[data-view]'))
+    b.classList.toggle('active', b.dataset.view === view);
+}
+
+/* ---- Reset view ------------------------------------------------------
+   No camera lock during quizzes — exploring matters — but a chip appears
+   as soon as the learner has drifted well away from the stage pose. ---- */
+const resetChip = document.getElementById('resetview');
+
+function driftedFromPose() {
+  if (!currentStage) return false;
+  const { pos, tgt } = poseFor(currentStage);
+  return camera.position.distanceTo(pos) > 4 || controls.target.distanceTo(tgt) > 1.5;
+}
+function updateResetChip() {
+  if (!resetChip) return;
+  if (flying || introRunning) return;          // don't flicker mid-glide
+  resetChip.classList.toggle('hidden', !driftedFromPose());
+}
+function resetView() {
+  if (!currentStage) return;
+  const { pos, tgt } = poseFor(currentStage);
+  markSeqViewButton(null);
+  flyTo(pos, tgt, RESET_MS);
+}
+if (resetChip) resetChip.onclick = resetView;
+
+let dragging = false;
+controls.addEventListener('change', updateResetChip);
+controls.addEventListener('start', () => {
+  dragging = true; flySeq++;                   // a touch of the mouse abandons a pending intro swing
+  markSeqViewButton(null);
+});
+controls.addEventListener('end', () => { dragging = false; updateResetChip(); });
+
+/* rotate the camera about the orbit target — doc 07 binds this to the
+   arrow keys so the scene is reachable without a pointer */
+function orbitBy(dAzDeg, dPolDeg) {
+  const sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+  sph.theta += THREE.MathUtils.degToRad(dAzDeg);
+  sph.phi = THREE.MathUtils.clamp(
+    sph.phi + THREE.MathUtils.degToRad(dPolDeg), controls.minPolarAngle, controls.maxPolarAngle);
+  camera.position.setFromSpherical(sph).add(controls.target);
   controls.update();
 }
 
@@ -1033,31 +1824,12 @@ function showStage(i) {
   ui.back.classList.add('hidden');
   controls.autoRotate = false;
 
+  setPrompt(promptFor(currentStage));
   if (currentStage.kind === 'example') {
-    const p = currentStage.part;
-    ui.prompt.innerHTML = p === 5 ? EXAMPLE5_PROMPT : p === 4 ? EXAMPLE4_PROMPT : p === 3 ? EXAMPLE3_PROMPT
-      : p === 2 ? EXAMPLE2_PROMPT : EXAMPLE_PROMPT;
-    ui.continueBtn.textContent = p > 1 ? 'Ready ▸' : 'Continue ▸';
+    ui.continueBtn.textContent = 'Next ▸';
     ui.continueBtn.classList.remove('hidden');
     if (currentIndex > 0) ui.back.classList.remove('hidden');
   } else {
-    const p = currentStage.part;
-    if (p === 2)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.label} · ${currentStage.difficulty}</b> — the first digit is the floor. ` +
-        `Click a door marked <b>?</b>, then pick its correct unit number on the right.`;
-    else if (p === 3)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.label}</b> — fill in the missing unit numbers, then name the building. ` +
-        `Click a door showing a <b>partial number</b> and pick the full number on the right.`;
-    else if (p === 4)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.building}</b> — numbers wrap around the front <i>and</i> back. ` +
-        `<b>Drag to spin around</b>, then click any door showing a <b>partial number</b> and pick the full unit.`;
-    else if (p === 5)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.building}</b> — floor numbers don't exist here; the units just count up around the building. ` +
-        `<b>Find the pattern and fill in the blanks.</b> Use the <b>Front / Back / Left / Right</b> buttons to navigate, ` +
-        `drag to look around, and pinch to zoom. Click a door with a <b>partial number</b> and pick the full unit.`;
-    else
-      ui.prompt.innerHTML = `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
-        `Click a door marked <b>?</b>, then pick its correct unit number from the options on the right.`;
     ui.back.classList.remove('hidden');
   }
   ui.prompt.classList.remove('hidden');
@@ -1068,6 +1840,8 @@ function showStage(i) {
   frameStage(currentStage);
 
   if (currentStage.kind === 'quiz') resumeQuizState();
+
+  document.dispatchEvent(new CustomEvent('stagechange', { detail: { index: i, stage: currentStage } }));
 }
 
 /* re-entering a quiz: pick up where the learner left off (door blanks, then
@@ -1076,7 +1850,7 @@ function resumeQuizState() {
   const ud = groups[currentIndex].userData;
   if (!ud.blankStates.every(s => s.solved)) return;   // still has doors to fill
   if (ud.buildingState && !ud.buildingState.solved) {
-    ui.prompt.innerHTML = `All units filled in — now <b>choose the building number</b>.`;
+    setPrompt(PROMPTS.nameBuilding);
     openQuiz(ud.buildingState);
   } else {
     showNext();   // already finished (no confetti on a revisit)
@@ -1084,25 +1858,129 @@ function resumeQuizState() {
 }
 
 /* ---- quiz interaction ---- */
+/* ---- quiz panel: option formatting, feedback, auto-close ---- */
+
+/* one short rule per part, appended after a second wrong pick on the same blank */
+const RULE_BY_PART = {
+  1: 'Doors count on in order.',
+  2: 'First digit = floor.',
+  3: 'Leading digits = building.',
+  4: 'Building, then floor, then door.',
+  5: 'One count runs around the whole building.',
+};
+
+/* which kind of question is open: the stage type, or 'building' for the
+   name-the-building step */
+function quizType(bstate) {
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (ud && ud.buildingState === bstate) return 'building';
+  return currentStage ? currentStage.type : 'plex';
+}
+
+/* digit places of a unit number -> [{text, place}].
+   Doc 09 owns splitPlaces(); until it lands we split locally so the colours
+   still teach. When it exists, it wins. */
+function quizPlaces(val, type) {
+  const s = String(val);
+  if (typeof splitPlaces === 'function') {
+    const segs = splitPlaces(s, type);
+    if (segs && segs.length) return segs;
+  }
+  if (type === 'building') return [{ text: s, place: 'building' }];
+  if (type === 'tower' && s.length >= 3)
+    return [{ text: s.slice(0, -2), place: 'floor' },
+            { text: s.slice(-2), place: 'door' }];
+  if ((type === 'row' || type === 'block') && s.length >= 4)
+    return [{ text: s.slice(0, -3), place: 'building' },
+            { text: s.slice(-3, -2), place: 'floor' },
+            { text: s.slice(-2), place: 'door' }];
+  if (type === 'seq' && s.length >= 3)
+    return [{ text: s.slice(0, -2), place: 'building' },
+            { text: s.slice(-2), place: 'door' }];
+  return [{ text: s, place: 'door' }];
+}
+
+function optionHTML(idx, val, type) {
+  const segs = quizPlaces(val, type);
+  return `<span class="ltr">${'abcd'[idx]}</span><span class="num">` +
+    segs.map(sg => `<span class="pl pl-${sg.place}">${sg.text}</span>`).join('') + '</span>';
+}
+
+/* the digit key above the options: one chip per place actually in play */
+function renderQuizKey(type, segs) {
+  const key = document.getElementById('qkey');
+  if (!key) return;
+  const show = type === 'building' || type === 'tower' || type === 'row' ||
+               type === 'block' || type === 'seq';
+  if (!show) { key.classList.add('hidden'); return; }
+  const places = [];
+  for (const sg of segs) if (!places.includes(sg.place)) places.push(sg.place);
+  key.innerHTML = places.map(pl => `<span class="pl pl-${pl}">${pl}</span>`).join('');
+  key.classList.remove('hidden');
+}
+
+/* why the pick was wrong, in <= 12 words — never reveals the answer */
+function explainWrong(chosen, correct, type) {
+  if (type === 'building') return 'Look at the digits every unit shares.';
+  if (type === 'plex') return 'Count on from the door next to it.';
+  if (type === 'seq') return 'No floor digit here — count on from the nearest known door.';
+  const a = quizPlaces(chosen, type), b = quizPlaces(correct, type);
+  const at = pl => { const sg = a.find(x => x.place === pl); return sg ? sg.text : null; };
+  const bt = pl => { const sg = b.find(x => x.place === pl); return sg ? sg.text : null; };
+  if (type === 'tower') {
+    if (at('floor') !== bt('floor')) return 'Right column, wrong floor — the first digit is the floor.';
+    if (at('door') !== bt('door')) return 'Right floor — count along the doors again.';
+  } else if (type === 'row' || type === 'block') {
+    if (at('building') !== bt('building')) return 'Right floor and door — check the leading digits: the building.';
+    if (at('floor') !== bt('floor')) return 'Right building, wrong floor.';
+    if (at('door') !== bt('door')) return 'Right building and floor — count the doors again.';
+  }
+  return 'Not quite — read the pattern again.';
+}
+
+/* auto-close after a correct answer: fast, but never taken from someone who is
+   still hovering or keyboard-focused inside the panel (and then never re-armed) */
+let quizCloseTimer = null;
+function cancelAutoClose() {
+  if (quizCloseTimer !== null) { clearTimeout(quizCloseTimer); quizCloseTimer = null; }
+}
+function armAutoClose(bstate) {
+  cancelAutoClose();
+  quizCloseTimer = setTimeout(() => {
+    quizCloseTimer = null;
+    if (activeBlank && activeBlank !== bstate) return;   // another question took over
+    const reading = ui.quiz.matches(':hover') || ui.quiz.contains(document.activeElement);
+    if (reading) return;                                 // still being read — stays put
+    closeQuiz();
+  }, 1100);
+}
+
+document.getElementById('qclose').onclick = () => closeQuiz();
+
 function openQuiz(bstate) {
   if (bstate.solved) return;
+  cancelAutoClose();
   activeBlank = bstate;
-  ui.qhead.innerHTML = bstate.header || 'Which unit is this?<small>Pick the number that fits the pattern</small>';
+  const type = quizType(bstate);
+  ui.qhead.innerHTML = bstate.header || 'Which unit is this?<small>Pick the number that matches the pattern</small>';
+  renderQuizKey(type, quizPlaces(bstate.value, type));
   ui.qopts.innerHTML = '';
   bstate.options.forEach((val, idx) => {
     const btn = document.createElement('button');
     btn.className = 'opt';
-    btn.innerHTML = `<span class="ltr">${'abcd'[idx]})</span> ${val}`;
-    btn.onclick = () => chooseOption(bstate, val, btn);
+    btn.innerHTML = optionHTML(idx, val, type);
+    btn.onclick = ev => chooseOption(bstate, val, btn, ev);
     ui.qopts.appendChild(btn);
   });
   ui.qmsg.textContent = '';
   ui.qmsg.className = '';
   ui.quiz.classList.remove('hidden');
+  document.dispatchEvent(new CustomEvent('quizopen', { detail: { bstate } }));
 }
 
-function chooseOption(bstate, val, btn) {
+function chooseOption(bstate, val, btn, ev) {
   if (bstate !== activeBlank || bstate.solved) return;
+  const type = quizType(bstate);
   if (val === bstate.value) {
     bstate.solved = true;
     setPlateText(bstate.plate,
@@ -1110,46 +1988,148 @@ function chooseOption(bstate, val, btn) {
       bstate.plateOpts || {});
     btn.classList.add('right');
     [...ui.qopts.children].forEach(b => b.disabled = true);
-    ui.qmsg.textContent = '✓ Correct!';
+    ui.qmsg.textContent = `✓ Correct — ${val}`;
     ui.qmsg.className = 'ok';
-    setTimeout(() => { if (!activeBlank || activeBlank.solved) closeQuiz(); }, 650);
-    checkComplete();
+    // a mouse click leaves focus on the option; drop it so the auto-close
+    // "still reading" test only holds for real keyboard users
+    if (ev && ev.detail > 0 && document.activeElement === btn) btn.blur();
+    checkComplete(bstate);
+    if (activeBlank === bstate) armAutoClose(bstate);
   } else {
     btn.disabled = true;
     btn.classList.add('wrong');
-    ui.qmsg.textContent = 'Not quite — try again.';
+    bstate.wrongCount = (bstate.wrongCount || 0) + 1;
+    let msg = explainWrong(val, bstate.value, type);
+    const rule = currentStage && RULE_BY_PART[currentStage.part];
+    if (bstate.wrongCount >= 2 && rule) msg += ' ' + rule;
+    ui.qmsg.textContent = msg;
     ui.qmsg.className = 'bad';
   }
 }
 
 function closeQuiz() {
+  cancelAutoClose();
   activeBlank = null;
   ui.quiz.classList.add('hidden');
+  document.dispatchEvent(new CustomEvent('quizclose', { detail: {} }));
 }
 
-function checkComplete() {
+function checkComplete(bstate) {
+  if (!bstate) bstate = activeBlank;            // doc 05 will pass it explicitly
+  if (bstate) {                                 // reward *every* correct answer
+    popPlate(bstate);
+    markSolved(bstate);
+    document.dispatchEvent(new CustomEvent('blanksolved', { detail: { bstate, index: currentIndex } }));
+  }
   if (!doorsSolved()) return;
   const bs = groups[currentIndex].userData.buildingState;
   if (bs && !bs.solved) {                     // all units in — now name the building
-    ui.prompt.innerHTML = `Nice — every unit is filled in. Now <b>choose the building number</b>.`;
+    setPrompt(PROMPTS.nameBuilding);
     openQuiz(bs);
     return;
   }
+  const isLast = currentIndex === STAGES.length - 1;
   if (!celebrated.has(currentIndex)) {
     celebrated.add(currentIndex);
-    fireConfetti();
+    fireConfetti(isLast ? 'cannons' : '');
+    if (isLast) showFinale();
   }
+  markStageComplete(currentIndex);
   showNext();
 }
 
 function showNext() {
   const isLast = currentIndex === STAGES.length - 1;
   const nextStage = STAGES[currentIndex + 1];
-  if (isLast) ui.next.textContent = 'Start Over ▸';
+  if (isLast) ui.next.textContent = 'Start over ▸';
   else if (nextStage && nextStage.kind === 'example') ui.next.textContent = `Next: Part ${nextStage.part} ▸`;
-  else ui.next.textContent = 'Next Building ▸';
+  else ui.next.textContent = 'Next ▸';
   ui.next.classList.remove('hidden');
 }
+
+/* ============================================================
+   reward + progress: every correct answer gets its own feedback
+   ============================================================ */
+const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* 320 ms scale pop (ease-out-back) + a 500 ms green tint on the plate */
+function popPlate(bstate) {
+  const p = bstate && bstate.plate;
+  if (!p) return;
+  const reduced = REDUCED();
+  const white = new THREE.Color(0xffffff), tint = new THREE.Color(0xc8ffd8);
+  const outBack = x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+  // start on the next frame: setPlateText resets material.color just before us
+  requestAnimationFrame(() => {
+    const t0 = performance.now(), mat = p.material;
+    (function step(t) {
+      const e = t - t0;
+      if (!reduced) {
+        const k = Math.min(1, e / 320);
+        const bump = k < 0.5 ? outBack(k / 0.5) : 1 - (k - 0.5) / 0.5;
+        const sc = 1 + 0.18 * bump;
+        p.scale.set(sc, sc, 1);
+      }
+      if (mat && mat.color) mat.color.copy(white).lerp(tint, Math.sin(Math.PI * Math.min(1, e / 500)));
+      if (e < 500) requestAnimationFrame(step);
+      else { p.scale.set(1, 1, 1); if (mat && mat.color) mat.color.copy(white); }
+    })(performance.now());
+  });
+  if (!reduced) plateBurst(p);
+}
+
+/* a persistent green dot in the plate's top-right corner: "you solved this one" */
+function markSolved(bstate) {
+  const p = bstate && bstate.plate;
+  if (!p || p.userData.solvedDot) return;
+  const par = p.geometry && p.geometry.parameters;
+  if (!par) return;
+  const pw = par.width, ph = par.height;
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(ph * 0.14, 20),
+    new THREE.MeshBasicMaterial({ color: 0x57c97e, fog: false }));
+  dot.position.set(pw / 2 - ph * 0.18, ph / 2 - ph * 0.18, 0.004);
+  p.add(dot);
+  p.userData.solvedDot = dot;
+}
+
+/* ---- 14-segment course progress bar in the jump bar ---- */
+const completed = new Set();
+const progressEl = document.getElementById('progress');
+const jbTitleEl = document.querySelector('#jumpbar .jbtitle');
+const progSegs = STAGES.map((st, i) => {
+  const seg = document.createElement('span');
+  seg.className = 'seg' + (i > 0 && st.part !== STAGES[i - 1].part ? ' part' : '');
+  if (progressEl) progressEl.appendChild(seg);
+  return seg;
+});
+
+function updateProgress() {
+  for (let i = 0; i < progSegs.length; i++) {
+    const done = completed.has(i);
+    progSegs[i].classList.toggle('done', done);
+    progSegs[i].classList.toggle('now', !done && i === currentIndex);
+  }
+  if (jbTitleEl && currentIndex >= 0)
+    jbTitleEl.textContent = `Part ${STAGES[currentIndex].part} · Building ${currentIndex + 1} of ${STAGES.length}`;
+}
+function markStageComplete(i) { completed.add(i); updateProgress(); }
+document.addEventListener('stagechange', updateProgress);
+
+/* ---- end-of-course summary ---- */
+const finaleEl = document.getElementById('finale');
+function showFinale() {
+  if (!finaleEl) return;
+  const open = () => finaleEl.classList.remove('hidden');
+  if (REDUCED()) open(); else setTimeout(open, 900);
+}
+function hideFinale() { if (finaleEl) finaleEl.classList.add('hidden'); }
+const fcloseBtn = document.getElementById('fclose');
+if (fcloseBtn) fcloseBtn.onclick = hideFinale;
+const fagainBtn = document.getElementById('fagain');
+if (fagainBtn) fagainBtn.onclick = () => { hideFinale(); resetCourse(); showStage(0); };
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && finaleEl && !finaleEl.classList.contains('hidden')) hideFinale();
+});
 
 /* ---- buttons ---- */
 function resetCourse() {
@@ -1163,33 +2143,251 @@ function resetCourse() {
     delete groups[k];
   }
   celebrated.clear();
+  completed.clear();
+  hideFinale();
 }
 
-ui.continueBtn.onclick = () => showStage(currentIndex + 1);
+ui.continueBtn.onclick = () => { markStageComplete(currentIndex); showStage(currentIndex + 1); };
 ui.back.onclick = () => showStage(Math.max(0, currentIndex - 1));
 ui.next.onclick = () => {
   if (currentIndex < STAGES.length - 1) showStage(currentIndex + 1);
-  else { resetCourse(); showStage(0); } // "Start Over" — fresh run from Part 1
+  else { hideFinale(); resetCourse(); showStage(0); } // "Start over" — fresh run from Part 1
 };
 
 /* ---- click a blank door/plate to open its options ---- */
+
+/* Which blank does a screen point mean? Plates win outright; the (much bigger)
+   door mesh only counts when its own plate faces the camera and the hit sits
+   beside or below that plate — so a click on the wall between Part 5's stacked
+   doors can no longer open a door on the far side of the building. */
+const pickV = new THREE.Vector3(), pickN = new THREE.Vector3(), pickQ = new THREE.Quaternion();
+function pickBlank(clientX, clientY) {
+  if (!blanks || !blanks.length) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  let door = null;
+  for (const h of raycaster.intersectObjects(blanks, false)) {
+    const bs = h.object.userData.bstate;
+    if (!bs || bs.solved || !bs.plate) continue;
+    if (h.object === bs.plate) return bs;                 // the number itself: always wins
+    if (!door && nearItsPlate(h.point, bs.plate)) door = bs;
+  }
+  return door;
+}
+function nearItsPlate(point, plate) {
+  plate.getWorldPosition(pickV);
+  pickN.set(0, 0, 1).applyQuaternion(plate.getWorldQuaternion(pickQ));
+  if (pickN.dot(pickV.clone().sub(camera.position)) > 0) return false;  // plate faces away
+  const dy = pickV.y - point.y;                            // plate sits above its door
+  return Math.hypot(pickV.x - point.x, pickV.z - point.z) <= 1.6 && dy >= -0.6 && dy <= 2.7;
+}
+
 let downPos = null;
 renderer.domElement.addEventListener('pointerdown', e => { downPos = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointercancel', () => { downPos = null; });
 renderer.domElement.addEventListener('pointerup', e => {
   if (!downPos) return;
   const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
   downPos = null;
   if (moved > 6 || currentStage.kind !== 'quiz') return; // a drag, or no quiz here
 
-  const rect = renderer.domElement.getBoundingClientRect();
-  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-  for (const h of raycaster.intersectObjects(blanks, false)) {
-    const bs = h.object.userData.bstate;
-    if (bs && !bs.solved) { openQuiz(bs); return; }
-  }
+  const bs = pickBlank(e.clientX, e.clientY);
+  if (bs) openQuiz(bs);
 });
+
+/* ============================================================
+   08 — discoverability in the 3D scene: a pulsing halo behind
+   every unsolved blank, a pointer cursor + hover tint, an
+   "N doors left" chip, a first-run drag hint and a "?" button.
+   Listens to `stagechange` / `blanksolved`; when those are not
+   dispatched it reconciles the same state from its own loop.
+   ============================================================ */
+{
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const canvas = renderer.domElement;
+  const chip = document.getElementById('doorsleft');
+  const hint = document.getElementById('draghint');
+  const helpBtn = document.getElementById('helpbtn');
+  const HINT_FULL = hint.innerHTML;
+  const HINT_TIP = '<div>Click a door marked <b>?</b> — the glowing ones.</div>';
+
+  const stageUD = () => (groups[currentIndex] && groups[currentIndex].userData) || null;
+  const isQuizStage = () => !!currentStage && currentStage.kind === 'quiz';
+  const quizIsOpen = () => !ui.quiz.classList.contains('hidden');
+
+  /* ---- halo behind an unsolved plate ---- */
+  function addHalo(bs, fw, fh) {
+    if (!bs || bs.halo || bs.solved || !bs.plate || !bs.plate.geometry.parameters) return;
+    const { width: pw, height: ph } = bs.plate.geometry.parameters;
+    const halo = new THREE.Mesh(
+      new THREE.PlaneGeometry(pw * fw, ph * fh),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd54a, transparent: true, opacity: 0.55, depthWrite: false, fog: false,
+      }));
+    halo.position.z = -0.006;        // between the wall and the plate
+    halo.renderOrder = -1;
+    bs.plate.add(halo);
+    bs.halo = halo;
+  }
+  function clearBlank(bs) {
+    if (!bs) return;
+    if (bs.halo) {
+      bs.plate.remove(bs.halo);
+      bs.halo.geometry.dispose();
+      bs.halo.material.dispose();
+      bs.halo = null;
+    }
+    if (bs.plate && bs.plate.material) {       // drop any leftover hover tint
+      bs.plate.material.color.set('#ffffff');
+      bs.plate.scale.set(1, 1, 1);
+    }
+    if (hovered === bs) hovered = null;
+  }
+  function bannerHalo(ud) {                    // the roof sign is the last question
+    const bs = ud.buildingState;
+    if (bs && !bs.solved && ud.blankStates.every(s => s.solved)) addHalo(bs, 1.06, 1.2);
+  }
+
+  /* ---- "N doors left" chip ---- */
+  function updateChip(ud) {
+    if (!ud || !isQuizStage()) { chip.className = 'hidden'; return; }
+    const left = ud.blankStates.filter(s => !s.solved).length;
+    const bs = ud.buildingState;
+    if (left > 0) {
+      chip.className = '';
+      chip.innerHTML = `<b>${left}</b> door${left === 1 ? '' : 's'} left`;
+    } else if (bs && !bs.solved) {
+      chip.className = '';
+      chip.textContent = 'Name the building';
+    } else {
+      chip.className = 'done';
+      chip.textContent = 'Done ✓';
+    }
+  }
+
+  /* ---- stage / solve bookkeeping ---- */
+  let stageIndex = -1, chipSig = '';
+  function onStage() {
+    const ud = stageUD();
+    if (!ud) return;
+    stageIndex = currentIndex;
+    if (isQuizStage()) {
+      for (const s of ud.blankStates) if (!s.solved) addHalo(s, 1.16, 1.34);
+      bannerHalo(ud);
+    }
+    chipSig = '';
+    tipAt = performance.now();
+    tipUsed = false;
+    firstRunHint();
+  }
+  function reconcile(now) {
+    const ud = stageUD();
+    if (!ud) return;
+    if (currentIndex !== stageIndex) onStage();
+    for (const s of ud.blankStates) if (s.solved && (s.halo || s === hovered)) clearBlank(s);
+    const bs = ud.buildingState;
+    if (bs && bs.solved && bs.halo) clearBlank(bs);
+    if (isQuizStage()) bannerHalo(ud);
+    const sig = currentIndex + ':' + ud.blankStates.reduce((n, s) => n + (s.solved ? 1 : 0), 0) +
+      ':' + (bs ? (bs.solved ? 1 : 0) : '-') + ':' + (isQuizStage() ? 'q' : 'e');
+    if (sig !== chipSig) { chipSig = sig; updateChip(ud); }
+    tipCheck(now, ud);
+  }
+  document.addEventListener('stagechange', () => onStage());
+  document.addEventListener('blanksolved', e => clearBlank(e.detail && e.detail.bstate));
+
+  /* ---- cursor + hover tint (one raycast per frame at most) ---- */
+  let hovered = null, hoverPt = null, hoverDirty = false, dragging = false;
+  canvas.style.cursor = 'grab';
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;     // touch never hovers; the halo carries the signal
+    hoverPt = { x: e.clientX, y: e.clientY };
+    hoverDirty = true;
+  });
+  canvas.addEventListener('pointerleave', () => { hoverPt = null; hoverDirty = true; });
+  controls.addEventListener('start', () => { dragging = true; canvas.style.cursor = 'grabbing'; });
+  controls.addEventListener('end', () => { dragging = false; hoverDirty = true; });
+  function updateHover() {
+    hoverDirty = false;
+    const hit = (hoverPt && isQuizStage()) ? pickBlank(hoverPt.x, hoverPt.y) : null;
+    if (hit !== hovered) {
+      if (hovered && hovered.plate) {
+        hovered.plate.material.color.set('#ffffff');
+        hovered.plate.scale.set(1, 1, 1);
+      }
+      hovered = hit;
+      if (hovered && hovered.plate) {
+        hovered.plate.material.color.set('#fff1c2');
+        hovered.plate.scale.set(1.06, 1.06, 1);
+      }
+    }
+    if (!dragging) canvas.style.cursor = hovered ? 'pointer' : 'grab';
+  }
+
+  /* ---- first-run drag hint, inactivity tip, "?" button ---- */
+  let hintTimer = 0, hideTimer = 0, firstStage = true, awaitingDrag = false;
+  let tipAt = 0, tipUsed = false;
+  const seen = {
+    get() { try { return localStorage.getItem('sf.hintSeen') === '1'; } catch (e) { return false; } },
+    set() { try { localStorage.setItem('sf.hintSeen', '1'); } catch (e) { /* private mode */ } },
+  };
+  function showHint(html, ms) {
+    clearTimeout(hintTimer); clearTimeout(hideTimer);
+    hint.innerHTML = html;
+    hint.classList.remove('hidden');
+    requestAnimationFrame(() => hint.classList.add('show'));
+    hintTimer = setTimeout(hideHint, ms);
+  }
+  function hideHint() {
+    clearTimeout(hintTimer);
+    if (awaitingDrag) { awaitingDrag = false; seen.set(); }
+    hint.classList.remove('show');
+    hideTimer = setTimeout(() => {
+      if (!hint.classList.contains('show')) hint.classList.add('hidden');
+    }, 340);
+  }
+  function firstRunHint() {
+    if (!firstStage) return;
+    firstStage = false;
+    if (seen.get()) return;
+    awaitingDrag = true;
+    showHint(HINT_FULL, 7000);
+  }
+  function tipCheck(now, ud) {
+    if (tipUsed || !isQuizStage()) return;
+    if (quizIsOpen() || hint.classList.contains('show') || ud.blankStates.some(s => s.solved)) {
+      tipAt = now;
+      return;
+    }
+    if (now - tipAt > 10000) { tipUsed = true; showHint(HINT_TIP, 5000); }
+  }
+  let hintDown = null;
+  canvas.addEventListener('pointerdown', e => { hintDown = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('pointercancel', () => { hintDown = null; });
+  canvas.addEventListener('pointerup', () => { hintDown = null; });
+  canvas.addEventListener('pointermove', e => {
+    if (!hintDown) return;
+    if (Math.hypot(e.clientX - hintDown.x, e.clientY - hintDown.y) > 20 &&
+        hint.classList.contains('show')) hideHint();
+  });
+  helpBtn.addEventListener('click', () => showHint(HINT_FULL, 6000));
+
+  /* ---- our own loop: pulse + reconcile (doc 02 owns tick()) ---- */
+  (function pulse(now) {
+    requestAnimationFrame(pulse);
+    reconcile(now);
+    if (hoverDirty) updateHover();
+    const ud = stageUD();
+    if (!ud) return;
+    const o = reduceMotion.matches
+      ? 0.6
+      : 0.35 + 0.3 * (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 2 * 0.9));
+    for (const s of ud.blankStates) if (s.halo) s.halo.material.opacity = (s === hovered ? 0.9 : o);
+    if (ud.buildingState && ud.buildingState.halo) ud.buildingState.halo.material.opacity = o;
+  })(performance.now());
+}
 
 /* ============================================================
    confetti (lightweight 2D canvas overlay)
@@ -1202,9 +2400,29 @@ function sizeConfetti() { cc.width = innerWidth; cc.height = innerHeight; }
 sizeConfetti();
 
 let confetti = [];
-function fireConfetti() {
-  const colors = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', '#ff9800'];
-  for (let i = 0; i < 170; i++) {
+const CONFETTI_COLORS = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', '#ff9800'];
+function fireConfetti(mode) {
+  if (REDUCED()) return;                       // no big motion for reduced-motion users
+  const colors = CONFETTI_COLORS;
+  if (mode === 'cannons') {                    // the finale: two cannons from the bottom corners
+    for (const side of [0, 1]) {
+      const dir = side === 0 ? 1 : -1;
+      for (let i = 0; i < 120; i++) {
+        confetti.push({
+          x: side === 0 ? 0 : innerWidth,
+          y: innerHeight * 0.8,
+          vx: dir * (6 + Math.random() * 8),
+          vy: -12 - Math.random() * 6,
+          g: 0.22 + Math.random() * 0.12,
+          rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45,
+          w: 6 + Math.random() * 7, h: 8 + Math.random() * 9,
+          color: colors[i % colors.length],
+        });
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < 170; i++) {              // per-building burst
     confetti.push({
       x: innerWidth / 2 + (Math.random() - 0.5) * 240,
       y: innerHeight * 0.32,
@@ -1217,6 +2435,28 @@ function fireConfetti() {
     });
   }
 }
+
+/* 14 small particles rising from one plate's position on screen */
+function plateBurst(plate) {
+  if (REDUCED() || !plate) return;
+  const v = plate.getWorldPosition(new THREE.Vector3()).project(camera);
+  if (v.z > 1) return;                         // behind the camera
+  const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight;
+  const colors = ['#57c97e', '#7ee0a0', '#ffd54a'];
+  for (let i = 0; i < 14; i++) {
+    confetti.push({
+      x: x + (Math.random() - 0.5) * 26,
+      y: y + (Math.random() - 0.5) * 16,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -4 - Math.random() * 3,
+      g: 0.16 + Math.random() * 0.08,
+      rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.5,
+      w: 4 + Math.random() * 2, h: 4 + Math.random() * 2,
+      color: colors[i % colors.length],
+    });
+  }
+}
+
 function drawConfetti() {
   cctx.clearRect(0, 0, cc.width, cc.height);
   if (!confetti.length) return;
@@ -1232,12 +2472,291 @@ function drawConfetti() {
 }
 
 /* ============================================================
+   accessibility (doc 07) — keyboard, focus, ARIA, scene text
+   ============================================================ */
+const sceneDescEl = document.getElementById('scene-desc');
+const doorListEl = document.getElementById('doorlist');
+
+/* the canvas is a real, focusable image with a text description */
+// tab order: part navigation should come before the 3D canvas and the door list
+for (const id of ['minimap', 'viewbar', 'jumpbar']) {
+  const el = document.getElementById(id);
+  if (el) document.body.insertBefore(el, app);
+}
+renderer.domElement.tabIndex = 0;
+renderer.domElement.setAttribute('role', 'img');
+renderer.domElement.setAttribute('aria-label', '3D view of the building. Use arrow keys to look around.');
+renderer.domElement.setAttribute('aria-describedby', 'scene-desc');
+
+/* ---- scene description + a keyboard door list ---- */
+/* doc 10 toggles the .active class on the jump buttons; the ARIA state is ours */
+function a11yMarkCurrentPart() {
+  if (!currentStage) return;
+  for (const b of jumpBtns) {
+    if (Number(b.dataset.part) === currentStage.part) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  }
+}
+const A11Y_ORD = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
+
+/* which wall a plate sits on, from its yaw */
+function a11yFace(plate) {
+  const y = ((plate.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  if (Math.abs(y - Math.PI / 2) < 0.4) return 'right';
+  if (Math.abs(y - Math.PI * 1.5) < 0.4) return 'left';
+  if (Math.abs(y - Math.PI) < 0.4) return 'back';
+  return 'front';
+}
+/* position along that wall, increasing left-to-right as the viewer sees it */
+function a11yAlong(plate, face) {
+  const p = plate.position;
+  return face === 'front' ? p.x : face === 'back' ? -p.x : face === 'left' ? p.z : -p.z;
+}
+/* every floor in the course is 3.2 units high and plates sit ~2.5 above it */
+function a11yFloor(plate) { return Math.round((plate.position.y - 2.5) / 3.2) + 1; }
+/* every number plate in a building group: a flat sign sitting one plate-height
+   above a floor slab (this skips roof banners, side signs, arrows and windows) */
+function a11yPlates(group) {
+  const out = [];
+  group.traverse(o => {
+    if (!o.isMesh || !o.geometry || o.geometry.type !== 'PlaneGeometry') return;
+    const k = Math.round((o.position.y - 2.5) / 3.2);
+    if (k >= 0 && Math.abs(o.position.y - (2.5 + 3.2 * k)) < 0.15) out.push(o);
+  });
+  return out;
+}
+
+/* the partial number printed on a blank plate, taken from the stage data */
+function a11yMask(bstate) {
+  const st = currentStage;
+  if (!st) return '?';
+  if (st.type === 'row' && st.floors) {
+    for (const row of st.floors)
+      for (const cell of row)
+        if (Array.isArray(cell) && cell[0] === bstate.value) return cell[1];
+  } else if (st.type === 'block' && st.blanks) {
+    return st.blanks[bstate.value] || '?';
+  } else if (st.type === 'seq' && st.blanks) {
+    return st.blanks[bstate.value - st.base] || '?';
+  }
+  return '?';
+}
+function a11ySpokenMask(mask) {
+  if (mask === '?') return 'no number yet';
+  return mask.replace(/_+/g, ' blank ').replace(/\s+/g, ' ').trim();
+}
+
+/* ---- one sentence describing the building the camera is looking at ---- */
+function a11yStageText() {
+  const st = currentStage;
+  if (!st) return '';
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  let text;
+  if (st.type === 'tower') {
+    const lo = 100 + Math.min(...st.suffixes), hi = 400 + Math.max(...st.suffixes);
+    text = `Four-storey building ${st.label} with three doors per floor, unit numbers ${lo} to ${hi}; ` +
+           `the first digit is the floor.`;
+  } else if (st.type === 'row') {
+    const all = st.floors.flat().map(c => (Array.isArray(c) ? c[0] : c));
+    const named = st.kind === 'example' || !st.chooseBuilding;
+    text = `Two-storey ${named ? `building ${st.building}` : 'building, its number still hidden,'} ` +
+           `with five doors per floor, unit numbers ${Math.min(...all)} to ${Math.max(...all)}; ` +
+           `the leading digits name the building and the next digit is the floor.`;
+  } else if (st.type === 'block') {
+    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them; ` +
+           `five-digit units where the leading digits are the building, then the floor, then the door.`;
+  } else if (st.type === 'seq') {
+    text = `Three-storey building ${st.building} with twenty doors around all four sides, ` +
+           `unit numbers ${st.base + 1} to ${st.base + 20}; one running count with no floor digit.`;
+  } else {
+    const last = st.kind === 'example' ? st.start + 7 : st.start + 3;
+    text = `Two-storey building ${st.number} with four doors, two on each floor, ` +
+           `unit numbers ${st.start} to ${last} counting up in order.`;
+  }
+  if (st.kind === 'example') return text + ' This is a worked example — every door already shows its number.';
+  const left = ud ? ud.blankStates.filter(b => !b.solved).length : 0;
+  const bld = ud && ud.buildingState && !ud.buildingState.solved;
+  if (left) return `${text} ${left} door${left === 1 ? ' is' : 's are'} blank — use the door list to fill ${left === 1 ? 'it' : 'them'} in.`;
+  if (bld) return `${text} Every door is filled in — now choose the building number.`;
+  return `${text} Every door is filled in.`;
+}
+
+function a11yDescribeStage() {
+  if (!sceneDescEl) return;
+  const text = a11yStageText();
+  if (sceneDescEl.textContent !== text) sceneDescEl.textContent = text;
+}
+
+/* ---- a real button per unsolved blank, so Tab reaches every door ---- */
+function a11yRebuildDoorList() {
+  if (!doorListEl) return;
+  doorListEl.innerHTML = '';
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (!ud || !currentStage || currentStage.kind !== 'quiz') return;
+
+  // rank every blank among ALL the plates sharing its floor and wall
+  const rank = new Map();
+  const buckets = new Map();
+  for (const plate of a11yPlates(groups[currentIndex])) {
+    const key = a11yFace(plate) + '/' + a11yFloor(plate);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(plate);
+  }
+  for (const [key, list] of buckets) {
+    const face = key.split('/')[0];
+    list.sort((x, y) => a11yAlong(x, face) - a11yAlong(y, face));
+    list.forEach((plate, i) => rank.set(plate, i));
+  }
+
+  // read them out in walking order: front wall first, then left, back, right
+  const faceOrder = { front: 0, left: 1, back: 2, right: 3 };
+  const open = ud.blankStates.filter(b => !b.solved).sort((x, y) => {
+    const fx = a11yFace(x.plate), fy = a11yFace(y.plate);
+    return (faceOrder[fx] - faceOrder[fy]) || (a11yFloor(x.plate) - a11yFloor(y.plate)) ||
+           (a11yAlong(x.plate, fx) - a11yAlong(y.plate, fy));
+  });
+
+  for (const b of open) {
+    const face = a11yFace(b.plate), floor = a11yFloor(b.plate);
+    const pos = rank.has(b.plate) ? rank.get(b.plate) : 0;
+    const ord = A11Y_ORD[pos] || `number ${pos + 1}`;
+    const mask = a11yMask(b);
+    const where = `floor ${floor}, ${ord} from the left on the ${face}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `Door showing ${mask.replace(/_/g, '▢')}, ${where} — open its options`;
+    btn.setAttribute('aria-label', `Door showing ${a11ySpokenMask(mask)}, ${where} — open its options`);
+    btn.onclick = () => openQuiz(b);
+    doorListEl.appendChild(btn);
+  }
+
+  const bs = ud.buildingState;
+  if (bs && !bs.solved && ud.blankStates.every(x => x.solved)) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Choose the building number — open its options';
+    btn.onclick = () => openQuiz(bs);
+    doorListEl.appendChild(btn);
+  }
+}
+
+/* ---- focus management + keyboard map ---- */
+let a11yReturnFocus = null;
+
+function a11yOnQuizOpen() {
+  const prev = document.activeElement;
+  if (prev && prev !== document.body && !ui.quiz.contains(prev)) a11yReturnFocus = prev;
+  setTimeout(() => {
+    const first = ui.qopts.querySelector('button.opt:not([disabled])');
+    if (first) first.focus();
+  }, 0);
+}
+function a11yOnQuizClose() {
+  const back = a11yReturnFocus;
+  a11yReturnFocus = null;
+  setTimeout(() => {
+    if (back && back.isConnected) back.focus();
+    else renderer.domElement.focus();
+  }, 0);
+}
+
+/* orbit by keyboard. doc 02 owns orbitBy(); until it lands, turn the camera
+   here so the arrow keys still work. */
+function a11yOrbit(dAz, dEl) {
+  if (typeof orbitBy === 'function') { orbitBy(dAz, dEl); return; }
+  const off = camera.position.clone().sub(controls.target);
+  const sph = new THREE.Spherical().setFromVector3(off);
+  sph.theta += dAz * Math.PI / 180;
+  sph.phi = Math.min(Math.max(sph.phi + dEl * Math.PI / 180, 0.08), controls.maxPolarAngle);
+  camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+  controls.update();
+}
+function a11yResetView() {
+  if (typeof resetView === 'function') resetView();
+  else if (currentStage) frameStage(currentStage);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  const quizOpen = !!activeBlank && !ui.quiz.classList.contains('hidden');
+
+  if (quizOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeQuiz(); return; }
+    const opts = [...ui.qopts.querySelectorAll('button.opt:not([disabled])')];
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && opts.length) {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      const at = opts.indexOf(document.activeElement);
+      const to = at < 0 ? (step > 0 ? 0 : opts.length - 1) : (at + step + opts.length) % opts.length;
+      opts[to].focus();
+      return;
+    }
+    const k = e.key.toLowerCase();
+    const idx = '1234'.indexOf(k) >= 0 ? '1234'.indexOf(k) : 'abcd'.indexOf(k);
+    if (idx >= 0) {
+      const btn = [...ui.qopts.querySelectorAll('button.opt')][idx];
+      if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+      return;
+    }
+    return;   // the quiz owns the keyboard while it is open
+  }
+
+  if (e.key === 'Home') { e.preventDefault(); a11yResetView(); return; }
+
+  // camera keys only from the canvas or the page background — never steal
+  // Enter/Space/arrows from another control
+  if (t && t !== document.body && t !== renderer.domElement &&
+      typeof t.closest === 'function' && t.closest('button, a[href], [tabindex]:not(canvas)')) return;
+
+  switch (e.key) {
+    case 'ArrowLeft':  e.preventDefault(); a11yOrbit(-15, 0); break;
+    case 'ArrowRight': e.preventDefault(); a11yOrbit(15, 0); break;
+    case 'ArrowUp':    e.preventDefault(); a11yOrbit(0, -10); break;
+    case 'ArrowDown':  e.preventDefault(); a11yOrbit(0, 10); break;
+    default: {
+      if (!currentStage || currentStage.type !== 'seq') return;
+      const view = { f: 'front', b: 'back', l: 'left', r: 'right' }[e.key.toLowerCase()];
+      if (view && typeof setSeqView === 'function') { e.preventDefault(); setSeqView(view); }
+    }
+  }
+});
+
+/* ---- wiring: the doc 05/10 events when they exist, a cheap poll otherwise.
+   Every handler is idempotent, so firing from both sources is harmless. ---- */
+let a11ySig = null, a11yQuizWasOpen = false;
+function a11ySync() {
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  const sig = currentIndex + '|' +
+    (ud ? ud.blankStates.filter(b => b.solved).length + '/' + ud.blankStates.length : '-') + '|' +
+    (ud && ud.buildingState ? (ud.buildingState.solved ? 'b1' : 'b0') : '-');
+  if (sig !== a11ySig) {
+    a11ySig = sig;
+    a11yMarkCurrentPart();
+    a11yDescribeStage();
+    a11yRebuildDoorList();
+  }
+  const open = !!activeBlank && !ui.quiz.classList.contains('hidden');
+  if (open !== a11yQuizWasOpen) {
+    a11yQuizWasOpen = open;
+    if (open) a11yOnQuizOpen(); else a11yOnQuizClose();
+  }
+}
+for (const ev of ['stagechange', 'blanksolved', 'quizopen', 'quizclose'])
+  document.addEventListener(ev, a11ySync);
+setInterval(a11ySync, 200);
+
+/* ============================================================
    loop + resize
    ============================================================ */
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  applyViewportFov();
+  // re-frame on orientation / window changes, unless a drag is under way
+  if (currentStage && !dragging) { const { pos, tgt } = poseFor(currentStage); flyTo(pos, tgt, 0); }
   sizeConfetti();
 });
 (function tick() {
