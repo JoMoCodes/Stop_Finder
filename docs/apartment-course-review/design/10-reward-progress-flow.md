@@ -47,12 +47,12 @@ CSS (insert after `#jumpbar button.jbtn.active`):
 `completed = new Set()` — a stage is complete when `allSolved()` (quiz) or when the learner presses Next on an example. `updateProgress()` on `stagechange` and after `checkComplete` marks `.done`/`.now` and sets `.jbtitle` to `Part ${p} · Building ${i+1} of 14`. `resetCourse()` clears the set.
 
 ### Button vocabulary (`showNext`, `showStage` labels come from doc 04)
-`#next`: `Next ▸`; if `STAGES[i+1].kind === 'example'` → `Next: Part ${part} ▸`; last stage → `Start over ▸`. `#continue` label is set by doc 04 to `Next ▸`. `#back` unchanged. Pressing `#continue` on an example marks it complete then `showStage(i+1)`.
+`#next`: `Next ▸`; if `STAGES[i+1].kind === 'example'` → `Next: Part ${part} ▸`; last stage → `Start over ▸` once every one of the 14 stages is in `completed`, otherwise `Finish Part ${N} ▸` where `N` is the part of `firstIncomplete()` (a helper returning the index of the first stage not in `completed`), and pressing it jumps there. `#continue` label is set by doc 04 to `Next ▸`. `#back` unchanged. Pressing `#continue` on an example marks it complete then `showStage(i+1)`.
 
 ### Confetti (`fireConfetti`, `drawConfetti`)
 - Guard: `if (REDUCED()) return;` at the top of `fireConfetti`.
 - Per-building burst: today's values (170 from top-centre) — keep.
-- Finale (`currentIndex === STAGES.length − 1`): `fireConfetti('cannons')` — two bursts of 120 from `(0, innerHeight·.8)` and `(innerWidth, innerHeight·.8)` with `vx` ±(6…14) toward centre, `vy` −12…−18.
+- Finale (the completing solve or Next press — i.e. `completed.size === STAGES.length` for the first time this run, tracked by a `finaleShown` flag so it fires from whichever stage finishes the course, exactly once): `fireConfetti('cannons')` on that stage — replacing its per-building burst if it is a quiz stage; an example stage that finishes the course gets only the cannons, since it has no burst of its own — two bursts of 120 from `(0, innerHeight·.8)` and `(innerWidth, innerHeight·.8)` with `vx` ±(6…14) toward centre, `vy` −12…−18.
 
 ### Completion summary `#finale`
 DOM: first child of `<body>`:
@@ -73,7 +73,7 @@ DOM: first child of `<body>`:
 CSS: `#finale{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,calc(100% - 32px));padding:24px 26px;border-radius:18px;background:rgba(20,24,30,.94);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);color:#eef2f6;z-index:40;box-shadow:0 20px 60px rgba(0,0,0,.5)}` `#finale h2{margin:0 0 12px;color:#ffd9a0;font-size:22px}` `#finale ol{margin:0 0 14px;padding-left:22px;line-height:1.6}` `#finale p{color:#dfe6ee;margin:0 0 18px}` `#finale div{display:flex;gap:10px;flex-wrap:wrap}`. Shown 900 ms after the finale confetti (immediately under reduced motion). `#fagain` = same as Start over; `#fclose` hides it and leaves `Start over ▸` in the bottom bar.
 
 ### Flow rules (`resetCourse`, handlers)
-- Start over: `resetCourse()` (existing disposal — now also disposes doc 08's halos and your dots via the existing `traverse`), `completed.clear()`, `showStage(0)`. Do not clear `localStorage`.
+- Start over: `resetCourse()` (existing disposal — now also disposes doc 08's halos and your dots via the existing `traverse`), `completed.clear()`, `finaleShown = false`, `showStage(0)`. Do not clear `localStorage`.
 - Back from stage 0 stays hidden (existing); Back never resets solved state (existing `groups` cache) — keep.
 - Revisiting a finished stage: `resumeQuizState` shows `Next ▸`, no confetti (existing `celebrated`), progress still `.done`.
 
@@ -84,8 +84,8 @@ CSS: `#finale{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);wid
 ## Acceptance checks
 - Stage 02: solve one of two blanks → plate pops for ~0.3 s, gains a green dot top-right, 14 small particles rise from it; `#doorsleft` (doc 08) and the mini-map (doc 09) update; no big confetti yet. Solve the second → full confetti, `Next ▸` appears.
 - Jump bar: caption `Part 1 · Building 3 of 14`; 14 segments, first two green, third amber, gaps at part boundaries.
-- Stage 03 → `Next: Part 2 ▸`; stage 05 → `Next ▸`; stage 13 → `Start over ▸`.
-- Stage 13 completion: two confetti cannons from the bottom corners, then `#finale` with five lines, coloured digits, two buttons; Escape/`Keep looking around` closes it; `Start over ▸` returns to stage 0 with an empty progress bar.
+- Stage 03 → `Next: Part 2 ▸`; stage 05 → `Next ▸`; stage 13, all other stages already complete → `Start over ▸`; stage 13 reached with an earlier stage still incomplete → `Finish Part N ▸` (N from `firstIncomplete()`), and pressing it jumps to that stage.
+- Course completion (whichever stage — of the 14 — is the one that brings `completed.size` to 14, jumping in via the jump bar included): two confetti cannons from the bottom corners on that stage (replacing its per-building burst if it is a quiz stage), then `#finale` with five lines, coloured digits, two buttons; Escape/`Keep looking around` closes it; `Start over ▸` returns to stage 0 with an empty progress bar. Reaching stage 13 first with stages still incomplete does not show `#finale` or fire cannons; finishing the last incomplete stage afterwards does, exactly once (`finaleShown`).
 - Reduced motion: no confetti, no pop (tint only), no particles; the dot and progress still appear; `#finale` appears instantly.
 - Revisit stage 06 after finishing it: dots present, no confetti, `Next ▸` shown.
 - `document.addEventListener('blanksolved', console.log)` logs on every solve, including the building name in stages 08/09.
