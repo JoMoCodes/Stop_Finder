@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Stop Finder — Apartment Number Course</title>
 <style>
   :root { color-scheme: dark; }
@@ -120,6 +120,93 @@
   #qmsg.ok { color: #7ee0a0; }
   #qmsg.bad { color: #ff9a8a; }
   @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+  /* ============================================================
+     RESPONSIVE / MOBILE LAYOUT (design 06)
+     Overrides only — every rule below lives inside a media query so
+     the base (desktop) rules owned by the other docs stay untouched.
+     ============================================================ */
+
+  /* --- coarse pointers anywhere: minimum tap targets --- */
+  @media (pointer: coarse) {
+    button { min-height: 44px; }
+    #jumpbar button.jbtn { width: 44px; height: 44px; }
+    button.opt { min-height: 52px; }
+  }
+
+  /* --- tablets 641-1024px: desktop layout holds, quiz just tucks in --- */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    #quiz { right: 12px; width: 248px; }
+    /* the centred prompt is full-bleed at this width, so drop the jump bar below it */
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); }
+  }
+
+  /* --- phones, portrait --- */
+  @media (max-width: 640px) {
+    #prompt { top: 8px; left: 8px; right: 8px; width: auto; transform: none; padding: 10px 12px 11px;
+      max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; }
+    #prompt .ptitle { font-size: 16px; }
+    #prompt .pbody { font-size: 15px; }
+
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+    #jumpbar .jbtns { gap: 8px; }
+    #jumpbar button.jbtn { width: 40px; height: 40px; }
+    #progress { margin-top: 6px; }
+
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); right: 8px; left: auto; }
+
+    #bottombar { bottom: 12px; gap: 8px; width: calc(100% - 16px); justify-content: center; }
+    #bottombar button { padding: 12px 18px; font-size: 15px; min-height: 46px; }
+
+    #viewbar { top: auto; bottom: 70px; left: 8px; transform: none;
+      flex-direction: row; width: auto; gap: 6px; padding: 8px; }
+    #viewbar .vbtitle { display: none; }
+    #viewbar button.vbtn { min-width: 60px; min-height: 44px; padding: 10px 6px; font-size: 14px; }
+
+    #helpbtn   { right: 8px; bottom: 70px;  left: auto; }
+    #resetview { right: 8px; bottom: 118px; left: auto; padding: 0; width: 40px; height: 40px; }
+    #resetview .rv-label { display: none; }
+    #minimap   { right: 8px; bottom: 166px; left: auto; top: auto; width: 88px; }
+    #draghint  { left: 8px; right: 8px; width: auto; bottom: 130px; }
+
+    #quiz { top: auto; bottom: 0; left: 0; right: 0; width: auto; transform: none; z-index: 30;
+      border-radius: 16px 16px 0 0; border-bottom: none; max-height: 60vh; overflow-y: auto;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); }
+    #qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button.opt { min-height: 56px; display: flex; align-items: center; justify-content: center; }
+    button.opt .ltr { display: none; }
+    button.opt .num { font-size: 24px; }
+    #qclose { width: 44px; height: 44px; top: 4px; right: 4px; }
+    #finale { inset: 0; border-radius: 0; }
+  }
+
+  /* --- phones, landscape --- */
+  @media (max-height: 520px) and (orientation: landscape) {
+    #prompt { top: 8px; left: 8px; right: auto; transform: none; width: min(52vw, 460px);
+      max-height: 44vh; overflow-y: auto; padding: 8px 12px; }
+    #prompt .ptitle { font-size: 14px; }
+    #prompt .pbody { font-size: 13px; }
+
+    #jumpbar { top: auto; bottom: 8px; left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+
+    #bottombar { bottom: 8px; left: auto; right: 8px; transform: none; }
+    #bottombar button { padding: 9px 16px; font-size: 14px; }
+
+    #viewbar { top: auto; bottom: 8px; left: 232px; transform: none;
+      flex-direction: row; width: auto; padding: 8px; gap: 6px; }
+    #viewbar .vbtitle { display: none; }
+    #viewbar button.vbtn { min-width: 56px; min-height: 44px; padding: 8px 6px; font-size: 13px; }
+
+    #quiz { top: 8px; bottom: 8px; right: 8px; left: auto; width: 236px;
+      max-height: none; transform: none; border-radius: 14px; overflow-y: auto; }
+    #qopts { display: flex; flex-direction: column; }
+
+    #minimap { right: 252px; top: 8px; bottom: auto; left: auto; width: 88px; }
+    #doorsleft { top: 8px; right: 8px; }
+    #helpbtn, #resetview { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -1128,6 +1215,11 @@ STAGES.forEach((s, idx) => { if (!(s.part in partStart)) partStart[s.part] = idx
 const jumpBtns = [...document.querySelectorAll('#jumpbar button[data-part]')];
 for (const btn of jumpBtns)
   btn.onclick = () => showStage(partStart[Number(btn.dataset.part)]);
+
+// responsive: publish the prompt banner's rendered height so phone layouts can sit below it
+// offsetHeight is the border box, so the same constant works at every padding size
+new ResizeObserver(([e]) => document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px'))
+  .observe(document.getElementById('prompt'));
 
 const EXAMPLE_PROMPT =
   'This is a common <b>number layout</b> you can find at most <b>apartment buildings</b>. ' +
