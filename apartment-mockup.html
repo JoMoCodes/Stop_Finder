@@ -12,6 +12,24 @@
   canvas { display: block; }
   .hidden { display: none !important; }
 
+  /* ---- accessibility (doc 07) ----------------------------------------
+     Contrast verified against the panel background #14181e (WCAG relative
+     luminance).  No colour changes were needed:
+       amber   #ffd9a0 on panel ......... 13.3 : 1  AA/AAA
+       grey    #9fb0c0 on panel (12 px) .  8.0 : 1  AA
+       success #7ee0a0 on panel ......... 11.1 : 1  AA/AAA
+       error   #ff9a8a on panel ..........  8.7 : 1  AA/AAA
+       blank   #c0392b on the white plate   5.4 : 1  AA
+       text    #08130c on green #57c97e ..  9.1 : 1  AA/AAA
+       doc 09  #f28c6a / #7cc4ff on panel   7.6 / 9.8 : 1  AA
+     -------------------------------------------------------------------- */
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  button:focus-visible, canvas:focus-visible, [tabindex]:focus-visible { outline:3px solid #ffd54a; outline-offset:2px; box-shadow:0 0 0 6px rgba(20,24,30,.9); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    button.opt.wrong { animation:none !important; }
+  }
+
   /* top prompt */
   #prompt {
     position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
@@ -52,7 +70,7 @@
     padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
   #viewbar .vbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 2px; }
-  #viewbar button.vbtn { padding: 10px 14px; font-size: 15px; text-align: center; }
+  #viewbar button.vbtn { padding: 10px 14px; font-size: 15px; text-align: center; min-height: 44px; }
 
   /* top-left "jump to part" menu */
   #jumpbar {
@@ -62,9 +80,9 @@
     padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
   #jumpbar .jbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 8px; }
-  #jumpbar .jbtns { display: flex; gap: 6px; }
+  #jumpbar .jbtns { display: flex; gap: 8px; }
   #jumpbar button.jbtn {
-    width: 34px; height: 34px; padding: 0; font-size: 15px; border-radius: 50%;
+    width: 40px; height: 40px; padding: 0; font-size: 15px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
   }
   #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
@@ -100,17 +118,21 @@
 <body>
 <div id="app"></div>
 
-<div id="prompt"></div>
+<!-- screen-reader text for the 3D scene, and a keyboard route to every blank door -->
+<p id="scene-desc" class="sr-only"></p>
+<div id="doorlist" class="sr-only" role="group" aria-label="Doors to fill in"></div>
+
+<div id="prompt" aria-live="polite" aria-atomic="true"></div>
 
 <!-- right-side multiple-choice panel -->
-<div id="quiz" class="hidden">
+<div id="quiz" class="hidden" role="dialog" aria-labelledby="qhead">
   <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that fits the pattern</small></div>
   <div id="qopts"></div>
-  <div id="qmsg"></div>
+  <div id="qmsg" aria-live="assertive" aria-atomic="true"></div>
 </div>
 
 <!-- Part 5 navigation: jump the camera to each face of the building -->
-<div id="viewbar" class="hidden">
+<div id="viewbar" class="hidden" role="group" aria-label="Walk around the building">
   <div class="vbtitle">Walk around</div>
   <button class="ghost vbtn" data-view="front">Front</button>
   <button class="ghost vbtn" data-view="back">Back</button>
@@ -119,18 +141,18 @@
 </div>
 
 <!-- jump menu: skip to the first building of any part -->
-<div id="jumpbar">
+<div id="jumpbar" role="navigation" aria-label="Jump to part">
   <div class="jbtitle">Jump to part</div>
   <div class="jbtns">
-    <button class="ghost jbtn" data-part="1">1</button>
-    <button class="ghost jbtn" data-part="2">2</button>
-    <button class="ghost jbtn" data-part="3">3</button>
-    <button class="ghost jbtn" data-part="4">4</button>
-    <button class="ghost jbtn" data-part="5">5</button>
+    <button class="ghost jbtn" data-part="1" aria-label="Part 1: numbers count up in order">1</button>
+    <button class="ghost jbtn" data-part="2" aria-label="Part 2: first digit is the floor">2</button>
+    <button class="ghost jbtn" data-part="3" aria-label="Part 3: leading digits name the building">3</button>
+    <button class="ghost jbtn" data-part="4" aria-label="Part 4: numbers wrap front and back">4</button>
+    <button class="ghost jbtn" data-part="5" aria-label="Part 5: one running count, no floor digit">5</button>
   </div>
 </div>
 
-<div id="bottombar">
+<div id="bottombar" role="group" aria-label="Course navigation">
   <button id="back" class="ghost hidden">◀ Back</button>
   <button id="continue" class="hidden">Continue ▸</button>
   <button id="next" class="hidden">Next Building ▸</button>
@@ -1230,6 +1252,277 @@ function drawConfetti() {
     cctx.restore();
   }
 }
+
+/* ============================================================
+   accessibility (doc 07) — keyboard, focus, ARIA, scene text
+   ============================================================ */
+const sceneDescEl = document.getElementById('scene-desc');
+const doorListEl = document.getElementById('doorlist');
+
+/* the canvas is a real, focusable image with a text description */
+renderer.domElement.tabIndex = 0;
+renderer.domElement.setAttribute('role', 'img');
+renderer.domElement.setAttribute('aria-label', '3D view of the building. Use arrow keys to look around.');
+renderer.domElement.setAttribute('aria-describedby', 'scene-desc');
+
+/* ---- scene description + a keyboard door list ---- */
+/* doc 10 toggles the .active class on the jump buttons; the ARIA state is ours */
+function a11yMarkCurrentPart() {
+  if (!currentStage) return;
+  for (const b of jumpBtns) {
+    if (Number(b.dataset.part) === currentStage.part) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  }
+}
+const A11Y_ORD = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
+
+/* which wall a plate sits on, from its yaw */
+function a11yFace(plate) {
+  const y = ((plate.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  if (Math.abs(y - Math.PI / 2) < 0.4) return 'right';
+  if (Math.abs(y - Math.PI * 1.5) < 0.4) return 'left';
+  if (Math.abs(y - Math.PI) < 0.4) return 'back';
+  return 'front';
+}
+/* position along that wall, increasing left-to-right as the viewer sees it */
+function a11yAlong(plate, face) {
+  const p = plate.position;
+  return face === 'front' ? p.x : face === 'back' ? -p.x : face === 'left' ? p.z : -p.z;
+}
+/* every floor in the course is 3.2 units high and plates sit ~2.5 above it */
+function a11yFloor(plate) { return Math.round((plate.position.y - 2.5) / 3.2) + 1; }
+/* every number plate in a building group: a flat sign sitting one plate-height
+   above a floor slab (this skips roof banners, side signs, arrows and windows) */
+function a11yPlates(group) {
+  const out = [];
+  group.traverse(o => {
+    if (!o.isMesh || !o.geometry || o.geometry.type !== 'PlaneGeometry') return;
+    const k = Math.round((o.position.y - 2.5) / 3.2);
+    if (k >= 0 && Math.abs(o.position.y - (2.5 + 3.2 * k)) < 0.15) out.push(o);
+  });
+  return out;
+}
+
+/* the partial number printed on a blank plate, taken from the stage data */
+function a11yMask(bstate) {
+  const st = currentStage;
+  if (!st) return '?';
+  if (st.type === 'row' && st.floors) {
+    for (const row of st.floors)
+      for (const cell of row)
+        if (Array.isArray(cell) && cell[0] === bstate.value) return cell[1];
+  } else if (st.type === 'block' && st.blanks) {
+    return st.blanks[bstate.value] || '?';
+  } else if (st.type === 'seq' && st.blanks) {
+    return st.blanks[bstate.value - st.base] || '?';
+  }
+  return '?';
+}
+function a11ySpokenMask(mask) {
+  if (mask === '?') return 'no number yet';
+  return mask.replace(/_+/g, ' blank ').replace(/\s+/g, ' ').trim();
+}
+
+/* ---- one sentence describing the building the camera is looking at ---- */
+function a11yStageText() {
+  const st = currentStage;
+  if (!st) return '';
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  let text;
+  if (st.type === 'tower') {
+    const lo = 100 + Math.min(...st.suffixes), hi = 400 + Math.max(...st.suffixes);
+    text = `Four-storey building ${st.label} with three doors per floor, unit numbers ${lo} to ${hi}; ` +
+           `the first digit is the floor.`;
+  } else if (st.type === 'row') {
+    const all = st.floors.flat().map(c => (Array.isArray(c) ? c[0] : c));
+    const named = st.kind === 'example' || !st.chooseBuilding;
+    text = `Two-storey ${named ? `building ${st.building}` : 'building, its number still hidden,'} ` +
+           `with five doors per floor, unit numbers ${Math.min(...all)} to ${Math.max(...all)}; ` +
+           `the leading digits name the building and the next digit is the floor.`;
+  } else if (st.type === 'block') {
+    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them; ` +
+           `five-digit units where the leading digits are the building, then the floor, then the door.`;
+  } else if (st.type === 'seq') {
+    text = `Three-storey building ${st.building} with twenty doors around all four sides, ` +
+           `unit numbers ${st.base + 1} to ${st.base + 20}; one running count with no floor digit.`;
+  } else {
+    const last = st.kind === 'example' ? st.start + 7 : st.start + 3;
+    text = `Two-storey building ${st.number} with four doors, two on each floor, ` +
+           `unit numbers ${st.start} to ${last} counting up in order.`;
+  }
+  if (st.kind === 'example') return text + ' This is a worked example — every door already shows its number.';
+  const left = ud ? ud.blankStates.filter(b => !b.solved).length : 0;
+  const bld = ud && ud.buildingState && !ud.buildingState.solved;
+  if (left) return `${text} ${left} door${left === 1 ? ' is' : 's are'} blank — use the door list to fill ${left === 1 ? 'it' : 'them'} in.`;
+  if (bld) return `${text} Every door is filled in — now choose the building number.`;
+  return `${text} Every door is filled in.`;
+}
+
+function a11yDescribeStage() {
+  if (!sceneDescEl) return;
+  const text = a11yStageText();
+  if (sceneDescEl.textContent !== text) sceneDescEl.textContent = text;
+}
+
+/* ---- a real button per unsolved blank, so Tab reaches every door ---- */
+function a11yRebuildDoorList() {
+  if (!doorListEl) return;
+  doorListEl.innerHTML = '';
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (!ud || !currentStage || currentStage.kind !== 'quiz') return;
+
+  // rank every blank among ALL the plates sharing its floor and wall
+  const rank = new Map();
+  const buckets = new Map();
+  for (const plate of a11yPlates(groups[currentIndex])) {
+    const key = a11yFace(plate) + '/' + a11yFloor(plate);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(plate);
+  }
+  for (const [key, list] of buckets) {
+    const face = key.split('/')[0];
+    list.sort((x, y) => a11yAlong(x, face) - a11yAlong(y, face));
+    list.forEach((plate, i) => rank.set(plate, i));
+  }
+
+  // read them out in walking order: front wall first, then left, back, right
+  const faceOrder = { front: 0, left: 1, back: 2, right: 3 };
+  const open = ud.blankStates.filter(b => !b.solved).sort((x, y) => {
+    const fx = a11yFace(x.plate), fy = a11yFace(y.plate);
+    return (faceOrder[fx] - faceOrder[fy]) || (a11yFloor(x.plate) - a11yFloor(y.plate)) ||
+           (a11yAlong(x.plate, fx) - a11yAlong(y.plate, fy));
+  });
+
+  for (const b of open) {
+    const face = a11yFace(b.plate), floor = a11yFloor(b.plate);
+    const pos = rank.has(b.plate) ? rank.get(b.plate) : 0;
+    const ord = A11Y_ORD[pos] || `number ${pos + 1}`;
+    const mask = a11yMask(b);
+    const where = `floor ${floor}, ${ord} from the left on the ${face}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `Door showing ${mask.replace(/_/g, '▢')}, ${where} — open its options`;
+    btn.setAttribute('aria-label', `Door showing ${a11ySpokenMask(mask)}, ${where} — open its options`);
+    btn.onclick = () => openQuiz(b);
+    doorListEl.appendChild(btn);
+  }
+
+  const bs = ud.buildingState;
+  if (bs && !bs.solved && ud.blankStates.every(x => x.solved)) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Choose the building number — open its options';
+    btn.onclick = () => openQuiz(bs);
+    doorListEl.appendChild(btn);
+  }
+}
+
+/* ---- focus management + keyboard map ---- */
+let a11yReturnFocus = null;
+
+function a11yOnQuizOpen() {
+  const prev = document.activeElement;
+  if (prev && prev !== document.body && !ui.quiz.contains(prev)) a11yReturnFocus = prev;
+  setTimeout(() => {
+    const first = ui.qopts.querySelector('button.opt:not([disabled])');
+    if (first) first.focus();
+  }, 0);
+}
+function a11yOnQuizClose() {
+  const back = a11yReturnFocus;
+  a11yReturnFocus = null;
+  setTimeout(() => {
+    if (back && back.isConnected) back.focus();
+    else renderer.domElement.focus();
+  }, 0);
+}
+
+/* orbit by keyboard. doc 02 owns orbitBy(); until it lands, turn the camera
+   here so the arrow keys still work. */
+function a11yOrbit(dAz, dEl) {
+  if (typeof orbitBy === 'function') { orbitBy(dAz, dEl); return; }
+  const off = camera.position.clone().sub(controls.target);
+  const sph = new THREE.Spherical().setFromVector3(off);
+  sph.theta += dAz * Math.PI / 180;
+  sph.phi = Math.min(Math.max(sph.phi + dEl * Math.PI / 180, 0.08), controls.maxPolarAngle);
+  camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+  controls.update();
+}
+function a11yResetView() {
+  if (typeof resetView === 'function') resetView();
+  else if (currentStage) frameStage(currentStage);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  const quizOpen = !!activeBlank && !ui.quiz.classList.contains('hidden');
+
+  if (quizOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeQuiz(); return; }
+    const opts = [...ui.qopts.querySelectorAll('button.opt:not([disabled])')];
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && opts.length) {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      const at = opts.indexOf(document.activeElement);
+      const to = at < 0 ? (step > 0 ? 0 : opts.length - 1) : (at + step + opts.length) % opts.length;
+      opts[to].focus();
+      return;
+    }
+    const k = e.key.toLowerCase();
+    const idx = '1234'.indexOf(k) >= 0 ? '1234'.indexOf(k) : 'abcd'.indexOf(k);
+    if (idx >= 0) {
+      const btn = [...ui.qopts.querySelectorAll('button.opt')][idx];
+      if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+      return;
+    }
+    return;   // the quiz owns the keyboard while it is open
+  }
+
+  if (e.key === 'Home') { e.preventDefault(); a11yResetView(); return; }
+
+  // camera keys only from the canvas or the page background — never steal
+  // Enter/Space/arrows from another control
+  if (t && t !== document.body && t !== renderer.domElement &&
+      typeof t.closest === 'function' && t.closest('button, a[href], [tabindex]:not(canvas)')) return;
+
+  switch (e.key) {
+    case 'ArrowLeft':  e.preventDefault(); a11yOrbit(-15, 0); break;
+    case 'ArrowRight': e.preventDefault(); a11yOrbit(15, 0); break;
+    case 'ArrowUp':    e.preventDefault(); a11yOrbit(0, -10); break;
+    case 'ArrowDown':  e.preventDefault(); a11yOrbit(0, 10); break;
+    default: {
+      if (!currentStage || currentStage.type !== 'seq') return;
+      const view = { f: 'front', b: 'back', l: 'left', r: 'right' }[e.key.toLowerCase()];
+      if (view && typeof setSeqView === 'function') { e.preventDefault(); setSeqView(view); }
+    }
+  }
+});
+
+/* ---- wiring: the doc 05/10 events when they exist, a cheap poll otherwise.
+   Every handler is idempotent, so firing from both sources is harmless. ---- */
+let a11ySig = null, a11yQuizWasOpen = false;
+function a11ySync() {
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  const sig = currentIndex + '|' +
+    (ud ? ud.blankStates.filter(b => b.solved).length + '/' + ud.blankStates.length : '-') + '|' +
+    (ud && ud.buildingState ? (ud.buildingState.solved ? 'b1' : 'b0') : '-');
+  if (sig !== a11ySig) {
+    a11ySig = sig;
+    a11yMarkCurrentPart();
+    a11yDescribeStage();
+    a11yRebuildDoorList();
+  }
+  const open = !!activeBlank && !ui.quiz.classList.contains('hidden');
+  if (open !== a11yQuizWasOpen) {
+    a11yQuizWasOpen = open;
+    if (open) a11yOnQuizOpen(); else a11yOnQuizClose();
+  }
+}
+for (const ev of ['stagechange', 'blanksolved', 'quizopen', 'quizclose'])
+  document.addEventListener(ev, a11ySync);
+setInterval(a11ySync, 200);
 
 /* ============================================================
    loop + resize
