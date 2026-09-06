@@ -36,6 +36,8 @@
     border: 1px solid rgba(255,255,255,0.20); font-weight: 500; padding: 11px 20px;
   }
   button.ghost:hover { background: rgba(255,255,255,0.18); }
+  #viewbar button.vbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
+  #resetview { position: fixed; right: 22px; bottom: 80px; z-index: 11; padding: 9px 14px; font-size: 14px; }
 
   /* bottom button bar */
   #bottombar {
@@ -135,6 +137,8 @@
   <button id="continue" class="hidden">Continue ▸</button>
   <button id="next" class="hidden">Next Building ▸</button>
 </div>
+
+<button id="resetview" class="ghost hidden" aria-label="Reset the camera to the default view">↺ <span class="rv-label">Reset view</span></button>
 
 <script type="importmap">
 {
@@ -240,7 +244,13 @@ app.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI * 0.49;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;                       // panning is how buildings get lost
+controls.minPolarAngle = 0.18;                    // no straight-down "map" view
+controls.maxPolarAngle = Math.PI * 0.49;          // never under the ground
+controls.minDistance = 8;
+controls.maxDistance = 95;
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 0.9));
 const sun = new THREE.DirectionalLight(0xfff4e0, 1.05);
@@ -977,33 +987,164 @@ let activeBlank = null; // blank whose options are open
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+/* ---- camera framing -------------------------------------------------
+   One canonical desktop pose per stage type. Portrait phones back the
+   camera off and widen the lens so the whole building still fits, rather
+   than making the learner pinch-zoom on every stage. ---- */
+const POSES = {
+  tower: { pos: [7, TH * 0.5, 38],  tgt: [0, TH * 0.42, 0] },
+  row:   { pos: [0, RH * 0.85, 32], tgt: [0, RH * 0.5, 0] },
+  block: { pos: [10, BH * 0.5, 42], tgt: [0, BH * 0.42, 0] },
+  // low enough that the walkway lips don't clip the floor-1 plates
+  seq:   { pos: [-30, 9, 34],       tgt: [0, 4.5, 0] },
+  plex:  { pos: [5, H * 0.6, 25],   tgt: [0, H * 0.45, 0] },
+};
+const SEQ_VIEWS = {
+  front: [0, 9, 38], back: [0, 9, -38], left: [-40, 9, 0], right: [40, 9, 0],
+};
+const SEQ_VIEW_TARGET = [0, 4.5, 0];
+/* tuned at 390x844: the Part 3 row keeps all five doors plus the stair on
+   screen with ~7% margin each side */
+const PORTRAIT_BACKOFF = 1.55;
+
+const MOVE_MS = 350;      // stage change + walk-around buttons
+const RESET_MS = 450;     // Reset view chip
+const INTRO_MS = 1400;    // one-time "this rotates" swing
+const INTRO_HOLD_MS = 300;
+const INTRO_SWING_DEG = -18;
+
+const reduceMotionMQ = matchMedia('(prefers-reduced-motion: reduce)');
+function prefersReducedMotion() { return reduceMotionMQ.matches; }
+
+function poseFor(st) {
+  const p = POSES[st && st.type] || POSES.plex;
+  const pos = new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2]);
+  const tgt = new THREE.Vector3(p.tgt[0], p.tgt[1], p.tgt[2]);
+  // portrait: pull straight back along the view ray, keeping the framing
+  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  return { pos, tgt };
+}
+
+/* portrait phones widen the lens so a 24-wide row still fits across */
+function applyViewportFov() {
+  const fov = camera.aspect < 1 ? Math.min(74, 50 / Math.sqrt(camera.aspect)) : 50;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+}
+
+/* ---- eased camera moves --------------------------------------------
+   Cubic ease-out on its own rAF loop. Controls are disabled while the
+   camera is in flight; a new call cancels the one in progress. Under
+   reduced motion every move becomes an instant cut. ---- */
+let flyRAF = 0, flying = false, flySeq = 0;
+
+function flyTo(pos, tgt, ms = MOVE_MS) {
+  flySeq++;
+  if (flyRAF) { cancelAnimationFrame(flyRAF); flyRAF = 0; }
+  if (prefersReducedMotion()) ms = 0;
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  const land = () => {
+    flyRAF = 0; flying = false;
+    camera.position.copy(pos); controls.target.copy(tgt);
+    controls.enabled = true; controls.update();
+    updateResetChip();
+  };
+  if (ms <= 0 || (p0.distanceTo(pos) < 1e-3 && t0.distanceTo(tgt) < 1e-3)) { land(); return; }
+  flying = true; controls.enabled = false;
+  const t0ms = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0ms) / ms);
+    const e = 1 - Math.pow(1 - k, 3);          // ease-out, no overshoot
+    camera.position.lerpVectors(p0, pos, e);
+    controls.target.lerpVectors(t0, tgt, e);
+    controls.update();
+    if (k < 1) flyRAF = requestAnimationFrame(step);
+    else land();
+  };
+  flyRAF = requestAnimationFrame(step);
+}
+
+/* one-time swing on the very first framing: start 18 degrees off the
+   resting pose and glide in, so "the building rotates" is shown, not told */
+let introRunning = false;
+function introSwing(pos, tgt) {
+  if (prefersReducedMotion()) { flyTo(pos, tgt, 0); return; }
+  const sph = new THREE.Spherical().setFromVector3(pos.clone().sub(tgt));
+  sph.theta += THREE.MathUtils.degToRad(INTRO_SWING_DEG);
+  const from = new THREE.Vector3().setFromSpherical(sph).add(tgt);
+  introRunning = true;                         // the chip must not flash during the swing
+  flyTo(from, tgt, 0);
+  const seq = flySeq;                          // abandon if anything else moves the camera
+  setTimeout(() => {
+    if (flySeq !== seq) { introRunning = false; return; }
+    flyTo(pos, tgt, INTRO_MS);
+    setTimeout(() => { introRunning = false; updateResetChip(); }, INTRO_MS + 60);
+  }, INTRO_HOLD_MS);
+}
+
+let firstFrame = true;
 function frameStage(st) {
-  if (st.type === 'tower') {
-    camera.position.set(7, TH * 0.5, 38);
-    controls.target.set(0, TH * 0.42, 0);
-  } else if (st.type === 'row') {
-    camera.position.set(0, RH * 0.85, 32);
-    controls.target.set(0, RH * 0.5, 0);
-  } else if (st.type === 'block') {
-    camera.position.set(10, BH * 0.5, 42);
-    controls.target.set(0, BH * 0.42, 0);
-  } else if (st.type === 'seq') {
-    camera.position.set(-30, 9, 34);      // low enough that the walkway lips don't clip the floor-1 plates
-    controls.target.set(0, 4.5, 0);
-  } else {
-    camera.position.set(5, H * 0.6, 25);
-    controls.target.set(0, H * 0.45, 0);
-  }
-  controls.update();
+  applyViewportFov();
+  markSeqViewButton(null);          // a stage change is not one of the walk-around views
+  const { pos, tgt } = poseFor(st);
+  if (firstFrame) { firstFrame = false; introSwing(pos, tgt); }
+  else flyTo(pos, tgt, MOVE_MS);
 }
 
 /* the Front/Back/Left/Right buttons for the Part 5 dollhouse */
 function setSeqView(view) {
-  const yT = 4.5;
-  if (view === 'front')      { camera.position.set(0, 9, 38);   controls.target.set(0, yT, 0); }
-  else if (view === 'back')  { camera.position.set(0, 9, -38);  controls.target.set(0, yT, 0); }
-  else if (view === 'left')  { camera.position.set(-40, 9, 0);  controls.target.set(0, yT, 0); }
-  else if (view === 'right') { camera.position.set(40, 9, 0);   controls.target.set(0, yT, 0); }
+  const v = SEQ_VIEWS[view];
+  if (!v) return;
+  const tgt = new THREE.Vector3(SEQ_VIEW_TARGET[0], SEQ_VIEW_TARGET[1], SEQ_VIEW_TARGET[2]);
+  const pos = new THREE.Vector3(v[0], v[1], v[2]);
+  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  markSeqViewButton(view);
+  flyTo(pos, tgt, MOVE_MS);
+}
+
+function markSeqViewButton(view) {
+  for (const b of document.querySelectorAll('#viewbar button[data-view]'))
+    b.classList.toggle('active', b.dataset.view === view);
+}
+
+/* ---- Reset view ------------------------------------------------------
+   No camera lock during quizzes — exploring matters — but a chip appears
+   as soon as the learner has drifted well away from the stage pose. ---- */
+const resetChip = document.getElementById('resetview');
+
+function driftedFromPose() {
+  if (!currentStage) return false;
+  const { pos, tgt } = poseFor(currentStage);
+  return camera.position.distanceTo(pos) > 4 || controls.target.distanceTo(tgt) > 1.5;
+}
+function updateResetChip() {
+  if (!resetChip) return;
+  if (flying || introRunning) return;          // don't flicker mid-glide
+  resetChip.classList.toggle('hidden', !driftedFromPose());
+}
+function resetView() {
+  if (!currentStage) return;
+  const { pos, tgt } = poseFor(currentStage);
+  markSeqViewButton(null);
+  flyTo(pos, tgt, RESET_MS);
+}
+if (resetChip) resetChip.onclick = resetView;
+
+let dragging = false;
+controls.addEventListener('change', updateResetChip);
+controls.addEventListener('start', () => {
+  dragging = true; flySeq++;                   // a touch of the mouse abandons a pending intro swing
+  markSeqViewButton(null);
+});
+controls.addEventListener('end', () => { dragging = false; updateResetChip(); });
+
+/* rotate the camera about the orbit target — doc 07 binds this to the
+   arrow keys so the scene is reachable without a pointer */
+function orbitBy(dAzDeg, dPolDeg) {
+  const sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+  sph.theta += THREE.MathUtils.degToRad(dAzDeg);
+  sph.phi = THREE.MathUtils.clamp(
+    sph.phi + THREE.MathUtils.degToRad(dPolDeg), controls.minPolarAngle, controls.maxPolarAngle);
+  camera.position.setFromSpherical(sph).add(controls.target);
   controls.update();
 }
 
@@ -1238,6 +1379,9 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  applyViewportFov();
+  // re-frame on orientation / window changes, unless a drag is under way
+  if (currentStage && !dragging) { const { pos, tgt } = poseFor(currentStage); flyTo(pos, tgt, 0); }
   sizeConfetti();
 });
 (function tick() {
