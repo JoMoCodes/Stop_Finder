@@ -297,14 +297,113 @@ function box(parent, w, h, d, color, x, y, z, opts = {}) {
   parent.add(m);
   return m;
 }
+/* ---- plate / sign typography ----
+   One font stack for every number in the scene, numerals that fill their
+   plate, and a blank style that reads without colour (dashed frame + hollow
+   boxes where digits are missing). */
+const PLATE_FONT = '"Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif';
+const PLATE_FG = '#16202b', PLATE_BG = 'rgba(255,255,255,0.96)';
+const BLANK_FG = '#c0392b';                 // 5.4:1 on the white plate
+const BLANK_ON_DARK = '#ffd9a0';            // same cue on the dark banner
+const BLANK_DASH = { width: 14, dash: [40, 26], inset: 22 };   // in 1024-px canvas units
+
+/* is this CSS colour dark? accepts #rgb, #rrggbb, rgb() and rgba() */
+function isDarkBg(css) {
+  if (!css) return false;
+  let r = 255, g = 255, b = 255;
+  const m = /rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(css);
+  if (m) { r = +m[1]; g = +m[2]; b = +m[3]; }
+  else if (css[0] === '#') {
+    const hx = css.slice(1), t = hx.length === 3 ? hx.replace(/./g, c => c + c) : hx;
+    r = parseInt(t.slice(0, 2), 16); g = parseInt(t.slice(2, 4), 16); b = parseInt(t.slice(4, 6), 16);
+  }
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
+}
+
+/* a hollow rounded box standing in for one missing digit, baseline-aligned */
+function drawDigitBox(ctx, x, baselineY, adv, cap, color) {
+  const bw = adv * 0.84, bh = cap * 0.78, r = Math.min(bw, bh) * 0.18;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, cap * 0.09);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x + (adv - bw) / 2, baselineY - bh, bw, bh, r);
+  else ctx.rect(x + (adv - bw) / 2, baselineY - bh, bw, bh);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function makeTextTexture(text, opts = {}) {
-  const { w = 512, h = 256, bg = 'rgba(255,255,255,0.95)', fg = '#16202b', font = 'bold 170px sans-serif' } = opts;
+  const s = String(text);
+  const isBlank = /[?_]/.test(s);
+  const wide = s.length > 3;                                  // 4-5 digit units get more pixels
+  const { w = wide ? 768 : 512, h = wide ? 384 : 256,
+    bg = PLATE_BG, fg = PLATE_FG, font = 'bold 170px sans-serif' } = opts;
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
-  ctx.fillStyle = fg; ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, w / 2, h / 2);
-  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8; return tex;
+
+  /* keep the caller's weight and size, always force our own family */
+  const fm = /^\s*(.*?)(\d+(?:\.\d+)?)px\s/.exec(font);
+  const weight = fm ? fm[1].trim() : 'bold';
+  const base = fm ? parseFloat(fm[2]) : 170;
+  const fontAt = px => `${weight} ${px}px ${PLATE_FONT}`.trim();
+
+  /* the dashed blank frame, and the room it leaves for the text */
+  const k = w / 1024, dashLw = BLANK_DASH.width * k, dashInset = BLANK_DASH.inset * k + dashLw / 2;
+  const pad = isBlank ? dashInset + dashLw : 0;
+  const availW = w - 2 * pad, availH = h - 2 * pad;
+
+  /* fit to the plate: <= 86 % of the width, cap height <= 72 % of the height,
+     never more than 1.35x the size the caller asked for (scaled with the
+     canvas, so a 768x384 plate is not left with small numerals) */
+  const probe = s.replace(/_/g, '0');                         // a box takes a digit's room
+  ctx.font = fontAt(100);
+  const pm = ctx.measureText(probe);
+  const wPer = (pm.width || 50) / 100;
+  const ascPer = (pm.actualBoundingBoxAscent || 72) / 100;
+  const descPer = (pm.actualBoundingBoxDescent || 0) / 100;
+  const px = Math.max(8, Math.min(0.86 * availW / wPer, 0.72 * availH / ascPer,
+    0.88 * availH / (ascPer + descPer), 1.35 * base * (h / 256)));
+  ctx.font = fontAt(px);
+  const dm = ctx.measureText('0');
+  const cap = dm.actualBoundingBoxAscent || px * 0.72;         // digit cap height
+  const asc = ascPer * px, desc = descPer * px;
+  const baselineY = (h - (asc + desc)) / 2 + asc;              // centre the ink, not the em
+  const blankFg = isDarkBg(bg) ? BLANK_ON_DARK : BLANK_FG;
+
+  if (isBlank) {                                              // dashed frame = still missing
+    ctx.save();
+    ctx.strokeStyle = blankFg; ctx.lineWidth = dashLw;
+    ctx.setLineDash(BLANK_DASH.dash.map(d => d * k));
+    ctx.strokeRect(dashInset, dashInset, w - 2 * dashInset, h - 2 * dashInset);
+    ctx.restore();
+  }
+
+  ctx.textBaseline = 'alphabetic';
+  if (isBlank) {                                              // glyph by glyph: '_' -> box
+    ctx.textAlign = 'left';
+    const adv = ch => ctx.measureText(ch === '_' ? '0' : ch).width;
+    const chars = Array.from(s);
+    let x = (w - chars.reduce((t, ch) => t + adv(ch), 0)) / 2;
+    for (const ch of chars) {
+      const a = adv(ch);
+      if (ch === '_') drawDigitBox(ctx, x, baselineY, a, cap, blankFg);
+      else { ctx.fillStyle = ch === '?' ? blankFg : fg; ctx.fillText(ch, x, baselineY); }
+      x += a;
+    }
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = fg;
+    ctx.fillText(s, w / 2, baselineY);
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
 }
 function label(parent, text, pw, ph, texOpts = {}) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
@@ -314,6 +413,7 @@ function label(parent, text, pw, ph, texOpts = {}) {
 function setPlateText(plate, text, texOpts = {}) {
   plate.material.map.dispose();
   plate.material.map = makeTextTexture(text, texOpts);
+  plate.material.color.set('#ffffff');   // drop any hover tint on solve
   plate.material.needsUpdate = true;
 }
 
@@ -404,7 +504,7 @@ function buildShell(g, number) {
   for (const ex of [1, -1]) box(g, sw, st, D + 2 * sw, COLOR.walkway, ex * (W / 2 + sw / 2), sy, 0);
 
   for (const ex of [1, -1]) {
-    const sign = label(g, String(number), 2.4, 2.4, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 320px sans-serif' });
+    const sign = label(g, String(number), 2.4, 2.4, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 320px sans-serif', w: 512, h: 512 });
     sign.position.set(ex * (W / 2 + 0.06), H * 0.6, 0);
     sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
   }
@@ -444,7 +544,7 @@ function buildTowerShell(g, txt) {
 
   // building identifier — a LETTER, so it can't be mistaken for the floor digit
   for (const ex of [1, -1]) {
-    const sign = label(g, txt, 2.6, 2.6, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 300px sans-serif' });
+    const sign = label(g, txt, 2.6, 2.6, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 300px sans-serif', w: 512, h: 512 });
     sign.position.set(ex * (TW / 2 + 0.06), TH * 0.62, 0);
     sign.rotation.y = ex > 0 ? -Math.PI / 2 : Math.PI / 2;
   }
@@ -548,12 +648,13 @@ function buildSlabShell(g, w, d, floors, fh) {
 /* a wide banner across the top of the front. Also the plate the learner
    updates when they name the building. Returns the plate. */
 function addTopBanner(g, h, halfD, text) {
-  const plate = label(g, text, 9.6, 2.4,
-    { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 256 });
-  plate.position.set(0, h + 1.2, halfD + 0.12);
+  const plate = label(g, text, 9.6, 2.0, BANNER_OPTS);
+  plate.position.set(0, h + 1.9, halfD + 0.12);
+  for (const ex of [1, -1])                    // posts: the sign stands on the roof slab
+    box(g, 0.16, 0.9, 0.16, COLOR.roof, ex * 4.2, h + 0.45, halfD + 0.05);
   return plate;
 }
-const BANNER_OPTS = { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 256 };
+const BANNER_OPTS = { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 214 };
 
 /* one front façade: RFLOORS x 5 doors. Each cell is either a number (shown)
    or a [value, mask] pair (blank — mask is the partial string, e.g. '710_'). */
@@ -732,12 +833,14 @@ function buildSeqStructure(g, number) {
 
   // building number over the front and back, and mid-height on each side
   for (const sz of [1, -1]) {
-    const b = label(g, `Building ${number}`, 9.6, 2.4, BANNER_OPTS);
-    b.position.set(0, SQH + 1.2, sz * (SQHD + 0.12));
+    const b = label(g, `Building ${number}`, 9.6, 2.0, BANNER_OPTS);
+    b.position.set(0, SQH + 1.9, sz * (SQHD + 0.12));
     b.rotation.y = sz > 0 ? 0 : Math.PI;
+    for (const ex of [1, -1])
+      box(g, 0.16, 0.9, 0.16, COLOR.roof, ex * 4.2, SQH + 0.45, sz * (SQHD + 0.05));
   }
   for (const sx of [1, -1]) {
-    const sign = label(g, `Building ${number}`, 4.2, 1.05,
+    const sign = label(g, `Building ${number}`, 5.0, 1.25,
       { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 120px sans-serif', w: 1024, h: 256 });
     sign.position.set(sx * (SQHW + 0.12), SQH * 0.62, 0);
     sign.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -926,7 +1029,7 @@ function buildStageGroup(i) {
   } else if (st.type === 'row') {
     buildSlabShell(g, RW, RD, RFLOORS, RFH);
     const named = st.kind === 'example' || !st.chooseBuilding;
-    const banner = addTopBanner(g, RH, RHALF_D, named ? `Building ${st.building}` : 'Building #');
+    const banner = addTopBanner(g, RH, RHALF_D, named ? `Building ${st.building}` : 'Building ?');
     buildRowFacade(g, st.floors, raycastList, blankStates);
     if (st.kind === 'quiz' && st.chooseBuilding) {
       buildingState = {
