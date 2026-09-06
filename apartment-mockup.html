@@ -15,12 +15,17 @@
   /* top prompt */
   #prompt {
     position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-    width: min(760px, calc(100% - 32px));
-    background: rgba(20, 24, 30, 0.86); backdrop-filter: blur(6px);
+    width: min(680px, calc(100% - 32px));
+    background: rgba(20, 24, 30, 0.9); backdrop-filter: blur(6px);
     color: #eef2f6; border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 14px; padding: 16px 20px; line-height: 1.55; font-size: 15px;
-    box-shadow: 0 10px 34px rgba(0,0,0,0.4); z-index: 10; text-align: center;
+    border-radius: 14px; padding: 14px 20px 15px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.4); z-index: 10; text-align: left;
   }
+  #prompt .ptitle { color: #ffd9a0; font-weight: 700; font-size: 17px; line-height: 1.3; margin-bottom: 4px; }
+  #prompt .pbody  { color: #dfe6ee; font-size: 15px; line-height: 1.5; }
+  #prompt .pbody b { color: #ffd9a0; font-weight: 600; }
+  #prompt .pbody i { font-style: normal; color: #eef2f6; text-decoration: underline dotted; }
+  #prompt .pbody .nb { white-space: nowrap; }
   #prompt b { color: #ffd9a0; }
 
   /* buttons */
@@ -935,38 +940,85 @@ const jumpBtns = [...document.querySelectorAll('#jumpbar button[data-part]')];
 for (const btn of jumpBtns)
   btn.onclick = () => showStage(partStart[Number(btn.dataset.part)]);
 
-const EXAMPLE_PROMPT =
-  'This is a common <b>number layout</b> you can find at most <b>apartment buildings</b>. ' +
-  'The units count up in order — the <b>yellow arrows</b> show the direction the pattern flows. ' +
-  'Drag to look around and <b>memorize the pattern</b>, then on the next buildings you will ' +
-  '<b>fill in the missing unit numbers</b>. When you are ready, <b>click Continue</b>.';
+/* ---- prompt banner copy: one amber headline + a short plain-language body ----
+   `short` is used on phones (<=640px) so the banner stays above the building. */
+const plSpan = (cls, txt) => `<span class="pl pl-${cls}">${txt}</span>`;
 
-const EXAMPLE2_PROMPT =
-  '<b>Part 2 — the first digit.</b> Taller buildings use <b>3-digit unit numbers</b>. ' +
-  'The trick: the <b>first digit tells you the floor</b> — floor 1 is 1__, floor 2 is 2__, and so on. ' +
-  'The last two digits stay the same as you go <b>straight up</b> a column. ' +
-  'Notice every unit on floor 3 starts with <b>3</b>. Drag to look around, and when you have it, <b>click Ready</b>.';
+const PROMPTS = {
+  p1example: {
+    title: 'Part 1 · Numbers count up in order',
+    body:  'Ground floor 101, 102 — upstairs 103, 104 — then it continues round the back (<span class="nb">105–108</span>). ' +
+           'The <b>yellow arrows</b> show the reading order. <b>Drag</b> to look around.',
+    short: '101, 102 downstairs; 103, 104 upstairs. Follow the <b>yellow arrows</b>. Drag to look.',
+  },
+  p1quiz: {
+    title: n => `Building ${n} · Follow the same pattern`,
+    body:  'Click a door marked <b>?</b>, then pick the number that continues the count.',
+  },
+  p2example: {
+    title: 'Part 2 · The first digit is the floor',
+    body:  'Floor 1 is <b>1</b>__, floor 2 is <b>2</b>__, and so on. ' +
+           'Straight up a column only the first digit changes.',
+    short: 'Floor 1 = 1__, floor 2 = 2__. Up a column, only the first digit changes.',
+  },
+  p2quiz: {
+    title: (n, d) => `Building ${n} · ${d} — first digit = floor`,
+    body:  'Click a door marked <b>?</b>. Read its floor first, then its column.',
+  },
+  p3example: {
+    title: 'Part 3 · Leading digits name the building',
+    body:  'Every unit here starts with <b>1</b>, so this is Building 1. Then the floor, then the door: ' +
+           plSpan('building', '1') + '·' + plSpan('floor', '1') + '·' + plSpan('door', '09') + '.',
+    short: 'Building · floor · door: ' + plSpan('building', '1') + '·' + plSpan('floor', '1') + '·' + plSpan('door', '09') +
+           '. Every unit starts with 1 — Building 1.',
+  },
+  p3quiz: {
+    title: n => `Building ${n} · Fill the doors, then name the building`,
+    body:  'Click a door with a <b>partial number</b> (like 71▢5 — one digit missing) and pick the full number. ' +
+           'When every door is done, the roof sign asks for the building number.',
+    short: 'Click a <b>partial number</b> (like 71▢5), pick the full one. Then name the building.',
+  },
+  p4example: {
+    title: 'Part 4 · Numbers wrap front and back',
+    body:  'Each front door has a door directly <b>behind</b> it, and the count carries on there. ' +
+           'Study the front, then <b>drag</b> to spin round and check the back.',
+    short: 'The count continues on the doors <b>behind</b>. Drag to spin and check the back.',
+  },
+  p4quiz: {
+    title: n => `Building ${n} · Front and back`,
+    body:  'Drag to spin the building. Click a door with a <b>partial number</b> and pick the full unit.',
+  },
+  p5example: {
+    title: 'Part 5 · No floor digit — one running count',
+    body:  n => `Building ${n} counts <span class="nb">601 → 620</span> around the outside, floor by floor. ` +
+           'Floor 1 holds the lowest (601) <i>and</i> the highest (<span class="nb">617–620</span>). ' +
+           'Use <b>Front / Back / Left / Right</b> to walk round.',
+    short: '<span class="nb">601 → 620</span> runs round the building. Floor 1 has 601 <i>and</i> <span class="nb">617–620</span>. Walk round with the buttons.',
+  },
+  p5quiz: {
+    title: n => `Building ${n} · One running count`,
+    body:  'Walk round with the buttons. Click a door with a <b>partial number</b> and pick the full unit.',
+  },
+  nameBuilding: {
+    title: 'All doors filled ✓',
+    body:  'Now click the <b>roof sign</b> and choose the building number.',
+  },
+};
 
-const EXAMPLE3_PROMPT =
-  '<b>Part 3 — the building number.</b> Larger complexes use <b>4- and 5-digit</b> unit numbers, ' +
-  'and the <b>leading digit(s) tell you the building</b>. Here every unit starts with <b>1</b>, so this is ' +
-  '<b>Building 1</b> — after the building comes the <b>floor</b>, then the door. On the next buildings you will ' +
-  '<b>fill in the missing numbers</b>, then <b>choose the correct building number</b>. ' +
-  'Drag to look around, and when you are ready, <b>click Ready</b>.';
+/* pick the row for a stage and fill in its building label / difficulty */
+function promptFor(st) {
+  const row = PROMPTS[`p${st.part}${st.kind === 'example' ? 'example' : 'quiz'}`] || PROMPTS.p1quiz;
+  const n = st.label ?? st.building ?? st.number;
+  const d = st.difficulty;
+  const val = v => (typeof v === 'function' ? v(n, d) : v);
+  return { title: val(row.title), body: val(row.body), short: val(row.short) };
+}
 
-const EXAMPLE4_PROMPT =
-  '<b>Part 4 — everything at once.</b> This last course is the toughest: it uses <b>everything so far</b>, and ' +
-  '<b>each building has its own pattern</b>. The units wrap around <b>both the front and the back</b> — the front ' +
-  'doors and the doors directly <b>behind</b> them. Study how the numbers climb on <b>Building 10</b>, then ' +
-  '<b>drag to spin around</b> and check the back. When you are ready, <b>click Ready</b>.';
-
-const EXAMPLE5_PROMPT =
-  '<b>Part 5 — no floor digit.</b> In some buildings the <b>floor numbers don\'t exist</b> in the unit number — ' +
-  'the units are just a <b>single running count</b> around the building, one floor after another. Walk around the ' +
-  'outside and read the door numbers off each wall. ' +
-  '<b>Building 6</b> runs 601 → 620, so floor 1 holds the <b>lowest</b> numbers <i>and</i> the <b>highest</b> ' +
-  '(617-620); no digit tells you the floor. Use the <b>Front / Back / Left / Right</b> buttons to walk around — ' +
-  'or drag to look and pinch to zoom — then <b>click Ready</b>.';
+/* render headline + body into #prompt; phones get the shorter body when there is one */
+function setPrompt({ title, body, short }) {
+  const useShort = short && matchMedia('(max-width: 640px)').matches;
+  ui.prompt.innerHTML = `<div class="ptitle">${title}</div><div class="pbody">${useShort ? short : body}</div>`;
+}
 
 const groups = {};
 const celebrated = new Set();
@@ -1033,31 +1085,12 @@ function showStage(i) {
   ui.back.classList.add('hidden');
   controls.autoRotate = false;
 
+  setPrompt(promptFor(currentStage));
   if (currentStage.kind === 'example') {
-    const p = currentStage.part;
-    ui.prompt.innerHTML = p === 5 ? EXAMPLE5_PROMPT : p === 4 ? EXAMPLE4_PROMPT : p === 3 ? EXAMPLE3_PROMPT
-      : p === 2 ? EXAMPLE2_PROMPT : EXAMPLE_PROMPT;
-    ui.continueBtn.textContent = p > 1 ? 'Ready ▸' : 'Continue ▸';
+    ui.continueBtn.textContent = 'Next ▸';
     ui.continueBtn.classList.remove('hidden');
     if (currentIndex > 0) ui.back.classList.remove('hidden');
   } else {
-    const p = currentStage.part;
-    if (p === 2)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.label} · ${currentStage.difficulty}</b> — the first digit is the floor. ` +
-        `Click a door marked <b>?</b>, then pick its correct unit number on the right.`;
-    else if (p === 3)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.label}</b> — fill in the missing unit numbers, then name the building. ` +
-        `Click a door showing a <b>partial number</b> and pick the full number on the right.`;
-    else if (p === 4)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.building}</b> — numbers wrap around the front <i>and</i> back. ` +
-        `<b>Drag to spin around</b>, then click any door showing a <b>partial number</b> and pick the full unit.`;
-    else if (p === 5)
-      ui.prompt.innerHTML = `<b>Building ${currentStage.building}</b> — floor numbers don't exist here; the units just count up around the building. ` +
-        `<b>Find the pattern and fill in the blanks.</b> Use the <b>Front / Back / Left / Right</b> buttons to navigate, ` +
-        `drag to look around, and pinch to zoom. Click a door with a <b>partial number</b> and pick the full unit.`;
-    else
-      ui.prompt.innerHTML = `<b>Building ${currentStage.number}</b> — keep the pattern going. ` +
-        `Click a door marked <b>?</b>, then pick its correct unit number from the options on the right.`;
     ui.back.classList.remove('hidden');
   }
   ui.prompt.classList.remove('hidden');
@@ -1076,7 +1109,7 @@ function resumeQuizState() {
   const ud = groups[currentIndex].userData;
   if (!ud.blankStates.every(s => s.solved)) return;   // still has doors to fill
   if (ud.buildingState && !ud.buildingState.solved) {
-    ui.prompt.innerHTML = `All units filled in — now <b>choose the building number</b>.`;
+    setPrompt(PROMPTS.nameBuilding);
     openQuiz(ud.buildingState);
   } else {
     showNext();   // already finished (no confetti on a revisit)
@@ -1131,7 +1164,7 @@ function checkComplete() {
   if (!doorsSolved()) return;
   const bs = groups[currentIndex].userData.buildingState;
   if (bs && !bs.solved) {                     // all units in — now name the building
-    ui.prompt.innerHTML = `Nice — every unit is filled in. Now <b>choose the building number</b>.`;
+    setPrompt(PROMPTS.nameBuilding);
     openQuiz(bs);
     return;
   }
