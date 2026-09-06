@@ -69,6 +69,26 @@
   }
   #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
 
+  /* course progress: one segment per building */
+  #progress { display: flex; gap: 3px; margin-top: 8px; height: 6px; }
+  #progress .seg { flex: 1; border-radius: 3px; background: rgba(255,255,255,0.18); }
+  #progress .seg.done { background: #57c97e; }
+  #progress .seg.now { background: #ffd9a0; }
+  #progress .seg.part { margin-left: 6px; }
+
+  /* end-of-course summary */
+  #finale {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100% - 32px)); padding: 24px 26px; border-radius: 18px;
+    background: rgba(20,24,30,0.94); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.16); color: #eef2f6; z-index: 40;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  #finale h2 { margin: 0 0 12px; color: #ffd9a0; font-size: 22px; }
+  #finale ol { margin: 0 0 14px; padding-left: 22px; line-height: 1.6; }
+  #finale p { color: #dfe6ee; margin: 0 0 18px; }
+  #finale div { display: flex; gap: 10px; flex-wrap: wrap; }
+
   /* right-side quiz panel */
   #quiz {
     position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
@@ -98,6 +118,20 @@
 </style>
 </head>
 <body>
+<!-- end-of-course summary (shown after the last building) -->
+<div id="finale" class="hidden" role="dialog" aria-labelledby="ftitle">
+  <h2 id="ftitle">You read all 14 buildings</h2>
+  <ol>
+    <li><b>Count in order</b> — 101, 102, 103…</li>
+    <li><b class="pl-floor">First digit = floor</b> — <span class="pl-floor">2</span><span class="pl-door">29</span></li>
+    <li><b class="pl-building">Leading digits = building</b> — <span class="pl-building">13</span><span class="pl-floor">1</span><span class="pl-door">17</span></li>
+    <li><b>Front and back</b> — the count carries on behind</li>
+    <li><b>No floor digit</b> — one running count round the building</li>
+  </ol>
+  <p>Next time you're at a new building, look for the pattern before you ring a bell.</p>
+  <div><button id="fagain">Start over ▸</button><button id="fclose" class="ghost">Keep looking around</button></div>
+</div>
+
 <div id="app"></div>
 
 <div id="prompt"></div>
@@ -128,12 +162,13 @@
     <button class="ghost jbtn" data-part="4">4</button>
     <button class="ghost jbtn" data-part="5">5</button>
   </div>
+  <div id="progress" aria-hidden="true"></div>
 </div>
 
 <div id="bottombar">
   <button id="back" class="ghost hidden">◀ Back</button>
   <button id="continue" class="hidden">Continue ▸</button>
-  <button id="next" class="hidden">Next Building ▸</button>
+  <button id="next" class="hidden">Next ▸</button>
 </div>
 
 <script type="importmap">
@@ -1068,6 +1103,8 @@ function showStage(i) {
   frameStage(currentStage);
 
   if (currentStage.kind === 'quiz') resumeQuizState();
+
+  document.dispatchEvent(new CustomEvent('stagechange', { detail: { index: i, stage: currentStage } }));
 }
 
 /* re-entering a quiz: pick up where the learner left off (door blanks, then
@@ -1127,7 +1164,13 @@ function closeQuiz() {
   ui.quiz.classList.add('hidden');
 }
 
-function checkComplete() {
+function checkComplete(bstate) {
+  if (!bstate) bstate = activeBlank;            // doc 05 will pass it explicitly
+  if (bstate) {                                 // reward *every* correct answer
+    popPlate(bstate);
+    markSolved(bstate);
+    document.dispatchEvent(new CustomEvent('blanksolved', { detail: { bstate, index: currentIndex } }));
+  }
   if (!doorsSolved()) return;
   const bs = groups[currentIndex].userData.buildingState;
   if (bs && !bs.solved) {                     // all units in — now name the building
@@ -1135,21 +1178,108 @@ function checkComplete() {
     openQuiz(bs);
     return;
   }
+  const isLast = currentIndex === STAGES.length - 1;
   if (!celebrated.has(currentIndex)) {
     celebrated.add(currentIndex);
-    fireConfetti();
+    fireConfetti(isLast ? 'cannons' : '');
+    if (isLast) showFinale();
   }
+  markStageComplete(currentIndex);
   showNext();
 }
 
 function showNext() {
   const isLast = currentIndex === STAGES.length - 1;
   const nextStage = STAGES[currentIndex + 1];
-  if (isLast) ui.next.textContent = 'Start Over ▸';
+  if (isLast) ui.next.textContent = 'Start over ▸';
   else if (nextStage && nextStage.kind === 'example') ui.next.textContent = `Next: Part ${nextStage.part} ▸`;
-  else ui.next.textContent = 'Next Building ▸';
+  else ui.next.textContent = 'Next ▸';
   ui.next.classList.remove('hidden');
 }
+
+/* ============================================================
+   reward + progress: every correct answer gets its own feedback
+   ============================================================ */
+const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* 320 ms scale pop (ease-out-back) + a 500 ms green tint on the plate */
+function popPlate(bstate) {
+  const p = bstate && bstate.plate;
+  if (!p) return;
+  const reduced = REDUCED();
+  const white = new THREE.Color(0xffffff), tint = new THREE.Color(0xc8ffd8);
+  const outBack = x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+  // start on the next frame: setPlateText resets material.color just before us
+  requestAnimationFrame(() => {
+    const t0 = performance.now(), mat = p.material;
+    (function step(t) {
+      const e = t - t0;
+      if (!reduced) {
+        const k = Math.min(1, e / 320);
+        const bump = k < 0.5 ? outBack(k / 0.5) : 1 - (k - 0.5) / 0.5;
+        const sc = 1 + 0.18 * bump;
+        p.scale.set(sc, sc, 1);
+      }
+      if (mat && mat.color) mat.color.copy(white).lerp(tint, Math.sin(Math.PI * Math.min(1, e / 500)));
+      if (e < 500) requestAnimationFrame(step);
+      else { p.scale.set(1, 1, 1); if (mat && mat.color) mat.color.copy(white); }
+    })(performance.now());
+  });
+  if (!reduced) plateBurst(p);
+}
+
+/* a persistent green dot in the plate's top-right corner: "you solved this one" */
+function markSolved(bstate) {
+  const p = bstate && bstate.plate;
+  if (!p || p.userData.solvedDot) return;
+  const par = p.geometry && p.geometry.parameters;
+  if (!par) return;
+  const pw = par.width, ph = par.height;
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(ph * 0.14, 20),
+    new THREE.MeshBasicMaterial({ color: 0x57c97e, fog: false }));
+  dot.position.set(pw / 2 - ph * 0.18, ph / 2 - ph * 0.18, 0.004);
+  p.add(dot);
+  p.userData.solvedDot = dot;
+}
+
+/* ---- 14-segment course progress bar in the jump bar ---- */
+const completed = new Set();
+const progressEl = document.getElementById('progress');
+const jbTitleEl = document.querySelector('#jumpbar .jbtitle');
+const progSegs = STAGES.map((st, i) => {
+  const seg = document.createElement('span');
+  seg.className = 'seg' + (i > 0 && st.part !== STAGES[i - 1].part ? ' part' : '');
+  if (progressEl) progressEl.appendChild(seg);
+  return seg;
+});
+
+function updateProgress() {
+  for (let i = 0; i < progSegs.length; i++) {
+    const done = completed.has(i);
+    progSegs[i].classList.toggle('done', done);
+    progSegs[i].classList.toggle('now', !done && i === currentIndex);
+  }
+  if (jbTitleEl && currentIndex >= 0)
+    jbTitleEl.textContent = `Part ${STAGES[currentIndex].part} · Building ${currentIndex + 1} of ${STAGES.length}`;
+}
+function markStageComplete(i) { completed.add(i); updateProgress(); }
+document.addEventListener('stagechange', updateProgress);
+
+/* ---- end-of-course summary ---- */
+const finaleEl = document.getElementById('finale');
+function showFinale() {
+  if (!finaleEl) return;
+  const open = () => finaleEl.classList.remove('hidden');
+  if (REDUCED()) open(); else setTimeout(open, 900);
+}
+function hideFinale() { if (finaleEl) finaleEl.classList.add('hidden'); }
+const fcloseBtn = document.getElementById('fclose');
+if (fcloseBtn) fcloseBtn.onclick = hideFinale;
+const fagainBtn = document.getElementById('fagain');
+if (fagainBtn) fagainBtn.onclick = () => { hideFinale(); resetCourse(); showStage(0); };
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && finaleEl && !finaleEl.classList.contains('hidden')) hideFinale();
+});
 
 /* ---- buttons ---- */
 function resetCourse() {
@@ -1163,13 +1293,15 @@ function resetCourse() {
     delete groups[k];
   }
   celebrated.clear();
+  completed.clear();
+  hideFinale();
 }
 
-ui.continueBtn.onclick = () => showStage(currentIndex + 1);
+ui.continueBtn.onclick = () => { markStageComplete(currentIndex); showStage(currentIndex + 1); };
 ui.back.onclick = () => showStage(Math.max(0, currentIndex - 1));
 ui.next.onclick = () => {
   if (currentIndex < STAGES.length - 1) showStage(currentIndex + 1);
-  else { resetCourse(); showStage(0); } // "Start Over" — fresh run from Part 1
+  else { hideFinale(); resetCourse(); showStage(0); } // "Start over" — fresh run from Part 1
 };
 
 /* ---- click a blank door/plate to open its options ---- */
@@ -1202,9 +1334,29 @@ function sizeConfetti() { cc.width = innerWidth; cc.height = innerHeight; }
 sizeConfetti();
 
 let confetti = [];
-function fireConfetti() {
-  const colors = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', '#ff9800'];
-  for (let i = 0; i < 170; i++) {
+const CONFETTI_COLORS = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', '#ff9800'];
+function fireConfetti(mode) {
+  if (REDUCED()) return;                       // no big motion for reduced-motion users
+  const colors = CONFETTI_COLORS;
+  if (mode === 'cannons') {                    // the finale: two cannons from the bottom corners
+    for (const side of [0, 1]) {
+      const dir = side === 0 ? 1 : -1;
+      for (let i = 0; i < 120; i++) {
+        confetti.push({
+          x: side === 0 ? 0 : innerWidth,
+          y: innerHeight * 0.8,
+          vx: dir * (6 + Math.random() * 8),
+          vy: -12 - Math.random() * 6,
+          g: 0.22 + Math.random() * 0.12,
+          rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45,
+          w: 6 + Math.random() * 7, h: 8 + Math.random() * 9,
+          color: colors[i % colors.length],
+        });
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < 170; i++) {              // per-building burst
     confetti.push({
       x: innerWidth / 2 + (Math.random() - 0.5) * 240,
       y: innerHeight * 0.32,
@@ -1217,6 +1369,28 @@ function fireConfetti() {
     });
   }
 }
+
+/* 14 small particles rising from one plate's position on screen */
+function plateBurst(plate) {
+  if (REDUCED() || !plate) return;
+  const v = plate.getWorldPosition(new THREE.Vector3()).project(camera);
+  if (v.z > 1) return;                         // behind the camera
+  const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight;
+  const colors = ['#57c97e', '#7ee0a0', '#ffd54a'];
+  for (let i = 0; i < 14; i++) {
+    confetti.push({
+      x: x + (Math.random() - 0.5) * 26,
+      y: y + (Math.random() - 0.5) * 16,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -4 - Math.random() * 3,
+      g: 0.16 + Math.random() * 0.08,
+      rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.5,
+      w: 4 + Math.random() * 2, h: 4 + Math.random() * 2,
+      color: colors[i % colors.length],
+    });
+  }
+}
+
 function drawConfetti() {
   cctx.clearRect(0, 0, cc.width, cc.height);
   if (!confetti.length) return;
