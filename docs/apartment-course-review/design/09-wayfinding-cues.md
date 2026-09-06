@@ -35,7 +35,7 @@ CSS (insert immediately after the `#viewbar button.vbtn` line):
 Semantics fixed for the whole course: **coral = building, blue = floor, white = door, yellow = reading order/path.** Doc 05 colours quiz digits, doc 04 the prompt examples, doc 10 the completion summary — all from these names.
 
 ### Part 1 arrows (`addArrows`)
-Keep the three front arrows. Add the "continues round the back" cue: a fourth arrow from top-right plate (xr, yt, z) to the building's right edge (W/2 + 1.2, yt, z), then a fifth along the right end wall from (W/2 + 1.2, yt, z) to (W/2 + 1.2, yt, −HALF_D − 0.6). Colour `COLOR.arrow`. Learners who drag will see the numbers keep counting.
+Keep the three front arrows. Add the "continues round the back" cue: a fourth arrow from top-right plate (xr, yt, z) to the building's right edge (W/2 + 1.2, yt, z), then a fifth along the right end wall from (W/2 + 1.2, yt, z) to (W/2 + 1.2, yt, −HALF_D − 0.6). Colour `COLOR.arrow`. Learners who drag will see the numbers keep counting. — *Removed (2026-09): only the three front arrows remain in `addArrows`.*
 
 ### Part 2 badges (`addTowerArrows`)
 Badge `fg` becomes `PLACE_COLORS.floor` (`#7cc4ff`) so "blue = floor" is learned here, where it is the only rule. Tidy the arrow: `arrowX = x − 1.4` (today's `x − 2` leaves a gap); shaft radius 0.1. Badge size 1.0 → 1.15.
@@ -59,7 +59,7 @@ Show on `stagechange` when `stage.type === 'seq'`, hide otherwise.
 **Must not edit:** `makeTextTexture`/`label`/banners (03); plate colours (plates stay monochrome — the digit key and the quiz carry the colours); `STAGES`, `SQ_LAYOUT`; `setSeqView`/`tick` (02 — you listen to `controls` events only); `showStage` (subscribe to `stagechange`); `#viewbar` rules other than your inserted block; `@media` (06 positions `#minimap` on phones).
 
 ## Acceptance checks
-- Stage 00: five yellow arrows; the last two lead off the right end towards the back; dragging right shows they point at 105.
+- Stage 00: three yellow arrows on the front façade (the "last two lead off the right end towards the back" cue was removed).
 - Stage 04: floor badges are blue on dark; the big arrow sits 1.4 units left of the badges with no gap.
 - Stage 07: right of "Building 1" a dark key reads **1 1 09** in coral/blue/white with captions; two blue floor badges on the left end.
 - Stage 10: key **10 1 01**; a yellow arrow runs front→back along the left end at ground-floor height and back→front on the right end; none intersect the stairs.
