@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Stop Finder — Apartment Number Course</title>
+<title>Stop Finder — Apartment Number Course (Brick look)</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -94,6 +94,23 @@
     border-radius: 50%; font-size: 18px; z-index: 11;
     display: flex; align-items: center; justify-content: center;
   }
+
+  /* look switcher: the classic build and the realistic variants stay one click apart.
+     Sits left of the ? button so it never meets the prompt banner; hidden on phones
+     (the menu page lists every look). */
+  #lookbar {
+    position: fixed; right: 74px; bottom: 28px; z-index: 11;
+    display: flex; align-items: center; gap: 2px; height: 40px;
+    padding: 0 8px 0 6px; border-radius: 999px; font-size: 12px; color: #9fb0c0;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #lookbar .lk-title { margin: 0 4px 0 6px; }
+  #lookbar a { color: #eef2f6; text-decoration: none; padding: 5px 9px; border-radius: 999px; }
+  #lookbar a:hover { background: rgba(255,255,255,0.12); }
+  #lookbar a[aria-current="page"] { background: #57c97e; color: #08130c; font-weight: 600; }
+  #lookbar a:focus-visible { outline: 2px solid #ffd54a; outline-offset: 1px; }
+  #lookbar a.lk-home { font-size: 15px; padding: 3px 8px; }
 
   /* left-side "walk around" buttons (Part 5) */
   #viewbar {
@@ -297,6 +314,9 @@
     #resetview { right: 8px; bottom: 112px; left: auto; padding: 0; width: 44px; height: 44px; }
     #resetview .rv-label { display: none; }
   }
+  @media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
+    #lookbar { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -372,6 +392,16 @@
 </div>
 
 <button id="helpbtn" class="ghost" aria-label="How to use the controls">?</button>
+
+<!-- look switcher: same course, different visual treatment; the classic build is always reachable -->
+<nav id="lookbar" aria-label="Choose a look">
+  <a class="lk-home" href="index.html" aria-label="Back to the course menu">⌂</a>
+  <span class="lk-title">Look:</span>
+  <a href="apartment-mockup.html" title="Classic look (the original flat-colour build)">Classic</a>
+  <a href="apartment-realistic-a.html" title="Realistic look A: Sunbelt garden-style walk-up">Sunbelt</a>
+  <a href="apartment-realistic-b.html" aria-current="page" title="Realistic look B: Midwest brick walk-up">Brick</a>
+  <a href="apartment-realistic-c.html" title="Realistic look C: contemporary suburban community">Suburban</a>
+</nav>
 
 <div id="bottombar" role="group" aria-label="Course navigation">
   <button id="back" class="ghost hidden">◀ Back</button>
