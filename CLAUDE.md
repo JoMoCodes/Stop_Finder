@@ -18,8 +18,21 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 
 | File                    | What it is                                              |
 |-------------------------|---------------------------------------------------------|
-| `index.html`            | Landing page; one card per course (the menu).           |
-| `apartment-mockup.html` | 3D apartment-number course (Three.js). See map below.   |
+| `index.html`            | Landing page; one card per course/look (the menu).      |
+| `apartment-mockup.html` | 3D apartment-number course, **classic look** (Three.js). See map below. |
+| `apartment-realistic-a.html` | Same course, **Sunbelt garden-style** look (brick/stucco, breezeway railings, parking, warm low sun). |
+| `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
+| `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). |
+
+### The three realistic looks
+Each `apartment-realistic-*.html` is a copy of `apartment-mockup.html` with **only the
+visual layer** reworked (colours, materials, procedural canvas textures, lighting,
+sky, ground/road, the `build*Shell` / `build*Facade` / `*Access` builders, plus
+environment props). The `STAGES` array, unit math, quiz, prompts, finale, DOM,
+CSS and accessibility code are identical across all four files, so a curriculum
+change has to be applied to all four. Each course page carries a `#lookbar`
+switcher (bottom right, hidden on phones) linking the four looks and the menu.
+Design notes and inspiration sources: `docs/apartment-course-review/realistic/`.
 
 ### Adding a course
 1. Create a new `*.html` at the root (copy an existing one as a starting point).
