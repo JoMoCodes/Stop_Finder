@@ -1,0 +1,3235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Stop Finder — Apartment Number Course</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  .hidden { display: none !important; }
+
+  /* ---- accessibility (doc 07) ----------------------------------------
+     Contrast verified against the panel background #14181e (WCAG relative
+     luminance).  No colour changes were needed:
+       amber   #ffd9a0 on panel ......... 13.3 : 1  AA/AAA
+       grey    #9fb0c0 on panel (12 px) .  8.0 : 1  AA
+       success #7ee0a0 on panel ......... 11.1 : 1  AA/AAA
+       error   #ff9a8a on panel ..........  8.7 : 1  AA/AAA
+       blank   #c0392b on the white plate   5.4 : 1  AA
+       text    #08130c on green #57c97e ..  9.1 : 1  AA/AAA
+       doc 09  #f28c6a / #7cc4ff on panel   7.6 / 9.8 : 1  AA
+     -------------------------------------------------------------------- */
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  button:focus-visible, canvas:focus-visible, [tabindex]:focus-visible { outline:3px solid #ffd54a; outline-offset:2px; box-shadow:0 0 0 6px rgba(20,24,30,.9); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    button.opt.wrong { animation:none !important; }
+  }
+
+  /* top prompt */
+  #prompt {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    width: min(680px, calc(100% - 32px));
+    background: rgba(20, 24, 30, 0.9); backdrop-filter: blur(6px);
+    color: #eef2f6; border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px; padding: 14px 20px 15px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.4); z-index: 10; text-align: left;
+  }
+  #prompt .ptitle { color: #ffd9a0; font-weight: 700; font-size: 17px; line-height: 1.3; margin-bottom: 4px; }
+  #prompt .pbody  { color: #dfe6ee; font-size: 15px; line-height: 1.5; }
+  #prompt .pbody b { color: #ffd9a0; font-weight: 600; }
+  #prompt .pbody i { font-style: normal; color: #eef2f6; text-decoration: underline dotted; }
+  #prompt .pbody .nb { white-space: nowrap; }
+  #prompt b { color: #ffd9a0; }
+
+  /* buttons */
+  button {
+    font: inherit; cursor: pointer; border: none; border-radius: 999px;
+    padding: 13px 30px; font-size: 16px; font-weight: 600; color: #08130c;
+    background: #57c97e; box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+    transition: transform .1s ease, background .12s ease;
+  }
+  button:hover { transform: translateY(-2px); background: #6fe096; }
+  button.ghost {
+    background: rgba(255,255,255,0.10); color: #eef2f6;
+    border: 1px solid rgba(255,255,255,0.20); font-weight: 500; padding: 11px 20px;
+  }
+  button.ghost:hover { background: rgba(255,255,255,0.18); }
+  #viewbar button.vbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
+  #resetview { position: fixed; right: 22px; bottom: 80px; z-index: 11; padding: 9px 14px; font-size: 14px; }
+
+  /* bottom button bar */
+  #bottombar {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    z-index: 10; display: flex; align-items: center; gap: 10px;
+  }
+
+  /* 08 — discoverability: per-building chip, first-run hint, help button */
+  #doorsleft {
+    position: fixed; top: 16px; right: 16px; z-index: 11; padding: 9px 14px; border-radius: 999px;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.14);
+    color: #eef2f6; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #doorsleft b { color: #ffd54a; }
+  #doorsleft.done { color: #7ee0a0; }
+
+  #draghint {
+    position: fixed; left: 50%; bottom: 104px; transform: translateX(-50%);
+    width: min(440px, calc(100% - 32px)); display: flex; gap: 14px; align-items: center;
+    padding: 12px 16px; border-radius: 14px; background: rgba(20,24,30,0.92);
+    border: 1px solid rgba(255,213,74,0.45); color: #eef2f6; font-size: 14px; line-height: 1.45;
+    z-index: 12; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    opacity: 0; transition: opacity .3s ease; pointer-events: none;
+  }
+  #draghint.show { opacity: 1; }
+  #draghint b { color: #ffd9a0; }
+  #draghint svg { width: 64px; flex: none; }
+
+  #helpbtn {
+    position: fixed; right: 22px; bottom: 28px; width: 40px; height: 40px; padding: 0;
+    border-radius: 50%; font-size: 18px; z-index: 11;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* left-side "walk around" buttons (Part 5) */
+  #viewbar {
+    position: fixed; top: 50%; left: 22px; transform: translateY(-50%);
+    z-index: 11; display: flex; flex-direction: column; gap: 8px; width: 130px;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #viewbar .vbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 2px; }
+  #viewbar button.vbtn { padding: 10px 14px; font-size: 15px; text-align: center; min-height: 44px; }
+
+  /* digit-place palette: one colour per place, shared by every part */
+  :root { --c-building:#f28c6a; --c-floor:#7cc4ff; --c-door:#eef2f6; --c-path:#ffd54a; }
+  .pl-building{color:var(--c-building)} .pl-floor{color:var(--c-floor)} .pl-door{color:var(--c-door)}
+
+  /* Part 5 top-down mini-map */
+  #minimap{position:fixed;left:22px;bottom:28px;z-index:11;width:132px;padding:10px;border-radius:14px;background:rgba(20,24,30,.9);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  #minimap svg{display:block;width:100%}
+  #minimap .mmnote{color:#9fb0c0;font-size:10px;text-align:center;margin-top:4px}
+
+  /* top-left "jump to part" menu */
+  #jumpbar {
+    position: fixed; top: 16px; left: 16px; z-index: 11;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #jumpbar .jbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 8px; }
+  #jumpbar .jbtns { display: flex; gap: 8px; }
+  #jumpbar button.jbtn {
+    width: 40px; height: 40px; padding: 0; font-size: 15px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
+
+  /* course progress: one segment per building */
+  #progress { display: flex; gap: 3px; margin-top: 8px; height: 6px; }
+  #progress .seg { flex: 1; border-radius: 3px; background: rgba(255,255,255,0.18); }
+  #progress .seg.done { background: #57c97e; }
+  #progress .seg.now { background: #ffd9a0; }
+  #progress .seg.part { margin-left: 6px; }
+
+  /* end-of-course summary */
+  #finale {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100% - 32px)); padding: 24px 26px; border-radius: 18px;
+    background: rgba(20,24,30,0.94); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.16); color: #eef2f6; z-index: 40;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  #finale h2 { margin: 0 0 12px; color: #ffd9a0; font-size: 22px; }
+  #finale ol { margin: 0 0 14px; padding-left: 22px; line-height: 1.6; }
+  #finale p { color: #dfe6ee; margin: 0 0 18px; }
+  #finale div { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* right-side quiz panel */
+  #quiz {
+    position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
+    width: 248px; z-index: 11;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 38px 16px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #quiz .qhead { color: #eef2f6; font-weight: 600; margin-bottom: 12px; text-align: center; }
+  #quiz .qhead small { display: block; color: #9fb0c0; font-weight: 400; font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  #qclose {
+    position: absolute; top: 5px; right: 6px; width: 32px; height: 32px; padding: 0;
+    border-radius: 50%; font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #qkey {
+    display: flex; gap: 10px; justify-content: center; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .06em; color: #9fb0c0; margin: -6px 0 10px;
+  }
+  #qopts { display: flex; flex-direction: column; gap: 8px; }
+  button.opt {
+    background: rgba(255,255,255,0.08); color: #eef2f6;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+    display: flex; align-items: center; gap: 10px; min-height: 48px;
+    padding: 10px 14px; font-size: 16px; font-weight: 600; text-align: left;
+    line-height: 1.5; box-shadow: none;
+    transition: background .12s, transform .12s, border-color .12s;
+  }
+  button.opt:hover { transform: none; }
+  button.opt:hover:not(:disabled) {
+    background: rgba(255,255,255,0.16); transform: translateX(3px);
+    border-color: rgba(255,217,160,0.6);
+  }
+  button.opt .ltr { width: 22px; color: #9fb0c0; font-weight: 500; }
+  button.opt .num {
+    font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum"; letter-spacing: .02em;
+  }
+  .pl + .pl { margin-left: .14em; }              /* hairline gap between digit places */
+  .pl-building { color: var(--c-building, #f28c6a); }
+  .pl-floor    { color: var(--c-floor, #7cc4ff); }
+  .pl-door     { color: var(--c-door, #eef2f6); }
+  button.opt.wrong { background: rgba(229,57,53,0.32); border-color: rgba(229,57,53,0.75); animation: shake .42s; }
+  button.opt.right { background: rgba(87,201,126,0.28); border-color: rgba(87,201,126,0.7); }
+  button.opt:disabled { cursor: default; }
+  #qmsg { margin-top: 12px; text-align: center; font-size: 14px; min-height: 20px; line-height: 1.4; }
+  #qmsg.ok { color: #7ee0a0; }
+  #qmsg.bad { color: #ff9a8a; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+  /* ============================================================
+     RESPONSIVE / MOBILE LAYOUT (design 06)
+     Overrides only — every rule below lives inside a media query so
+     the base (desktop) rules owned by the other docs stay untouched.
+     ============================================================ */
+
+  /* --- coarse pointers anywhere: minimum tap targets --- */
+  @media (pointer: coarse) {
+    button { min-height: 44px; }
+    #jumpbar button.jbtn { width: 44px; height: 44px; }
+    button.opt { min-height: 52px; }
+    #qclose { width: 44px; height: 44px; }
+  }
+
+  /* --- tablets 641-1024px: desktop layout holds, quiz just tucks in --- */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    #quiz { right: 12px; width: 248px; }
+    /* the centred prompt is full-bleed at this width, so drop the jump bar below it */
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); }
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); }
+  }
+
+  /* --- phones, portrait --- */
+  @media (max-width: 640px) {
+    #prompt { top: 8px; left: 8px; right: 8px; width: auto; transform: none; padding: 10px 12px 11px;
+      max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; }
+    #prompt .ptitle { font-size: 16px; }
+    #prompt .pbody { font-size: 15px; }
+
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+    #jumpbar .jbtns { gap: 8px; }
+    #progress { margin-top: 6px; }
+
+    /* stacked under the jump bar so the two never collide on narrow phones */
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px); right: 8px; left: auto; }
+
+    #bottombar { bottom: 12px; gap: 8px; width: calc(100% - 16px); justify-content: center; }
+    #bottombar button { padding: 12px 18px; font-size: 15px; min-height: 46px; }
+
+    #viewbar { top: auto; bottom: 70px; left: 8px; transform: none;
+      flex-direction: row; width: auto; gap: 6px; padding: 8px; }
+    #viewbar .vbtitle { display: none; }
+    #viewbar button.vbtn { min-width: 60px; min-height: 44px; padding: 10px 6px; font-size: 14px; }
+
+    #helpbtn   { right: 8px; bottom: auto; top: calc(var(--prompt-h, 140px) + 16px + 74px + 50px); left: auto; width: 44px; height: 44px; }
+    #resetview { right: 8px; bottom: 122px; left: auto; padding: 0; width: 44px; height: 44px; }
+    #resetview .rv-label { display: none; }
+    #minimap   { right: 8px; bottom: 166px; left: auto; top: auto; width: 88px; }
+    #draghint  { left: 8px; right: 8px; width: auto; top: 46%; bottom: auto; transform: none; }
+
+    #quiz { top: auto; bottom: 0; left: 0; right: 0; width: auto; transform: none; z-index: 30;
+      border-radius: 16px 16px 0 0; border-bottom: none; max-height: 60vh; overflow-y: auto;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); }
+    #qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button.opt { min-height: 56px; display: flex; align-items: center; justify-content: center; }
+    button.opt .ltr { display: none; }
+    button.opt .num { font-size: 24px; }
+    #qclose { width: 44px; height: 44px; top: 4px; right: 4px; }
+    #finale { inset: 0; border-radius: 0; }
+  }
+
+  /* --- very small phones: keep the Part 5 mini-map clear of the doors-left chip --- */
+  @media (max-width: 360px) {
+    #minimap { width: 72px; bottom: 150px; }
+    #minimap .mmnote { display: none; }
+  }
+
+  /* --- phones, landscape --- */
+  @media (max-height: 520px) and (orientation: landscape) {
+    #prompt { top: 8px; left: 8px; right: auto; transform: none; width: min(52vw, 460px);
+      max-height: 44vh; overflow-y: auto; padding: 8px 12px; }
+    #prompt .ptitle { font-size: 14px; }
+    #prompt .pbody { font-size: 13px; }
+
+    #jumpbar { top: auto; bottom: 8px; left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+
+    #bottombar { bottom: 8px; left: auto; right: 8px; transform: none; }
+    #bottombar button { padding: 9px 16px; font-size: 14px; }
+
+    #viewbar { top: auto; bottom: 8px; left: 284px; transform: none;
+      flex-direction: row; width: auto; padding: 8px; gap: 6px; }
+    #viewbar .vbtitle { display: none; }
+    #viewbar button.vbtn { min-width: 56px; min-height: 44px; padding: 8px 6px; font-size: 13px; }
+
+    #quiz { top: 8px; bottom: 8px; right: 8px; left: auto; width: 236px;
+      max-height: none; transform: none; border-radius: 14px; overflow-y: auto; }
+    #qopts { display: flex; flex-direction: column; }
+
+    #minimap { right: 252px; top: 8px; bottom: auto; left: auto; width: 88px; }
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); left: 8px; right: auto; }
+    #draghint { left: 8px; right: auto; width: min(52vw, 460px); top: calc(var(--prompt-h, 140px) + 60px); bottom: auto; transform: none; }
+    #helpbtn { display: none; }
+    #resetview { right: 8px; bottom: 112px; left: auto; padding: 0; width: 44px; height: 44px; }
+    #resetview .rv-label { display: none; }
+  }
+</style>
+</head>
+<body>
+<!-- end-of-course summary (shown after the last building) -->
+<div id="finale" class="hidden" role="dialog" aria-labelledby="ftitle">
+  <h2 id="ftitle">You read all 14 buildings</h2>
+  <ol>
+    <li><b>Count in order</b> — 101, 102, 103…</li>
+    <li><b class="pl-floor">First digit = floor</b> — <span class="pl-floor">2</span><span class="pl-door">29</span></li>
+    <li><b class="pl-building">Leading digits = building</b> — <span class="pl-building">13</span><span class="pl-floor">1</span><span class="pl-door">17</span></li>
+    <li><b>Front and back</b> — the count carries on behind</li>
+    <li><b>No floor digit</b> — one running count round the building</li>
+  </ol>
+  <p>Next time you're at a new building, look for the pattern before you ring a bell.</p>
+  <div><button id="fagain">Start over ▸</button><button id="fclose" class="ghost">Keep looking around</button></div>
+</div>
+
+<div id="app"></div>
+
+<!-- screen-reader text for the 3D scene, and a keyboard route to every blank door -->
+<p id="scene-desc" class="sr-only"></p>
+<div id="doorlist" class="sr-only" role="group" aria-label="Doors to fill in"></div>
+
+<div id="prompt" aria-live="polite" aria-atomic="true"></div>
+
+<!-- right-side multiple-choice panel -->
+<div id="quiz" class="hidden" role="dialog" aria-labelledby="qhead">
+  <button id="qclose" class="ghost" aria-label="Close">×</button>
+  <div class="qhead" id="qhead">Which unit is this?<small>Pick the number that matches the pattern</small></div>
+  <div id="qkey" class="hidden"><span class="pl pl-building">building</span><span class="pl pl-floor">floor</span><span class="pl pl-door">door</span></div>
+  <div id="qopts"></div>
+  <div id="qmsg" aria-live="assertive" aria-atomic="true"></div>
+</div>
+
+<!-- Part 5 navigation: jump the camera to each face of the building -->
+<div id="viewbar" class="hidden" role="group" aria-label="Walk around the building">
+  <div class="vbtitle">Walk around</div>
+  <button class="ghost vbtn" data-view="front">Front</button>
+  <button class="ghost vbtn" data-view="back">Back</button>
+  <button class="ghost vbtn" data-view="left">Left</button>
+  <button class="ghost vbtn" data-view="right">Right</button>
+</div>
+
+<!-- Part 5: top-down map of the 20-door loop, with "you are here" -->
+<div id="minimap" class="hidden" aria-hidden="true"><svg viewBox="0 0 132 200"></svg><div class="mmnote">9–16 upstairs, back &amp; front</div></div>
+
+<!-- jump menu: skip to the first building of any part -->
+<div id="jumpbar" role="navigation" aria-label="Jump to part">
+  <div class="jbtitle">Jump to part</div>
+  <div class="jbtns">
+    <button class="ghost jbtn" data-part="1" aria-label="Part 1: numbers count up in order">1</button>
+    <button class="ghost jbtn" data-part="2" aria-label="Part 2: first digit is the floor">2</button>
+    <button class="ghost jbtn" data-part="3" aria-label="Part 3: leading digits name the building">3</button>
+    <button class="ghost jbtn" data-part="4" aria-label="Part 4: numbers wrap front and back">4</button>
+    <button class="ghost jbtn" data-part="5" aria-label="Part 5: one running count, no floor digit">5</button>
+  </div>
+  <div id="progress" aria-hidden="true"></div>
+</div>
+
+<!-- 08 — how many doors are left on this building, plus the controls hint -->
+<div id="doorsleft" class="hidden" aria-live="polite"></div>
+
+<div id="draghint" class="hidden" role="status">
+  <svg viewBox="0 0 64 40" aria-hidden="true" fill="none" stroke="#ffd54a" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <path d="M27 37v-6.5l-4.6-5.1a2.6 2.6 0 0 1 3.7-3.7l1.9 1.9V10.5a2.4 2.4 0 0 1 4.8 0v8.2" />
+    <path d="M32.8 19.6a2.4 2.4 0 0 1 4.8 0v1.8" />
+    <path d="M37.6 21.4a2.4 2.4 0 0 1 4.8 0v8.3a7 7 0 0 1-2 4.9V37" />
+    <path d="M15 16.5 9.5 22l5.5 5.5" /><path d="M9.5 22h8.5" />
+    <path d="M49 16.5 54.5 22 49 27.5" /><path d="M54.5 22H46" />
+  </svg>
+  <div><b>Drag</b> to look around · <b>Scroll / pinch</b> to zoom · Click a door marked <b>?</b> to answer</div>
+</div>
+
+<button id="helpbtn" class="ghost" aria-label="How to use the controls">?</button>
+
+<div id="bottombar" role="group" aria-label="Course navigation">
+  <button id="back" class="ghost hidden">◀ Back</button>
+  <button id="continue" class="hidden">Next ▸</button>
+  <button id="next" class="hidden">Next ▸</button>
+</div>
+
+<button id="resetview" class="ghost hidden" aria-label="Reset the camera to the default view">↺ <span class="rv-label">Reset view</span></button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ============================================================
+   CONFIG — 2-story garden 4-plex. Units run sequentially around
+   each building: front F1 (L,R), F2 (L,R), then back F1, F2.
+   Each "building" in the course shows one façade of 4 units:
+   Bld 1 = example 101-108, Bld 2 = 109-112, Bld 3 = 113-116,
+   Bld 4 = 117-120 (continuing the same numbering).
+   ============================================================ */
+const CONFIG = {
+  floors: 2, width: 14, depth: 9, floorHeight: 3.2,
+  doorOffsetX: 1.45, windowOffsetX: 4.6, gap: 10,
+};
+
+const COLOR = {
+  ground: 0x6d8a4c, walkway: 0xb9b4ab, road: 0x4d4f52,
+  brick: 0x8b4a3c, siding: 0x8b4a3c, band: 0xd6cfbd,
+  roof: 0x3a3836, canopy: 0x3a3d40,
+  door: 0x2f5d3a, glass: 0x3b4a5c, trim: 0xe9e5db,
+  balcony: 0x9c9a95, step: 0x77797a, sky: 0xc9d6e2,
+  arrow: 0xffd54a,
+};
+
+/* ---- one colour per digit place, used by the digit keys, badges, quiz and
+   prompt so the same place always looks the same across all five parts ---- */
+const PLACE_COLORS = { building: '#f28c6a', floor: '#7cc4ff', door: '#eef2f6', path: '#ffd54a' };
+
+/* split a unit string into its digit places for a stage type; masks ('_', '▢')
+   keep their position, so a partial number colours the same way a full one does. */
+function splitPlaces(str, type) {
+  const n = str.length;
+  if (type === 'building') return [{ text: str, place: 'building' }];
+  if (type === 'tower' && n === 3) return [{ text: str[0], place: 'floor' }, { text: str.slice(1), place: 'door' }];
+  if ((type === 'row' || type === 'block') && n >= 4)
+    return [{ text: str.slice(0, n - 3), place: 'building' }, { text: str[n - 3], place: 'floor' }, { text: str.slice(n - 2), place: 'door' }];
+  if (type === 'seq' && n >= 3) return [{ text: str.slice(0, n - 2), place: 'building' }, { text: str.slice(n - 2), place: 'door' }];
+  return [{ text: str, place: 'door' }];                 // plex and anything unexpected
+}
+
+const W = CONFIG.width, D = CONFIG.depth, FH = CONFIG.floorHeight;
+const H = CONFIG.floors * FH, HALF_D = D / 2, SPAN = W + CONFIG.gap;
+
+/* ---- Part 2: tall 4-story walk-up (3 doors per floor). Same depth as the
+   plex so the shared ground/road still fit; only wider. Units are 3 digits
+   where the FIRST digit is the floor and the last two digits are the column. */
+const TW = 18, TD = 9, TFLOORS = 4, TFH = 3.2;
+const TH = TFLOORS * TFH, THALF_D = TD / 2;   // 12.8 tall, 4.5 half-depth
+const TDOORX = [-5.5, 0, 5.5];                 // left / middle / right doors
+
+/* ---- Part 3: wide 2-story "garden row" with 5 doors per floor. Units are
+   4- or 5-digit; the LEADING digit(s) are the building number, then the floor,
+   then the door. Learners fill the gaps, then name the building. */
+const RW = 24, RD = 9, RFLOORS = 2, RFH = 3.2;
+const RH = RFLOORS * RFH, RHALF_D = RD / 2;
+const RDOORX = [-9.6, -4.8, 0, 4.8, 9.6];
+
+/* ---- Part 4: 4-story block numbered around BOTH faces (front doors + the
+   doors directly behind them). 5-digit units: building*1000 + floor*100 +
+   suffix, where the front gets odd suffixes and the back gets even. */
+const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
+const BH = BFLOORS * BFH, BHALF_D = BD / 2;
+const BDOORX = 3.6;                            // door offset from centre
+
+/* ---- Part 5: a uniform 3-story walk-up in the same solid-slab style as
+   Parts 3-4. The unit number is a single running count with NO floor digit,
+   so floor 1 owns both the lowest numbers AND the highest. Doors sit around
+   the perimeter facing OUT, so each side's doors read straight-on from its
+   nav button. Floor 1 is fully occupied (left 1-4, back 5-6, front 7-8,
+   right 17-20); floors 2-3 have only front/back pairs, on walkways served
+   by a switchback stair at two opposite corners. ---- */
+const SQW = 12, SQHW = SQW / 2;          // width  (X, left <-> right)
+const SQD = 22, SQHD = SQD / 2;          // depth  (Z, front <-> back)
+const SQFH = 3.2, SQFLOORS = 3, SQH = SQFLOORS * SQFH;
+
+/* door slots: { d:door#, f:floorIndex 0-2, face:'L'|'R'|'F'|'B', a:position
+   along that wall (z for L/R, x for F/B) }. Left counts up toward the back;
+   right counts up from the back to the front. */
+const SQ_LAYOUT = [
+  // floor 1 left wall (front -> back) = 1..4
+  { d: 1, f: 0, face: 'L', a:  7.5 }, { d: 2, f: 0, face: 'L', a:  2.5 },
+  { d: 3, f: 0, face: 'L', a: -2.5 }, { d: 4, f: 0, face: 'L', a: -7.5 },
+  // floor 1 back wall 5,6 ; front wall 7,8
+  { d: 5, f: 0, face: 'B', a: -3 }, { d: 6, f: 0, face: 'B', a: 3 },
+  { d: 7, f: 0, face: 'F', a: -3 }, { d: 8, f: 0, face: 'F', a: 3 },
+  // floor 2 back 9,10 ; front 11,12
+  { d: 9, f: 1, face: 'B', a: -3 }, { d: 10, f: 1, face: 'B', a: 3 },
+  { d: 11, f: 1, face: 'F', a: -3 }, { d: 12, f: 1, face: 'F', a: 3 },
+  // floor 3 back 13,14 ; front 15,16
+  { d: 13, f: 2, face: 'B', a: -3 }, { d: 14, f: 2, face: 'B', a: 3 },
+  { d: 15, f: 2, face: 'F', a: -3 }, { d: 16, f: 2, face: 'F', a: 3 },
+  // floor 1 right wall (back -> front) = 17..20
+  { d: 17, f: 0, face: 'R', a: -7.5 }, { d: 18, f: 0, face: 'R', a: -2.5 },
+  { d: 19, f: 0, face: 'R', a:  2.5 }, { d: 20, f: 0, face: 'R', a:  7.5 },
+];
+
+/* ============================================================ */
+const app = document.getElementById('app');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(COLOR.sky);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 3000);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+/* no tone mapping on purpose: it would shift plate colours (MeshBasicMaterial is tone-mapped too) */
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+app.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;                       // panning is how buildings get lost
+controls.minPolarAngle = 0.18;                    // no straight-down "map" view
+controls.maxPolarAngle = Math.PI * 0.49;          // never under the ground
+controls.minDistance = 8;
+controls.maxDistance = 95;
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
+
+/* soft, slightly overcast Midwestern light: a cool sky bounce, a warm but
+   gentle sun, so the brick reads through its texture rather than hard contrast */
+const hemi = new THREE.HemisphereLight(0xdfe7f0, 0x6d6a62, 0.85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff0dc, 1.15);
+sun.position.set(18, 30, 26);          // front-right, high: shadows fall down-left, doors read as recessed
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
+sun.shadow.camera.left = -34; sun.shadow.camera.right = 34;
+sun.shadow.camera.top = 34;   sun.shadow.camera.bottom = -34;   // buildings are centred on origin; +-34 covers the 24-wide row + stairs
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+
+/* ---- sky dome (vertex-coloured inverted sphere) + distance fog ---- */
+const skyGeo = new THREE.SphereGeometry(900, 32, 16);
+{
+  /* high thin overcast: pale grey-blue overhead, near-white haze at the horizon */
+  const col = [], top = new THREE.Color(0x86a4c4), mid = new THREE.Color(0xc4d3e0), hor = new THREE.Color(0xe9edf0), c = new THREE.Color();
+  const pos = skyGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const t = THREE.MathUtils.clamp(pos.getY(i) / 900, 0, 1);     // 0 at/below horizon, 1 overhead
+    if (t < 0.25) c.copy(hor).lerp(mid, t / 0.25); else c.copy(mid).lerp(top, Math.pow((t - 0.25) / 0.75, 0.8));
+    col.push(c.r, c.g, c.b);
+  }
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+}
+const sky = new THREE.Mesh(skyGeo,
+  new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false }));
+scene.add(sky);
+scene.background = null;
+scene.fog = new THREE.Fog(0xe4e9ee, 70, 330);   // haze swallows the neighbourhood; plates (<45 units) untouched
+
+/* ---- helpers ---- */
+/* per-role roughness so surfaces don't all read as the same plastic */
+const ROUGH = new Map([[COLOR.brick, .88], [COLOR.siding, .86], [COLOR.door, .95], [COLOR.roof, .72],
+                       [COLOR.step, .9], [COLOR.balcony, .9], [COLOR.walkway, .95], [COLOR.canopy, .9]]);
+function box(parent, w, h, d, color, x, y, z, opts = {}) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color, roughness: ROUGH.get(color) ?? 0.92, ...opts }));
+  m.castShadow = true; m.receiveShadow = true;
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+
+/* ============================================================
+   REALISTIC LAYER (variant B — Midwest brick walk-up)
+   Procedural canvas textures, shared materials, a geometry
+   batcher for repeated props, and the building-detail helpers
+   (windows with sills/lintels, doors with surrounds, painted
+   steel railings + stairs, brick shell with parapet/coping).
+   ============================================================ */
+
+/* deterministic random so the scene looks the same every load */
+function mkRand(seed) {
+  let s = (seed >>> 0) || 1;
+  return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+}
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+function speckle(ctx, w, h, n, rnd, alphaMax = 0.08, sizeMax = 2) {
+  for (let i = 0; i < n; i++) {
+    const v = rnd() < 0.5 ? 0 : 255, a = rnd() * alphaMax, s = 1 + rnd() * (sizeMax - 1);
+    ctx.fillStyle = `rgba(${v},${v},${v},${a})`;
+    ctx.fillRect(rnd() * w, rnd() * h, s, s);
+  }
+}
+/* running-bond brick: cols x rows bricks over the canvas, per-brick tone variation */
+function drawBrick(ctx, w, h, cols, rows, rnd, base = { h: 12, s: 46, l: 34 }) {
+  ctx.fillStyle = 'hsl(30, 12%, 66%)'; ctx.fillRect(0, 0, w, h);      // mortar
+  speckle(ctx, w, h, 900, rnd, 0.18, 2);
+  const bw = w / cols, bh = h / rows, j = Math.max(1.5, bh * 0.14);
+  for (let r = 0; r < rows; r++) {
+    const off = (r % 2) ? bw / 2 : 0;
+    for (let c = -1; c <= cols; c++) {
+      const x = c * bw + off, y = r * bh;
+      const t = rnd();
+      let hh = base.h + (rnd() - 0.5) * 10, ss = base.s + (rnd() - 0.5) * 16, ll = base.l + (rnd() - 0.5) * 12;
+      if (t < 0.07) ll -= 12;                     // the odd over-fired clinker
+      else if (t < 0.13) { ll += 9; ss -= 8; }    // and a paler one
+      ctx.fillStyle = `hsl(${hh}, ${ss}%, ${ll}%)`;
+      ctx.fillRect(x + j / 2, y + j / 2, bw - j, bh - j);
+      // a faint darker bottom edge = shadow in the raked joint
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.fillRect(x + j / 2, y + bh - j, bw - j, j / 2);
+    }
+  }
+  speckle(ctx, w, h, 2500, rnd, 0.10, 2);
+}
+
+const TEX = {};        // kind -> { tex, m: metres per tile, rough }
+function buildTextures() {
+  const rnd = mkRand(7);
+  TEX.brick = { m: 2, rough: 0.92, tex: canvasTex(512, 512, (ctx, w, h) => drawBrick(ctx, w, h, 10, 30, rnd)) };
+  TEX.concrete = { m: 4, rough: 0.96, tex: canvasTex(512, 512, (ctx, w, h) => {
+    ctx.fillStyle = '#b9b4ab'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 9000, rnd, 0.12, 2.5);
+    for (let i = 0; i < 14; i++) {                                   // stains
+      ctx.fillStyle = `rgba(60,55,50,${0.03 + rnd() * 0.05})`;
+      ctx.beginPath(); ctx.ellipse(rnd() * w, rnd() * h, 20 + rnd() * 60, 10 + rnd() * 40, rnd() * 3, 0, 7); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(40,38,35,0.55)'; ctx.lineWidth = 3;      // control joints every 2 m
+    for (const p of [0, w / 2]) { ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, h); ctx.moveTo(0, p); ctx.lineTo(w, p); ctx.stroke(); }
+  }) };
+  TEX.asphalt = { m: 6, rough: 0.98, tex: canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#4d4f52'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 6000, rnd, 0.14, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.10)';                                // wheel tracks
+    for (const y of [h * 0.28, h * 0.72]) ctx.fillRect(0, y - 14, w, 28);
+    ctx.strokeStyle = 'rgba(30,30,32,0.5)'; ctx.lineWidth = 1.2;        // a crack
+    ctx.beginPath(); ctx.moveTo(rnd() * w, 0); for (let y = 0; y < h; y += 16) ctx.lineTo(rnd() * w * 0.3 + w * 0.6, y); ctx.stroke();
+    ctx.fillStyle = '#c9a63c';                                         // dashed centre line: 3 m dash / 3 m gap
+    ctx.fillRect(0, h / 2 - 3, w / 2, 6);
+  }) };
+  TEX.grass = { m: 3, rough: 1, tex: canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#6d8a4c'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) {
+      ctx.fillStyle = `hsla(${80 + rnd() * 30}, ${30 + rnd() * 25}%, ${28 + rnd() * 18}%, ${0.25 + rnd() * 0.3})`;
+      ctx.beginPath(); ctx.ellipse(rnd() * w, rnd() * h, 6 + rnd() * 22, 4 + rnd() * 12, rnd() * 3, 0, 7); ctx.fill();
+    }
+    for (let i = 0; i < 12; i++) {                                    // worn brown patches
+      ctx.fillStyle = `rgba(120,95,60,${0.08 + rnd() * 0.12})`;
+      ctx.beginPath(); ctx.ellipse(rnd() * w, rnd() * h, 10 + rnd() * 20, 6 + rnd() * 12, rnd() * 3, 0, 7); ctx.fill();
+    }
+    speckle(ctx, w, h, 5000, rnd, 0.16, 2);
+  }) };
+  TEX.stone = { m: 1, rough: 0.85, tex: canvasTex(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = '#d6cfbd'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 1800, rnd, 0.10, 2);
+  }) };
+  TEX.roof = { m: 4, rough: 1, tex: canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#5a5855'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 9000, rnd, 0.2, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(rnd() * w, rnd() * h, 20 + rnd() * 40, 10 + rnd() * 30, rnd() * 3, 0, 7); ctx.fill(); }
+  }) };
+  TEX.chain = { m: 1, rough: 0.6, tex: canvasTex(64, 64, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(190,196,200,0.95)'; ctx.lineWidth = 1.6;
+    for (let k = -1; k <= 4; k++) {
+      ctx.beginPath(); ctx.moveTo(k * 16 - 16, 0); ctx.lineTo(k * 16 + 48, 64); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(k * 16 + 48, 0); ctx.lineTo(k * 16 - 16, 64); ctx.stroke();
+    }
+  }) };
+  /* far-off neighbour: 8 m x 8 m of brick with two floors of dark windows */
+  TEX.neighbour = { m: 8, rough: 0.95, tex: canvasTex(512, 512, (ctx, w, h) => {
+    drawBrick(ctx, w, h, 40, 120, rnd, { h: 14, s: 38, l: 36 });
+    for (let f = 0; f < 2; f++) for (let c = 0; c < 3; c++) {
+      const x = 48 + c * 160, y = f * 256 + 70, ww = 84, hh = 118;
+      ctx.fillStyle = '#d9d2c0'; ctx.fillRect(x - 8, y + hh, ww + 16, 8);          // sill
+      ctx.fillStyle = rnd() < 0.25 ? '#8e7a55' : '#2c3542'; ctx.fillRect(x, y, ww, hh);
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillRect(x, y + hh / 2 - 3, ww, 6);
+      ctx.strokeStyle = '#e8e4da'; ctx.lineWidth = 5; ctx.strokeRect(x, y, ww, hh);
+    }
+  }) };
+  /* window glass: 3 variants (blind / curtains / dark with a lamp) */
+  TEX.glass = [0, 1, 2].map(v => canvasTex(128, 192, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#7d8fa4'); g.addColorStop(0.5, '#4a5a70'); g.addColorStop(1, '#2b3442');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    if (v === 0) {                                                     // venetian blind, half down
+      ctx.fillStyle = 'rgba(235,230,220,0.55)';
+      for (let y = 6; y < h * 0.55; y += 7) ctx.fillRect(4, y, w - 8, 3);
+    } else if (v === 1) {                                              // curtains at both edges
+      ctx.fillStyle = 'rgba(225,215,200,0.7)'; ctx.fillRect(3, 3, 26, h - 6); ctx.fillRect(w - 29, 3, 26, h - 6);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = 6; x < 28; x += 7) { ctx.fillRect(x, 3, 2, h - 6); ctx.fillRect(w - 6 - x, 3, 2, h - 6); }
+    } else {                                                           // a warm lamp deep inside
+      const r = ctx.createRadialGradient(w * 0.62, h * 0.62, 4, w * 0.62, h * 0.62, 50);
+      r.addColorStop(0, 'rgba(255,214,150,0.85)'); r.addColorStop(1, 'rgba(255,214,150,0)');
+      ctx.fillStyle = r; ctx.fillRect(0, 0, w, h);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';                          // sky reflection streak
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w * 0.55, 0); ctx.lineTo(0, h * 0.7); ctx.fill();
+    ctx.fillStyle = '#ece8e0'; ctx.fillRect(0, h / 2 - 4, w, 8);          // meeting rail (double-hung)
+    ctx.fillRect(w / 2 - 2, 0, 4, h);                                   // centre muntin
+    ctx.strokeStyle = '#ece8e0'; ctx.lineWidth = 8; ctx.strokeRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 3; ctx.strokeRect(5, 5, w - 10, h - 10);   // reveal shadow
+  }));
+  /* painted six-panel door with a brass knob (same green family as before) */
+  TEX.door = canvasTex(128, 208, (ctx, w, h) => {
+    ctx.fillStyle = '#2f5d3a'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 600, rnd, 0.08, 2);
+    const panel = (x, y, pw, ph) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x, y, pw, ph);
+      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(x + 3, y + 3, pw - 6, ph - 6);
+      ctx.fillStyle = '#2b563a'; ctx.fillRect(x + 6, y + 6, pw - 12, ph - 12);
+    };
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++)
+      panel(12 + c * 56, 14 + r * 62, 48, r === 0 ? 40 : 52);
+    ctx.fillStyle = '#c9a44a'; ctx.beginPath(); ctx.arc(w - 18, h * 0.52, 5, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(0, h - 10, w, 10);   // kick-plate grime
+  });
+  TEX.door.wrapS = TEX.door.wrapT = THREE.ClampToEdgeWrapping;
+  TEX.glass.forEach(t => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; });
+}
+buildTextures();
+
+/* ---- shared materials (cached; three re-uploads them after a dispose) ---- */
+const MAT_DEFS = {
+  steel:  () => new THREE.MeshStandardMaterial({ color: 0x24292b, roughness: 0.55, metalness: 0.55 }),
+  galv:   () => new THREE.MeshStandardMaterial({ color: 0x8c9296, roughness: 0.5, metalness: 0.7 }),
+  tread:  () => new THREE.MeshStandardMaterial({ color: 0x77797a, roughness: 0.9 }),
+  stone:  () => new THREE.MeshStandardMaterial({ map: TEX.stone.tex, roughness: 0.85 }),
+  frame:  () => new THREE.MeshStandardMaterial({ color: 0xe9e5db, roughness: 0.7 }),
+  dark:   () => new THREE.MeshStandardMaterial({ color: 0x1f2a24, roughness: 0.8 }),
+  ac:     () => new THREE.MeshStandardMaterial({ color: 0xbfc3c2, roughness: 0.6, metalness: 0.2 }),
+  acgrill:() => new THREE.MeshStandardMaterial({ color: 0x6d7275, roughness: 0.7, metalness: 0.3 }),
+  bark:   () => new THREE.MeshStandardMaterial({ color: 0x5a4636, roughness: 1 }),
+  leaf:   () => new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 0.95, flatShading: true }),
+  leaf2:  () => new THREE.MeshStandardMaterial({ color: 0x6a8f3e, roughness: 0.95, flatShading: true }),
+  shrub:  () => new THREE.MeshStandardMaterial({ color: 0x3f6a34, roughness: 1, flatShading: true }),
+  soil:   () => new THREE.MeshStandardMaterial({ color: 0x4a3b2e, roughness: 1 }),
+  bulk:   () => new THREE.MeshStandardMaterial({ color: 0x8a8d90, roughness: 0.8 }),
+  tyre:   () => new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 }),
+  carglass:() => new THREE.MeshStandardMaterial({ color: 0x223040, roughness: 0.15, metalness: 0.5 }),
+  dumpster:() => new THREE.MeshStandardMaterial({ color: 0x2f5e3c, roughness: 0.75, metalness: 0.3 }),
+  lamp:   () => new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.5, metalness: 0.6 }),
+  glow:   () => new THREE.MeshBasicMaterial({ color: 0xfff1cc }),
+  concrete: () => new THREE.MeshStandardMaterial({ map: TEX.concrete.tex, roughness: 0.96 }),
+};
+const MATS = {};
+function mat(key) { return MATS[key] || (MATS[key] = MAT_DEFS[key]()); }
+
+/* textured box: one material per face so brick courses / paving joints keep
+   their real size on every side. top: texture kind for the +y face. */
+const _texMatCache = new Map();
+function texMat(kind, ru, rv) {
+  const k = `${kind}|${ru.toFixed(3)}|${rv.toFixed(3)}`;
+  if (_texMatCache.has(k)) return _texMatCache.get(k);
+  const t = TEX[kind]; const tex = t.tex.clone(); tex.repeat.set(ru, rv); tex.needsUpdate = true;
+  const m = new THREE.MeshStandardMaterial({ map: tex, roughness: t.rough ?? 0.95 });
+  _texMatCache.set(k, m); return m;
+}
+function tbox(parent, w, h, d, kind, x, y, z, opts = {}) {
+  const m = TEX[kind].m, top = opts.top || kind, mt = TEX[top].m;
+  const mats = [texMat(kind, d / m, h / m), texMat(kind, d / m, h / m),
+                texMat(top, w / mt, d / mt), texMat(top, w / mt, d / mt),
+                texMat(kind, w / m, h / m), texMat(kind, w / m, h / m)];
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+  mesh.castShadow = opts.castShadow ?? true; mesh.receiveShadow = true;
+  mesh.position.set(x, y, z);
+  if (opts.ry) mesh.rotation.y = opts.ry;
+  parent.add(mesh); return mesh;
+}
+
+/* ---- geometry batcher: many small parts -> one mesh per material ---- */
+const GEO = {
+  box: new THREE.BoxGeometry(1, 1, 1),
+  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
+  cone: new THREE.ConeGeometry(0.5, 1, 10),
+  ico: new THREE.IcosahedronGeometry(0.5, 1),
+  plane: new THREE.PlaneGeometry(1, 1),
+};
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
+class Batch {
+  constructor() { this.parts = new Map(); }
+  add(key, geo, sx, sy, sz, x, y, z, rx = 0, ry = 0, rz = 0) {
+    const g = geo.clone();
+    _e.set(rx, ry, rz, 'YXZ'); _q.setFromEuler(_e); _v.set(x, y, z); _s.set(sx, sy, sz);
+    g.applyMatrix4(_m4.compose(_v, _q, _s));
+    if (!this.parts.has(key)) this.parts.set(key, []);
+    this.parts.get(key).push(g);
+  }
+  box(key, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) { this.add(key, GEO.box, w, h, d, x, y, z, rx, ry, rz); }
+  cyl(key, r, h, x, y, z, rx = 0, ry = 0, rz = 0) { this.add(key, GEO.cyl, r * 2, h, r * 2, x, y, z, rx, ry, rz); }
+  flush(parent, opts = {}) {
+    for (const [key, list] of this.parts) {
+      const merged = BufferGeometryUtils.mergeGeometries(list, false);
+      list.forEach(g => g.dispose());
+      const mesh = new THREE.Mesh(merged, mat(key));
+      mesh.castShadow = opts.castShadow ?? true; mesh.receiveShadow = true;
+      parent.add(mesh);
+    }
+    this.parts.clear();
+  }
+}
+
+/* ---- painted steel guard rail from (x0,z0) to (x1,z1) at height y ---- */
+function railing(b, x0, z0, x1, z1, y, h = 1.05) {
+  const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz), yaw = Math.atan2(dx, dz);
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  b.box('steel', 0.07, 0.05, L, cx, y + h, cz, 0, yaw, 0);          // top rail
+  b.box('steel', 0.035, 0.035, L, cx, y + 0.1, cz, 0, yaw, 0);       // bottom rail
+  const nPost = Math.max(1, Math.round(L / 1.9));
+  for (let i = 0; i <= nPost; i++) { const t = i / nPost; b.box('steel', 0.07, h, 0.07, x0 + dx * t, y + h / 2, z0 + dz * t); }
+  const nBal = Math.round(L / 0.13);
+  for (let i = 1; i < nBal; i++) { const t = i / nBal; b.box('steel', 0.022, h - 0.15, 0.022, x0 + dx * t, y + h / 2 + 0.05, z0 + dz * t); }
+}
+
+/* ---- a straight stair run: steel stringers, pan treads, rails both sides.
+   (x0,z0,y0) is the foot, (x1,z1,y1) the head; run is horizontal in xz. ---- */
+function stairRun(b, x0, z0, y0, x1, z1, y1, width, n, rails = 3) {
+  const dx = x1 - x0, dz = z1 - z0, dy = y1 - y0, run = Math.hypot(dx, dz), yaw = Math.atan2(dx, dz);
+  const sy = Math.sin(yaw), cy = Math.cos(yaw);
+  const P = (lx, ly, lz) => [x0 + lz * sy + lx * cy, y0 + ly, z0 + lz * cy - lx * sy];
+  const L = Math.hypot(run, dy), tilt = -Math.atan2(dy, run);
+  const tread = run / n, rise = dy / n;
+  for (let i = 0; i < n; i++) {
+    const p = P(0, rise * (i + 1), tread * (i + 0.5));
+    b.box('tread', width, 0.07, tread + 0.04, ...p);                       // pan tread
+    b.box('steel', width, 0.04, 0.05, p[0], p[1] - 0.04, p[2], 0, yaw, 0); // nosing
+    b.box('steel', width, rise - 0.06, 0.03, ...P(0, rise * (i + 0.5), tread * (i + 1)), 0, yaw, 0);      // riser
+  }
+  for (const s of [-1, 1]) {
+    const lx = s * (width / 2 + 0.03);
+    if (!(rails & (s < 0 ? 1 : 2))) {                                                       // stringer only
+      b.box('galv', 0.05, 0.22, L, ...P(lx, dy / 2 - 0.02, run / 2), tilt, yaw, 0);
+      continue;
+    }
+    b.box(rails === 0 ? 'galv' : 'steel', 0.06, 0.28, L, ...P(lx, dy / 2 - 0.02, run / 2), tilt, yaw, 0);          // stringer
+    b.box('steel', 0.05, 0.05, L + 0.1, ...P(lx, dy / 2 + 0.98, run / 2), tilt, yaw, 0);    // handrail
+    for (let i = 0; i <= n; i++) {
+      const y = rise * i, z = tread * i;
+      b.box('steel', i % 2 ? 0.022 : 0.05, 0.98, i % 2 ? 0.022 : 0.05, ...P(lx, y + 0.5, z));
+    }
+  }
+}
+
+/* ---- concrete landing slab with a steel nosing and rails on the open sides ---- */
+function landingSlab(b, w, d, x, yTop, z, sides) {   // sides: {L,R,F,B} = rail on that local side
+  b.box('tread', w, 0.14, d, x, yTop - 0.07, z);
+  b.box('steel', w, 0.16, 0.04, x, yTop - 0.08, z + d / 2 + 0.02);
+  const y = yTop;
+  if (sides.F) railing(b, x - w / 2, z + d / 2, x + w / 2, z + d / 2, y);
+  if (sides.B) railing(b, x - w / 2, z - d / 2, x + w / 2, z - d / 2, y);
+  if (sides.L) railing(b, x - w / 2, z - d / 2, x - w / 2, z + d / 2, y);
+  if (sides.R) railing(b, x + w / 2, z - d / 2, x + w / 2, z + d / 2, y);
+}
+
+/* ---- double-hung window with limestone sill + lintel; the unit sits on the
+   wall face (x,y,z) and faces +z rotated by yaw. ---- */
+let _winCounter = 0;
+function windowUnit(g, b, w, h, x, y, z, yaw, opts = {}) {
+  const sy = Math.sin(yaw), cy = Math.cos(yaw);
+  const P = (lx, ly, lz) => [x + lz * sy + lx * cy, y + ly, z + lz * cy - lx * sy];
+  const i = _winCounter++;
+  b.box('stone', w + 0.36, 0.12, 0.24, ...P(0, -h / 2 - 0.06, 0.08), 0, yaw, 0);   // sill
+  b.box('stone', w + 0.36, 0.22, 0.10, ...P(0, h / 2 + 0.12, 0.01), 0, yaw, 0);    // lintel
+  b.box('frame', w + 0.12, h + 0.12, 0.05, ...P(0, 0, 0.02), 0, yaw, 0);            // painted frame
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+    new THREE.MeshStandardMaterial({ map: TEX.glass[(i * 7 + 3) % 3], roughness: 0.25, metalness: 0.35 }));
+  glass.position.set(...P(0, 0, 0.05)); glass.rotation.y = yaw; glass.receiveShadow = true;
+  g.add(glass);
+  if (opts.ac ?? (i % 4 === 1)) {                                                  // window air conditioner
+    b.box('ac', 0.72, 0.44, 0.52, ...P(-w * 0.12, -h / 2 + 0.23, 0.30), 0, yaw, 0);
+    b.box('acgrill', 0.60, 0.30, 0.02, ...P(-w * 0.12, -h / 2 + 0.23, 0.57), 0, yaw, 0);
+    b.box('galv', 0.5, 0.03, 0.4, ...P(-w * 0.12, -h / 2 + 0.0, 0.3), 0, yaw, 0);   // support bracket
+  }
+}
+
+/* ---- door with painted surround, stone lintel over the plate zone, a lamp
+   and a threshold; returns the clickable door mesh ---- */
+function doorUnit(g, b, w, h, x, yc, z, yaw, opts = {}) {
+  const sy = Math.sin(yaw), cy = Math.cos(yaw);
+  const yb = yc - h / 2;
+  const P = (lx, ly, lz) => [x + lz * sy + lx * cy, yb + ly, z + lz * cy - lx * sy];
+  const H = h + 0.95;                                            // surround reaches over the number plate
+  b.box('dark', w + 0.34, H + 0.08, 0.05, ...P(0, H / 2, 0.025), 0, yaw, 0);
+  b.box('stone', w + 0.6, 0.26, 0.14, ...P(0, H + 0.17, 0.02), 0, yaw, 0);       // lintel
+  b.box('lamp', 0.14, 0.24, 0.12, ...P(w / 2 + 0.42, h + 0.15, 0.08), 0, yaw, 0); // wall lantern
+  b.add('glow', GEO.box, 0.09, 0.12, 0.08, ...P(w / 2 + 0.42, h + 0.13, 0.11), 0, yaw, 0);
+  if (yb < 0.5) b.box('stone', w + 0.5, 0.08, 0.55, ...P(0, 0.0, 0.3), 0, yaw, 0); // threshold step
+  const door = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.12),
+    new THREE.MeshStandardMaterial({ map: TEX.door, roughness: 0.75 }));
+  door.position.set(...P(0, h / 2, 0.0)); door.rotation.y = yaw;
+  door.castShadow = true; door.receiveShadow = true;
+  g.add(door); return door;
+}
+
+/* ---- the brick shell shared by every building: full-height brick box with a
+   membrane roof, limestone water table + belt courses, brick parapet with
+   stone coping, corner downspouts, rooftop bulkhead + vents, concrete
+   sidewalk apron, chain-link along the side lot lines, a dumpster out back. ---- */
+function brickShell(g, b, w, d, floors, fh) {
+  const h = floors * fh, hd = d / 2, hw = w / 2;
+  tbox(g, w, h, d, 'brick', 0, h / 2, 0, { top: 'roof' });
+  b.box('stone', w + 0.22, 0.32, d + 0.22, 0, 0.16, 0);                          // water table
+  for (let fi = 1; fi < floors; fi++) b.box('stone', w + 0.14, 0.14, d + 0.14, 0, fi * fh, 0);
+  // parapet + coping
+  const ph = 0.55, pt = 0.34;
+  tbox(g, w, ph, pt, 'brick', 0, h + ph / 2, hd - pt / 2);
+  tbox(g, w, ph, pt, 'brick', 0, h + ph / 2, -hd + pt / 2);
+  tbox(g, pt, ph, d - 2 * pt, 'brick', hw - pt / 2, h + ph / 2, 0);
+  tbox(g, pt, ph, d - 2 * pt, 'brick', -hw + pt / 2, h + ph / 2, 0);
+  b.box('stone', w + 0.16, 0.09, pt + 0.16, 0, h + ph + 0.045, hd - pt / 2);
+  b.box('stone', w + 0.16, 0.09, pt + 0.16, 0, h + ph + 0.045, -hd + pt / 2);
+  b.box('stone', pt + 0.16, 0.09, d + 0.16, hw - pt / 2, h + ph + 0.045, 0);
+  b.box('stone', pt + 0.16, 0.09, d + 0.16, -hw + pt / 2, h + ph + 0.045, 0);
+  // roof furniture: stair bulkhead, vents, a satellite dish pole
+  b.box('bulk', 2.2, 1.1, 1.8, -hw + 2.2, h + 0.55, -hd + 1.8);
+  for (const [vx, vz] of [[hw - 2, -hd + 1.5], [hw - 3.5, 0.8], [0.5, hd - 1.6]]) b.cyl('galv', 0.1, 0.9, vx, h + 0.45, vz);
+  b.cyl('galv', 0.14, 0.3, hw - 2, h + 0.95, -hd + 1.5);
+  // downspouts at the corners
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    b.cyl('lamp', 0.06, h + ph - 0.1, sx * (hw + 0.1), (h + ph) / 2, sz * (hd - 0.5));
+    b.box('lamp', 0.24, 0.12, 0.12, sx * (hw + 0.02), h + ph - 0.1, sz * (hd - 0.5));
+  }
+  // sidewalk apron
+  const sw = 2.2, sy = -0.14, st = 0.06;
+  for (const s of [1, -1]) tbox(g, w + 2 * sw, st, sw, 'concrete', 0, sy, s * (hd + sw / 2), { castShadow: false });
+  for (const ex of [1, -1]) tbox(g, sw, st, d + 2 * sw, 'concrete', ex * (hw + sw / 2), sy, 0, { castShadow: false });
+  // foundation shrubs in a soil strip under the front + back windows
+  for (const s of [1, -1]) {
+    const n = Math.max(2, Math.round(w / 3));
+    for (let i = 0; i < n; i++) {
+      const x = -hw + 1.2 + (w - 2.4) * (n === 1 ? 0.5 : i / (n - 1));
+      if (Math.abs(x) < 2.6 && s > 0) continue;                                  // keep the front entrance clear
+      b.add('shrub', GEO.ico, 1.0, 0.7, 0.9, x, 0.2, s * (hd + sw + 0.55), 0, i, 0);
+      b.add('shrub', GEO.ico, 0.7, 0.55, 0.7, x + 0.45, 0.15, s * (hd + sw + 0.35), 0, i * 2, 0);
+    }
+  }
+  // chain-link along both side lot lines, running from the kerb to the back fence
+  const fx = hw + sw + 1.6, zF = HALF_D + 5.4 - 3.2 - 0.2, zB = -(hd + sw + 4.5), fh2 = 1.2;
+  for (const sx of [-1, 1]) chainLink(g, b, sx * fx, zB, sx * fx, zF, fh2);
+  chainLink(g, b, -fx, zB, fx, zB, fh2);
+  // dumpster + a parked bike out back
+  b.box('dumpster', 1.8, 1.2, 1.1, -fx + 1.6, 0.6 - 0.14, zB + 1.2);
+  b.box('dark', 1.86, 0.1, 1.16, -fx + 1.6, 1.12, zB + 1.2);
+  b.box('tyre', 1.7, 0.16, 1.0, -fx + 1.6, -0.06, zB + 1.2);
+  // bank of mailboxes by the kerb
+  b.box('galv', 0.9, 1.25, 0.42, fx - 0.9, 0.62 - 0.14, zF - 0.6);
+  b.box('lamp', 0.9, 0.16, 0.46, fx - 0.9, 1.25 - 0.14, zF - 0.6);
+  return h;
+}
+function chainLink(g, b, x0, z0, x1, z1, h) {
+  const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz), yaw = Math.atan2(dx, dz);
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, yb = -0.14;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(L, h),
+    new THREE.MeshStandardMaterial({ map: TEX.chain.tex.clone(), transparent: true, alphaTest: 0.35,
+      side: THREE.DoubleSide, roughness: 0.6, metalness: 0.5 }));
+  mesh.material.map.repeat.set(L / 0.6, h / 0.6); mesh.material.map.needsUpdate = true;
+  mesh.position.set(cx, yb + h / 2, cz); mesh.rotation.y = yaw + Math.PI / 2;
+  mesh.castShadow = false;
+  g.add(mesh);
+  b.box('galv', 0.06, 0.06, L, cx, yb + h, cz, 0, yaw, 0);   // top rail
+  const nPost = Math.max(1, Math.round(L / 2.5));
+  for (let i = 0; i <= nPost; i++) { const t = i / nPost; b.cyl('galv', 0.035, h + 0.1, x0 + dx * t, yb + h / 2, z0 + dz * t); }
+}
+
+/* ---- plate / sign typography ----
+   One font stack for every number in the scene, numerals that fill their
+   plate, and a blank style that reads without colour (dashed frame + hollow
+   boxes where digits are missing). */
+const PLATE_FONT = '"Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif';
+const PLATE_FG = '#16202b', PLATE_BG = 'rgba(255,255,255,0.96)';
+const BLANK_FG = '#c0392b';                 // 5.4:1 on the white plate
+const BLANK_ON_DARK = '#ffd9a0';            // same cue on the dark banner
+const BLANK_DASH = { width: 14, dash: [40, 26], inset: 22 };   // in 1024-px canvas units
+
+/* is this CSS colour dark? accepts #rgb, #rrggbb, rgb() and rgba() */
+function isDarkBg(css) {
+  if (!css) return false;
+  let r = 255, g = 255, b = 255;
+  const m = /rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(css);
+  if (m) { r = +m[1]; g = +m[2]; b = +m[3]; }
+  else if (css[0] === '#') {
+    const hx = css.slice(1), t = hx.length === 3 ? hx.replace(/./g, c => c + c) : hx;
+    r = parseInt(t.slice(0, 2), 16); g = parseInt(t.slice(2, 4), 16); b = parseInt(t.slice(4, 6), 16);
+  }
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
+}
+
+/* a hollow rounded box standing in for one missing digit, baseline-aligned */
+function drawDigitBox(ctx, x, baselineY, adv, cap, color) {
+  const bw = adv * 0.84, bh = cap * 0.78, r = Math.min(bw, bh) * 0.18;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, cap * 0.09);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x + (adv - bw) / 2, baselineY - bh, bw, bh, r);
+  else ctx.rect(x + (adv - bw) / 2, baselineY - bh, bw, bh);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function makeTextTexture(text, opts = {}) {
+  const s = String(text);
+  const isBlank = /[?_]/.test(s);
+  const wide = s.length > 3;                                  // 4-5 digit units get more pixels
+  const { w = wide ? 768 : 512, h = wide ? 384 : 256,
+    bg = PLATE_BG, fg = PLATE_FG, font = 'bold 170px sans-serif' } = opts;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
+
+  /* keep the caller's weight and size, always force our own family */
+  const fm = /^\s*(.*?)(\d+(?:\.\d+)?)px\s/.exec(font);
+  const weight = fm ? fm[1].trim() : 'bold';
+  const base = fm ? parseFloat(fm[2]) : 170;
+  const fontAt = px => `${weight} ${px}px ${PLATE_FONT}`.trim();
+
+  /* the dashed blank frame, and the room it leaves for the text */
+  const k = w / 1024, dashLw = BLANK_DASH.width * k, dashInset = BLANK_DASH.inset * k + dashLw / 2;
+  const pad = isBlank ? dashInset + dashLw : 0;
+  const availW = w - 2 * pad, availH = h - 2 * pad;
+
+  /* fit to the plate: <= 86 % of the width, cap height <= 72 % of the height,
+     never more than 1.35x the size the caller asked for (scaled with the
+     canvas, so a 768x384 plate is not left with small numerals) */
+  const probe = s.replace(/_/g, '0');                         // a box takes a digit's room
+  ctx.font = fontAt(100);
+  const pm = ctx.measureText(probe);
+  const wPer = (pm.width || 50) / 100;
+  const ascPer = (pm.actualBoundingBoxAscent || 72) / 100;
+  const descPer = (pm.actualBoundingBoxDescent || 0) / 100;
+  const px = Math.max(8, Math.min(0.86 * availW / wPer, 0.72 * availH / ascPer,
+    0.88 * availH / (ascPer + descPer), 1.35 * base * (h / 256)));
+  ctx.font = fontAt(px);
+  const dm = ctx.measureText('0');
+  const cap = dm.actualBoundingBoxAscent || px * 0.72;         // digit cap height
+  const asc = ascPer * px, desc = descPer * px;
+  const baselineY = (h - (asc + desc)) / 2 + asc;              // centre the ink, not the em
+  const blankFg = isDarkBg(bg) ? BLANK_ON_DARK : BLANK_FG;
+
+  if (isBlank) {                                              // dashed frame = still missing
+    ctx.save();
+    ctx.strokeStyle = blankFg; ctx.lineWidth = dashLw;
+    ctx.setLineDash(BLANK_DASH.dash.map(d => d * k));
+    ctx.strokeRect(dashInset, dashInset, w - 2 * dashInset, h - 2 * dashInset);
+    ctx.restore();
+  }
+
+  ctx.textBaseline = 'alphabetic';
+  if (isBlank) {                                              // glyph by glyph: '_' -> box
+    ctx.textAlign = 'left';
+    const adv = ch => ctx.measureText(ch === '_' ? '0' : ch).width;
+    const chars = Array.from(s);
+    let x = (w - chars.reduce((t, ch) => t + adv(ch), 0)) / 2;
+    for (const ch of chars) {
+      const a = adv(ch);
+      if (ch === '_') drawDigitBox(ctx, x, baselineY, a, cap, blankFg);
+      else { ctx.fillStyle = ch === '?' ? blankFg : fg; ctx.fillText(ch, x, baselineY); }
+      x += a;
+    }
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = fg;
+    ctx.fillText(s, w / 2, baselineY);
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+function label(parent, text, pw, ph, texOpts = {}) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
+    new THREE.MeshBasicMaterial({ map: makeTextTexture(text, texOpts), transparent: true }));
+  parent.add(m); return m;
+}
+function setPlateText(plate, text, texOpts = {}) {
+  plate.material.map.dispose();
+  plate.material.map = makeTextTexture(text, texOpts);
+  plate.material.color.set('#ffffff');   // drop any hover tint on solve
+  plate.material.needsUpdate = true;
+}
+
+/* ---- a bright, readable 3D arrow from -> to ---- */
+function arrow(parent, from, to, color, radius = 0.08) {
+  const dir = to.clone().sub(from);
+  const len = dir.length();
+  const shaftLen = Math.max(0.05, len - 0.6);
+  const grp = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, shaftLen, 12), mat);
+  shaft.position.y = shaftLen / 2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.6, 16), mat);
+  head.position.y = shaftLen + 0.3;
+  grp.add(shaft, head);
+  grp.position.copy(from);
+  grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  parent.add(grp);
+}
+
+/* ============================================================
+   façade pieces shared by every building
+   ============================================================ */
+function addWindows(g, b, fi, s) {
+  const base = fi * FH, face = s * HALF_D, yaw = s > 0 ? 0 : Math.PI;
+  for (const wx of [-CONFIG.windowOffsetX, CONFIG.windowOffsetX])
+    windowUnit(g, b, 1.7, 1.55, wx, base + 1.65, face, yaw);
+}
+function addFacadeCommon(g, b, s) {
+  // 2nd-floor landing on steel columns, guard rail along the open edge
+  const lz = s * (HALF_D + 0.75), lw = 6.6, ld = 1.5;
+  tbox(g, lw, 0.16, ld, 'concrete', 0, FH - 0.06, lz);
+  b.box('steel', lw, 0.14, 0.04, 0, FH - 0.07, lz + s * (ld / 2 + 0.02));
+  for (const px of [-lw / 2 + 0.3, lw / 2 - 0.3]) b.box('steel', 0.14, FH - 0.2, 0.14, px, (FH - 0.2) / 2, lz + s * (ld / 2 - 0.12));
+  const outer = lz + s * ld / 2, yTop = FH + 0.02;
+  // rail: full outer edge except where the stair lands (x 0..-0.4 on the front, mirrored on the back)
+  railing(b, -lw / 2 * s, outer, -0.9 * s, outer, yTop);
+  railing(b, 0.3 * s, outer, lw / 2 * s, outer, yTop);
+  railing(b, -lw / 2 * s, outer, -lw / 2 * s, lz - s * ld / 2, yTop);   // left return
+  railing(b, lw / 2 * s, outer, lw / 2 * s, lz - s * ld / 2, yTop);     // right return
+  // straight stair up to the landing, clear of the doors
+  const z = s * (HALF_D + 1.0);
+  stairRun(b, 3.0 * s, z, 0.0, -0.4 * s, z, FH - 0.05, 1.25, 12, 0);
+  // eyebrow canopy on brackets over the entrance
+  b.box('bulk', 7, 0.1, 1.7, 0, H - 0.05, s * (HALF_D + 0.9));
+  for (const cx of [-3.2, 0, 3.2]) b.box('steel', 0.07, 0.07, 1.36, cx, H - 0.5, s * (HALF_D + 0.55), s * -0.63, 0, 0);   // knee braces
+}
+
+/* one façade. getUnit(faceOrder, floor, side) -> {type:'num'|'blank'|'none', value} */
+function buildFacade(g, s, isFront, getUnit, raycastList, blankStates) {
+  const b = new Batch();
+  const face = s * HALF_D, plateZ = s * (HALF_D + 0.09);
+  const yaw = s > 0 ? 0 : Math.PI, faceOrder = isFront ? 0 : 1;
+  const leftX = isFront ? -CONFIG.doorOffsetX : CONFIG.doorOffsetX;
+  const rightX = isFront ? CONFIG.doorOffsetX : -CONFIG.doorOffsetX;
+
+  for (let fi = 0; fi < CONFIG.floors; fi++) {
+    const base = fi * FH;
+    for (const sd of [{ x: leftX, i: 0 }, { x: rightX, i: 1 }]) {
+      const u = getUnit(faceOrder, fi, sd.i);
+      const door = doorUnit(g, b, 1.25, 2.05, sd.x, base + 1.05, face, yaw);
+      if (!u || u.type === 'none') continue;
+
+      if (u.type === 'num') {
+        const plate = label(g, String(u.value), 1.7, 0.85);
+        plate.position.set(sd.x, base + 2.5, plateZ);
+        plate.rotation.y = yaw;
+      } else { // blank — clickable
+        const plate = label(g, '?', 1.7, 0.85, { fg: '#c0392b' });
+        plate.position.set(sd.x, base + 2.5, plateZ);
+        plate.rotation.y = yaw;
+        const bstate = { value: u.value, solved: false, plate, options: makeOptions(u.value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
+    }
+    addWindows(g, b, fi, s);
+  }
+  addFacadeCommon(g, b, s);
+  b.flush(g);
+}
+
+/* ============================================================
+   building shell (walls, roof, sidewalk, side number signs)
+   ============================================================ */
+function buildShell(g, number) {
+  const b = new Batch();
+  brickShell(g, b, W, D, CONFIG.floors, FH);
+  b.flush(g);
+  for (const ex of [1, -1]) {
+    const sign = label(g, String(number), 2.4, 2.4, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 320px sans-serif', w: 512, h: 512 });
+    sign.position.set(ex * (W / 2 + 0.06), H * 0.6, 0);
+    sign.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+}
+
+/* arrows tracing the counting order on the example front façade:
+   bottom-left -> bottom-right -> up to top-left -> top-right */
+function addArrows(g) {
+  // pushed forward to sit right at the front edge of the central staircase
+  const z = HALF_D + 1.55, yb = 2.0, yt = 5.25, xl = -CONFIG.doorOffsetX, xr = CONFIG.doorOffsetX;
+  arrow(g, new THREE.Vector3(xl, yb, z), new THREE.Vector3(xr, yb, z), COLOR.arrow); // 1st -> 2nd
+  arrow(g, new THREE.Vector3(xr, yb, z), new THREE.Vector3(xl, yt, z), COLOR.arrow); // wrap up
+  arrow(g, new THREE.Vector3(xl, yt, z), new THREE.Vector3(xr, yt, z), COLOR.arrow); // 3rd -> 4th
+}
+
+/* ============================================================
+   PART 2 — 4-story building. First digit = floor.
+   ============================================================ */
+
+/* options are the SAME unit on every floor (e.g. 129/229/329/429) so the
+   learner must read the first digit to pick the right floor. */
+function makeTowerOptions(correct) {
+  const suffix = correct % 100;
+  return shuffle([1, 2, 3, 4].map(f => f * 100 + suffix));
+}
+
+function buildTowerShell(g, txt) {
+  const b = new Batch();
+  brickShell(g, b, TW, TD, TFLOORS, TFH);
+  b.flush(g);
+  // building identifier — a LETTER, so it can't be mistaken for the floor digit
+  for (const ex of [1, -1]) {
+    const sign = label(g, txt, 2.6, 2.6, { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 300px sans-serif', w: 512, h: 512 });
+    sign.position.set(ex * (TW / 2 + 0.06), TH * 0.62, 0);
+    sign.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+}
+
+/* exterior walkways on floors 2-4, a ground stoop, and a switchback stair */
+function buildTowerAccess(g) {
+  const b = new Batch();
+  const wDepth = 1.7, wzc = THALF_D + 0.85, outer = wzc + wDepth / 2;
+  for (let fi = 1; fi < TFLOORS; fi++) {
+    const yTop = fi * TFH + 0.02;
+    tbox(g, TW, 0.16, wDepth, 'concrete', 0, fi * TFH - 0.06, wzc);
+    b.box('steel', TW, 0.14, 0.04, 0, fi * TFH - 0.07, outer + 0.02);
+    railing(b, -TW / 2, outer, TW / 2, outer, yTop);
+    railing(b, -TW / 2, outer, -TW / 2, wzc - wDepth / 2, yTop);          // closed left end
+  }
+  for (const px of [-TW / 2 + 0.6, -3, 3, TW / 2 - 0.6])
+    b.box('steel', 0.16, TH - TFH, 0.16, px, (TH - TFH) / 2, outer - 0.2);
+  tbox(g, TW, 0.12, wDepth, 'concrete', 0, 0.0, wzc);                 // ground stoop
+
+  const zF = THALF_D + 0.9, zB = -1.6, xA = 10.0, xB = 11.6;
+  for (let t = 0; t < TFLOORS - 1; t++) {
+    const yFloor = t * TFH, yMid = t * TFH + TFH / 2, yNext = (t + 1) * TFH;
+    landingSlab(b, 3.0, 1.4, 10.8, yFloor + 0.02, zF, { F: true, R: true });
+    stairRun(b, xA, zF - 0.7, yFloor, xA, zB + 0.7, yMid, 1.4, 6, 1);
+    landingSlab(b, 3.0, 1.4, 10.8, yMid + 0.02, zB, { B: true, R: true, L: true });
+    stairRun(b, xB, zB + 0.7, yMid, xB, zF - 0.7, yNext, 1.4, 6, 2);
+  }
+  landingSlab(b, 3.0, 1.4, 10.8, (TFLOORS - 1) * TFH + 0.02, zF, { F: true, R: true });
+  b.flush(g);
+}
+
+/* big up-arrow + floor badges on the left: shows the first digit climbing 1->4 */
+function addTowerArrows(g) {
+  const x = -TW / 2 - 0.9, z = THALF_D + 1.6;
+
+  // the climb arrow sits just left of the badges — close enough to read as one cue
+  const arrowX = x - 1.4;
+  arrow(g, new THREE.Vector3(arrowX, 1.6, z), new THREE.Vector3(arrowX, TH - 0.9, z), COLOR.arrow, 0.1);
+
+  // blue = floor: the badges teach the colour here, where floor is the only rule
+  for (let fi = 0; fi < TFLOORS; fi++) {
+    const b = label(g, String(fi + 1), 1.15, 1.15, { bg: 'rgba(20,24,30,0.85)', fg: PLACE_COLORS.floor, font: 'bold 240px sans-serif' });
+    b.position.set(x, fi * TFH + 2.55, z + 0.02);
+  }
+}
+
+/* ---- digit key: a small sign that spells out which part of the number is
+   which place. Draws its own canvas (place colours + captions). ----
+   segments: [[text, 'building'|'floor'|'door'], …] */
+function addPlaceKey(g, segments, x, y, z) {
+  const CW = 1024, CH = 256;
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+  const r = 26;
+  ctx.fillStyle = 'rgba(20,24,30,0.92)';
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(CW - r, 0); ctx.quadraticCurveTo(CW, 0, CW, r);
+  ctx.lineTo(CW, CH - r); ctx.quadraticCurveTo(CW, CH, CW - r, CH);
+  ctx.lineTo(r, CH); ctx.quadraticCurveTo(0, CH, 0, CH - r);
+  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath(); ctx.fill();
+
+  const digitFont = 'bold 150px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  const capFont = 'bold 46px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  const gap = 150 * 0.14;
+  const cols = segments.map(([text, place]) => {
+    ctx.font = digitFont; const dw = ctx.measureText(text).width;
+    ctx.font = capFont; const cw = ctx.measureText(place.toUpperCase()).width;
+    return { text, place, w: Math.max(dw, cw) };
+  });
+  let total = 0;
+  cols.forEach((col, i) => { total += col.w + (i ? gap : 0); });
+  let cx = (CW - total) / 2;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const col of cols) {
+    const mid = cx + col.w / 2;
+    ctx.fillStyle = PLACE_COLORS[col.place] || PLACE_COLORS.door;
+    ctx.font = digitFont; ctx.fillText(col.text, mid, 98);
+    ctx.font = capFont; ctx.fillText(col.place.toUpperCase(), mid, 194);
+    cx += col.w + gap;
+  }
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.3),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  m.position.set(x, y, z);
+  g.add(m);
+  return m;
+}
+
+/* Part 3 example: the anatomy of 1 1 09 + blue floor badges on the left end */
+function addRowGuides(g) {
+  addPlaceKey(g, [['1', 'building'], ['1', 'floor'], ['09', 'door']],
+    RW / 2 - 3.2, RH + 0.95, RHALF_D + 0.12);
+  for (let fi = 0; fi < 2; fi++) {
+    const b = label(g, String(fi + 1), 1.0, 1.0,
+      { bg: 'rgba(20,24,30,0.85)', fg: PLACE_COLORS.floor, font: 'bold 240px sans-serif' });
+    b.position.set(-RW / 2 - 1.0, fi * RFH + 2.55, RHALF_D + 0.6);
+  }
+}
+
+/* Part 4 example: the key for 10 1 01 (no ground arrows — the prompt text explains the wrap) */
+function addBlockGuides(g) {
+  // clear of the 9.6-wide banner (its right edge is x = 4.8), still on the roof line
+  addPlaceKey(g, [['10', 'building'], ['1', 'floor'], ['01', 'door']],
+    BW / 2 - 0.4, BH + 0.95, BHALF_D + 0.12);
+}
+
+
+/* one front façade: 4 floors x 3 doors. getUnit(floor, col) -> {type,value} */
+function buildTowerFacade(g, getUnit, raycastList, blankStates) {
+  const b = new Batch();
+  const face = THALF_D, plateZ = THALF_D + 0.10;
+  for (let fi = 0; fi < TFLOORS; fi++) {
+    const base = fi * TFH;
+    TDOORX.forEach((dx, ii) => {
+      const u = getUnit(fi, ii);
+      const door = doorUnit(g, b, 1.3, 2.05, dx, base + 1.05, face, 0);
+      if (!u || u.type === 'none') return;
+      if (u.type === 'num') {
+        const plate = label(g, String(u.value), 1.8, 0.9);
+        plate.position.set(dx, base + 2.55, plateZ);
+      } else {
+        const plate = label(g, '?', 1.8, 0.9, { fg: '#c0392b' });
+        plate.position.set(dx, base + 2.55, plateZ);
+        const bstate = { value: u.value, solved: false, plate, options: makeTowerOptions(u.value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
+    });
+    for (const wx of [-7.6, -2.75, 2.75, 7.6]) windowUnit(g, b, 1.3, 1.5, wx, base + 1.5, face, 0);
+    for (const wx of [-6, 0, 6]) windowUnit(g, b, 1.3, 1.5, wx, base + 1.5, -face, Math.PI);   // back wall
+  }
+  b.flush(g);
+}
+
+/* ============================================================
+   PART 3 — wide 2-story row. Leading digit(s) = building number.
+   ============================================================ */
+
+/* a plain stacked-floor slab (walls, bands, roof, sidewalks) shared by
+   Parts 3 and 4 */
+function buildSlabShell(g, w, d, floors, fh) {
+  const b = new Batch();
+  brickShell(g, b, w, d, floors, fh);
+  b.flush(g);
+}
+
+/* a wide banner across the top of the front. Also the plate the learner
+   updates when they name the building. Returns the plate. */
+function addTopBanner(g, h, halfD, text) {
+  const plate = label(g, text, 9.6, 2.0, BANNER_OPTS);
+  plate.position.set(0, h + 1.9, halfD + 0.12);
+  for (const ex of [1, -1])                    // posts: the sign stands on the roof slab
+    box(g, 0.16, 0.9, 0.16, COLOR.roof, ex * 4.2, h + 0.45, halfD + 0.05);
+  return plate;
+}
+const BANNER_OPTS = { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 150px sans-serif', w: 1024, h: 214 };
+
+/* one front façade: RFLOORS x 5 doors. Each cell is either a number (shown)
+   or a [value, mask] pair (blank — mask is the partial string, e.g. '710_'). */
+function buildRowFacade(g, floorsData, raycastList, blankStates) {
+  const b = new Batch();
+  const face = RHALF_D, plateZ = RHALF_D + 0.10;
+  for (let fi = 0; fi < RFLOORS; fi++) {
+    const base = fi * RFH;
+    RDOORX.forEach((dx, di) => {
+      const cell = floorsData[fi][di];
+      const isBlank = Array.isArray(cell);
+      const value = isBlank ? cell[0] : cell;
+      const door = doorUnit(g, b, 1.25, 2.05, dx, base + 1.05, face, 0);
+      if (!isBlank) {
+        const plate = label(g, String(value), 1.95, 0.92);
+        plate.position.set(dx, base + 2.55, plateZ);
+      } else {
+        const plate = label(g, cell[1], 1.95, 0.92, { fg: '#c0392b' });
+        plate.position.set(dx, base + 2.55, plateZ);
+        const bstate = { value, solved: false, plate, options: makeBigOptions(value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
+    });
+    for (const wx of [-7.2, -2.4, 2.4, 7.2]) windowUnit(g, b, 1.2, 1.4, wx, base + 1.55, face, 0);
+    for (const wx of [-9, -4.5, 0, 4.5, 9]) windowUnit(g, b, 1.2, 1.4, wx, base + 1.55, -face, Math.PI);
+  }
+  // 2nd-floor walkway on steel columns + a straight stair clear of the doors at the right end
+  const wz = RHALF_D + 0.78, wd = 1.5, outer = wz + wd / 2, yTop = RFH + 0.02;
+  tbox(g, RW, 0.16, wd, 'concrete', 0, RFH - 0.06, wz);
+  b.box('steel', RW, 0.14, 0.04, 0, RFH - 0.07, outer + 0.02);
+  railing(b, -RW / 2, outer, RW / 2 - 1.9, outer, yTop);
+  railing(b, -RW / 2, outer, -RW / 2, wz - wd / 2, yTop);
+  for (const px of [-RW / 2 + 0.5, -7.2, -2.4, 2.4, 7.2, RW / 2 - 0.5])
+    b.box('steel', 0.14, RFH - 0.2, 0.14, px, (RFH - 0.2) / 2, outer - 0.15);
+  const z = RHALF_D + 1.05;
+  stairRun(b, 12.4, z, 0.0, 10.6, z, RFH - 0.05, 1.25, 11);
+  b.flush(g);
+}
+
+/* ============================================================
+   PART 4 — 4-story block numbered around the front AND back.
+   ============================================================ */
+
+/* unit = building*1000 + floor*100 + suffix.
+   front: door0 -> 2f-1, door1 -> 2f+7   (odd suffixes)
+   back:  door0 -> 2f+8, door1 -> 2f     (even suffixes, swapped L<->R) */
+function blockUnit(building, isFront, fi, di) {
+  const f = fi + 1;
+  const suffix = isFront ? (di === 0 ? 2 * f - 1 : 2 * f + 7)
+                         : (di === 0 ? 2 * f + 8 : 2 * f);
+  return building * 1000 + f * 100 + suffix;
+}
+
+/* one façade (front s=1 / back s=-1), 4 floors x 2 doors.
+   getCell(fi, di) -> { value, mask|null } */
+function buildBlockFacade(g, s, isFront, getCell, raycastList, blankStates) {
+  const b = new Batch();
+  const face = s * BHALF_D, plateZ = s * (BHALF_D + 0.10);
+  const yaw = s > 0 ? 0 : Math.PI;
+  const leftX = isFront ? -BDOORX : BDOORX;
+  const rightX = isFront ? BDOORX : -BDOORX;
+  for (let fi = 0; fi < BFLOORS; fi++) {
+    const base = fi * BFH;
+    for (const sd of [{ x: leftX, di: 0 }, { x: rightX, di: 1 }]) {
+      const cell = getCell(fi, sd.di);
+      const door = doorUnit(g, b, 1.3, 2.05, sd.x, base + 1.05, face, yaw);
+      if (cell.mask === null) {
+        const plate = label(g, String(cell.value), 2.05, 0.95);
+        plate.position.set(sd.x, base + 2.55, plateZ);
+        plate.rotation.y = yaw;
+      } else {
+        const plate = label(g, cell.mask, 2.05, 0.95, { fg: '#c0392b' });
+        plate.position.set(sd.x, base + 2.55, plateZ);
+        plate.rotation.y = yaw;
+        const bstate = { value: cell.value, solved: false, plate, options: makeBigOptions(cell.value) };
+        plate.userData.bstate = bstate;
+        door.userData.bstate = bstate;
+        raycastList.push(plate, door);
+        blankStates.push(bstate);
+      }
+    }
+    for (const wx of [-6.6, 0, 6.6]) windowUnit(g, b, 1.3, 1.5, wx, base + 1.55, face, yaw);
+    if (fi > 0) {
+      const wz = s * (BHALF_D + 0.8), wd = 1.5, outer = wz + s * wd / 2, yTop = base + 0.02;
+      tbox(g, BW, 0.16, wd, 'concrete', 0, base - 0.06, wz);
+      b.box('steel', BW, 0.14, 0.04, 0, base - 0.07, outer + s * 0.02);
+      railing(b, -BW / 2, outer, BW / 2, outer, yTop);
+      railing(b, -BW / 2, outer, -BW / 2, wz - s * wd / 2, yTop);         // closed left end
+    }
+  }
+  for (const px of [-BW / 2 + 0.5, -3.3, 3.3, BW / 2 - 0.5])
+    b.box('steel', 0.16, BH - BFH, 0.16, px, (BH - BFH) / 2, s * (BHALF_D + 1.4));
+  b.flush(g);
+}
+
+/* switchback stair on the right end serving the upper landings */
+function buildBlockAccess(g) {
+  const b = new Batch();
+  const zF = BHALF_D + 0.9, zB = -1.4, xA = BW / 2 + 0.2, xB = BW / 2 + 1.6;
+  for (let t = 0; t < BFLOORS - 1; t++) {
+    const yFloor = t * BFH, yMid = t * BFH + BFH / 2, yNext = (t + 1) * BFH;
+    landingSlab(b, 2.6, 1.4, xA, yFloor + 0.02, zF, { F: true, R: false });
+    stairRun(b, xA, zF - 0.7, yFloor, xA, zB + 0.7, yMid, 1.3, 6, 1);
+    landingSlab(b, 2.6, 1.4, xB, yMid + 0.02, zB, { B: true, R: true });
+    stairRun(b, xB, zB + 0.7, yMid, xB, zF - 0.7, yNext, 1.3, 6, 2);
+  }
+  landingSlab(b, 2.6, 1.4, xA, (BFLOORS - 1) * BFH + 0.02, zF, { F: true, R: true });
+  b.flush(g);
+}
+
+/* the building label on both ends so it reads from the front or the back */
+function addBlockSideSigns(g, text) {
+  for (const ex of [1, -1]) {
+    const sign = label(g, text, 4.2, 1.05,
+      { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 120px sans-serif', w: 1024, h: 256 });
+    sign.position.set(ex * (BW / 2 + 0.06), BH * 0.62, 0);
+    sign.rotation.y = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+}
+
+/* ============================================================
+   PART 5 — running count with NO floor digit, on a solid walk-up block.
+   ============================================================ */
+
+/* switchback stair hugging one corner (front-right s=1, back-left s=-1),
+   serving the upper front/back walkways while staying clear of the
+   side-wall doors (door 20 / door 4 end at |z| = 8.1). */
+function buildSeqAccess(g, b, s) {
+  const zF = s * (SQHD + 0.9), zB = s * 8.6, xA = s * (SQHW + 0.2), xB = s * (SQHW + 1.6);
+  const railsA = s > 0 ? 1 : 2, railsB = s > 0 ? 2 : 1;
+  for (let t = 0; t < SQFLOORS - 1; t++) {
+    const yFloor = t * SQFH, yMid = t * SQFH + SQFH / 2, yNext = (t + 1) * SQFH;
+    landingSlab(b, 2.6, 1.4, xA, yFloor + 0.02, zF, s > 0 ? { F: true } : { B: true });
+    stairRun(b, xA, zF - s * 0.7, yFloor, xA, zB + s * 0.7, yMid, 1.3, 6, railsA);
+    landingSlab(b, 2.6, 1.4, xB, yMid + 0.02, zB, s > 0 ? { B: true, R: true } : { F: true, L: true });
+    stairRun(b, xB, zB + s * 0.7, yMid, xB, zF - s * 0.7, yNext, 1.3, 6, railsB);
+  }
+  landingSlab(b, 2.6, 1.4, xA, (SQFLOORS - 1) * SQFH + 0.02, zF, s > 0 ? { F: true, R: true } : { B: true, L: true });
+}
+
+/* solid slab shell in the shared style, windows, walkway ledges under the
+   upper front/back doors, corner stairs, and the number on all four faces */
+function buildSeqStructure(g, number) {
+  buildSlabShell(g, SQW, SQD, SQFLOORS, SQFH);
+  const b = new Batch();
+
+  const win = (px, py, pz, onFB) => {          // onFB: window sits on the front/back wall
+    if (onFB) windowUnit(g, b, 1.3, 1.5, px, py, Math.sign(pz) * SQHD, pz > 0 ? 0 : Math.PI);
+    else windowUnit(g, b, 1.3, 1.5, Math.sign(px) * SQHW, py, pz, px > 0 ? Math.PI / 2 : -Math.PI / 2);
+  };
+  for (let fi = 0; fi < SQFLOORS; fi++) {
+    const wy = fi * SQFH + 1.55;
+    for (const sz of [-1, 1]) for (const wx of [-4.9, 4.9])      // front + back, flanking the door pair
+      win(wx, wy, sz * (SQHD + 0.05), true);
+    // sides: between the doors on floor 1, above them on floors 2-3
+    for (const sx of [-1, 1]) for (const wz of (fi === 0 ? [-5, 0, 5] : [-7.5, -2.5, 2.5, 7.5]))
+      win(sx * (SQHW + 0.05), wy, wz, false);
+  }
+
+  for (let fi = 1; fi < SQFLOORS; fi++)                          // walkways with guard rails
+    for (const sz of [-1, 1]) {
+      const wz = sz * (SQHD + 0.8), wd = 1.5, outer = wz + sz * wd / 2, yTop = fi * SQFH + 0.02;
+      tbox(g, SQW, 0.16, wd, 'concrete', 0, fi * SQFH - 0.06, wz);
+      b.box('steel', SQW, 0.14, 0.04, 0, fi * SQFH - 0.07, outer + sz * 0.02);
+      railing(b, -SQHW, outer, SQHW, outer, yTop);
+      // the end away from that face's stair is closed
+      const cx = sz > 0 ? -SQHW : SQHW;
+      railing(b, cx, outer, cx, wz - sz * wd / 2, yTop);
+    }
+  for (const sz of [-1, 1]) for (const px of [-SQHW + 0.5, 0, SQHW - 0.5])
+    b.box('steel', 0.16, SQH - SQFH, 0.16, px, (SQH - SQFH) / 2, sz * (SQHD + 1.4));
+  for (const s of [1, -1]) buildSeqAccess(g, b, s);
+  b.flush(g);
+
+  // building number over the front and back, and mid-height on each side
+  for (const sz of [1, -1]) {
+    const bn = label(g, `Building ${number}`, 9.6, 2.0, BANNER_OPTS);
+    bn.position.set(0, SQH + 1.9, sz * (SQHD + 0.12));
+    bn.rotation.y = sz > 0 ? 0 : Math.PI;
+    for (const ex of [1, -1])
+      box(g, 0.16, 0.9, 0.16, COLOR.roof, ex * 4.2, SQH + 0.45, sz * (SQHD + 0.05));
+  }
+  for (const sx of [1, -1]) {
+    const sign = label(g, `Building ${number}`, 5.0, 1.25,
+      { bg: 'rgba(20,24,30,0.92)', fg: '#ffe4c2', font: 'bold 120px sans-serif', w: 1024, h: 256 });
+    sign.position.set(sx * (SQHW + 0.12), SQH * 0.62, 0);
+    sign.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+}
+
+/* place all 20 doors. getUnit(door#) -> { value, mask|null }
+   (mask = the partial string to show on a blank, e.g. '12__'). Doors face out. */
+function buildSeqFacade(g, getUnit, raycastList, blankStates) {
+  const b = new Batch();
+  for (const slot of SQ_LAYOUT) {
+    const base = slot.f * SQFH;
+    let x, z, yaw, px, pz;
+    if (slot.face === 'L' || slot.face === 'R') {
+      const sx = slot.face === 'L' ? -1 : 1;
+      x = sx * SQHW; z = slot.a; yaw = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+      px = sx * (SQHW + 0.12); pz = slot.a;
+    } else {
+      const sz = slot.face === 'F' ? 1 : -1;
+      x = slot.a; z = sz * SQHD; yaw = sz > 0 ? 0 : Math.PI;
+      px = slot.a; pz = sz * (SQHD + 0.12);
+    }
+
+    const u = getUnit(slot.d);
+    const door = doorUnit(g, b, 1.2, 2.05, x, base + 1.05, z, yaw);
+    const plate = label(g, u.mask === null ? String(u.value) : u.mask, 1.95, 0.92,
+      u.mask === null ? {} : { fg: '#c0392b' });
+    plate.position.set(px, base + 2.55, pz);
+    plate.rotation.y = yaw;
+    if (u.mask !== null) {
+      const bstate = { value: u.value, solved: false, plate, options: makeBigOptions(u.value) };
+      plate.userData.bstate = bstate;
+      door.userData.bstate = bstate;
+      raycastList.push(plate, door);
+      blankStates.push(bstate);
+    }
+  }
+  b.flush(g);
+}
+
+/* ---- ground + street (shared by every stage) ---- */
+{
+  const grass = TEX.grass.tex.clone(); grass.repeat.set(800 / TEX.grass.m, 800 / TEX.grass.m); grass.needsUpdate = true;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800),
+    new THREE.MeshStandardMaterial({ map: grass, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.17;
+  ground.receiveShadow = true; scene.add(ground);
+
+  const ROAD_Z = HALF_D + 5.4, ROAD_W = 6;
+  const asph = TEX.asphalt.tex.clone(); asph.repeat.set(800 / TEX.asphalt.m, 1); asph.needsUpdate = true;
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(800, ROAD_W),
+    new THREE.MeshStandardMaterial({ map: asph, roughness: 0.98 }));
+  road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, ROAD_Z);
+  road.receiveShadow = true; scene.add(road);
+
+  const env = new Batch();
+  /* concrete kerbs, a public sidewalk + grass parkway on the far side */
+  for (const s of [-1, 1]) tbox(scene, 800, 0.14, 0.35, 'concrete', 0, -0.10, ROAD_Z + s * 3.2, { castShadow: false });
+  tbox(scene, 800, 0.06, 2.4, 'concrete', 0, -0.14, ROAD_Z + 3.2 + 0.175 + 1.2, { castShadow: false });
+  /* storm drains at the kerb line */
+  for (const x of [-9, 21]) env.box('lamp', 0.9, 0.04, 0.5, x, -0.148, ROAD_Z + 2.7);
+
+  /* street trees: far side of the road (|x| >= 24 keeps them out of every
+     default pose) and behind the lot */
+  const tree = (x, z, hTrunk, r, seed) => {
+    const rnd = mkRand(seed);
+    env.cyl('bark', 0.16 + rnd() * 0.06, hTrunk, x, -0.17 + hTrunk / 2, z);
+    const n = 3 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const rr = r * (0.6 + rnd() * 0.5);
+      env.add(rnd() < 0.5 ? 'leaf' : 'leaf2', GEO.ico, rr * 2, rr * 1.6, rr * 2,
+        x + (rnd() - 0.5) * r * 1.1, hTrunk - 0.4 + rr * 0.8 + rnd() * r * 0.6, z + (rnd() - 0.5) * r * 1.1,
+        rnd(), rnd() * 3, rnd());
+    }
+    env.box('soil', 1.4, 0.05, 1.4, x, -0.16, z);                         // tree pit
+  };
+  const farZ = ROAD_Z + 3.2 + 2.4 + 0.9;
+  let seed = 11;
+  for (const x of [-50, -39, -28, 28, 39, 50]) tree(x, farZ, 3.2 + (seed % 3) * 0.4, 2.3, seed++);
+  /* behind the lot and out to the sides: nothing within the Part 4/5 back and
+     side poses' view cones (|x| >= 24 behind, |x| >= 48 beside) */
+  for (const x of [-36, -24, 24, 36]) tree(x, -22 - (seed % 2) * 3, 3.6, 2.6, seed++);
+  for (const [x, z] of [[-48, -10], [48, -10], [-54, 14], [54, 14], [-30, -40], [30, -40], [-12, -52], [12, -52]])
+    tree(x, z, 3.4, 2.8, seed++);
+
+  /* street lights on the far kerb */
+  for (const x of [-20, 20]) {
+    env.cyl('lamp', 0.09, 7, x, -0.17 + 3.5, ROAD_Z + 3.0);
+    env.box('lamp', 0.1, 0.1, 2.4, x, 6.55, ROAD_Z + 3.0 - 1.15, -0.2, 0, 0);
+    env.box('lamp', 0.6, 0.16, 0.36, x, 6.72, ROAD_Z + 0.8);
+    env.add('glow', GEO.box, 0.5, 0.04, 0.3, x, 6.63, ROAD_Z + 0.8);
+    env.cyl('concrete', 0.22, 0.5, x, 0.08, ROAD_Z + 3.0);
+  }
+  /* a fire hydrant */
+  env.cyl('carglass', 0.12, 0.7, -12, 0.2, ROAD_Z - 3.1);
+  env.cyl('carglass', 0.14, 0.1, -12, 0.58, ROAD_Z - 3.1);
+
+  /* parked cars along both kerbs (positions keep every default pose clear) */
+  const car = (x, z, colour, seed) => {
+    const rnd = mkRand(seed), yaw = rnd() < 0.5 ? 0 : Math.PI, key = 'car' + colour;
+    if (!MAT_DEFS[key]) MAT_DEFS[key] = () => new THREE.MeshStandardMaterial({ color: colour, roughness: 0.35, metalness: 0.4 });
+    env.box(key, 4.4, 0.62, 1.8, x, 0.42, z, 0, yaw, 0);                    // body
+    env.box(key, 2.4, 0.55, 1.65, x - 0.2, 0.98, z, 0, yaw, 0);            // cabin
+    env.box('carglass', 2.2, 0.4, 1.7, x - 0.2, 1.02, z, 0, yaw, 0);         // glass band
+    env.box('dark', 4.42, 0.2, 1.82, x, 0.2, z, 0, yaw, 0);                 // sills / bumpers
+    for (const wx of [-1.45, 1.45]) for (const wz of [-0.85, 0.85])
+      env.cyl('tyre', 0.33, 0.24, x + wx, 0.16, z + wz, Math.PI / 2, 0, 0);
+  };
+  car(-19, ROAD_Z - 1.85, 0x9aa3ad, 3); car(-30, ROAD_Z - 1.85, 0x2c3e6b, 4); car(19.5, ROAD_Z - 1.85, 0x7a2e2a, 5);
+  car(31, ROAD_Z - 1.85, 0xe8e6df, 6); car(-15, ROAD_Z + 1.85, 0x1f1f22, 7); car(-25, ROAD_Z + 1.85, 0x6b7b52, 8);
+  car(15.5, ROAD_Z + 1.85, 0xcfd3d6, 9); car(26, ROAD_Z + 1.85, 0x3d4a5a, 10);
+
+  /* the neighbourhood: brick blocks far enough away that the orbit camera
+     (max 95 units out) never enters one; the fog softens them */
+  const nb = (x, z, w, floors, d) => {                 // one material: at 100+ m the stretch on the ends is invisible
+    const h = floors * 3.6;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), texMat('neighbour', w / TEX.neighbour.m, h / TEX.neighbour.m));
+    m.position.set(x, h / 2 - 0.17, z); scene.add(m);
+  };
+  nb(-40, -118, 30, 4, 14); nb(-4, -122, 26, 3, 14); nb(30, -116, 22, 5, 12); nb(66, -120, 34, 3, 14);
+  nb(-118, -20, 14, 3, 30); nb(-116, 22, 14, 4, 26); nb(118, -16, 12, 4, 28); nb(120, 24, 14, 3, 24);
+  nb(-40, 124, 30, 3, 14); nb(2, 126, 26, 4, 14); nb(44, 122, 28, 3, 14);
+  nb(-84, -84, 22, 4, 22); nb(84, -86, 24, 3, 22); nb(-86, 88, 22, 3, 22); nb(88, 86, 24, 4, 22);
+  env.flush(scene);
+}
+
+/* ============================================================
+   course stages
+   ============================================================ */
+const STAGES = [
+  // ---- PART 1 — sequential numbering around a 2-story 4-plex ----
+  { part: 1, type: 'plex', kind: 'example', number: 1, start: 101 },                   // 101-108, arrows
+  { part: 1, type: 'plex', kind: 'quiz',    number: 2, start: 109, blanks: [112] },           // blank 112
+  { part: 1, type: 'plex', kind: 'quiz',    number: 3, start: 113, blanks: [115, 116] },      // blanks 115,116
+  { part: 1, type: 'plex', kind: 'quiz',    number: 4, start: 117, blanks: [118, 119, 120] }, // 3 blanks
+
+  // ---- PART 2 — 3-digit units, first digit = floor (4 floors x 3 doors) ----
+  // unit(floor fi 0-3, col ii 0-2) = (fi+1)*100 + suffixes[ii]
+  { part: 2, type: 'tower', kind: 'example', label: 'A', suffixes: [28, 29, 30] },     // 128..430, arrows
+  { part: 2, type: 'tower', kind: 'quiz', label: 'B', difficulty: 'Easy',
+    suffixes: [21, 22, 23], blanks: [222] },                                           // 1 blank
+  { part: 2, type: 'tower', kind: 'quiz', label: 'C', difficulty: 'Medium',
+    suffixes: [35, 36, 37], blanks: [236, 335, 437, 137] },                            // 4 blanks
+
+  // ---- PART 3 — 4-5 digit units; the leading digit(s) name the building ----
+  { part: 3, type: 'row', kind: 'example', label: 'A', building: 1,
+    floors: [[1101, 1103, 1105, 1107, 1109],
+             [1202, 1204, 1206, 1208, 1210]] },
+  { part: 3, type: 'row', kind: 'quiz', label: 'B', building: 7,
+    floors: [[7101, [7103, '710_'], [7105, '71_5'], [7107, '7_07'], [7109, '_109']],
+             [7202, 7204, 7206, 7208, 7210]],
+    chooseBuilding: true, buildingOptions: [7, 1, 71, 17] },
+  { part: 3, type: 'row', kind: 'quiz', label: 'C', building: 13,
+    floors: [[[13117, '1_117'], [13119, '13_19'], [13121, '131_1'], [13123, '1312_'], 13125],
+             [[13218, '132__'], [13220, '132_0'], [13222, '13__2'], [13224, '1__24'], [13226, '__226']]],
+    chooseBuilding: true, buildingOptions: [13, 1, 131, 3] },
+
+  // ---- PART 4 — front + back, 4 floors, a unique pattern per building ----
+  { part: 4, type: 'block', kind: 'example', building: 10 },
+  { part: 4, type: 'block', kind: 'quiz', building: 19,
+    blanks: {                                          // value -> partial mask shown
+      19101: '1_101', 19109: '19_09', 19203: '1920_', 19211: '__211',
+      19305: '193__', 19407: '19_07', 19415: '19_15',
+      19102: '191__', 19110: '191__', 19204: '19___', 19212: '19___',
+      19306: '19___', 19314: '19___',
+    } },
+
+  // ---- PART 5 — no floor digit: one running count around the building ----
+  // unit(door#) = base + door#  →  Bld 6 runs 601-620, Bld 12 runs 1231-1250.
+  { part: 5, type: 'seq', kind: 'example', building: 6, base: 600 },
+  { part: 5, type: 'seq', kind: 'quiz', building: 12, base: 1230,
+    blanks: {                                          // door# -> partial mask shown
+      1: '12__', 2: '12__', 6: '123_', 7: '123_',
+      10: '____', 11: '____', 13: '____', 14: '____', 15: '____', 16: '____',
+      17: '12__', 19: '12__', 20: '12__',
+    } },
+];
+
+function makeOptions(correct) {
+  const pool = [];
+  for (const d of [-3, -2, -1, 1, 2, 3, 5, -5, 7, 10, -10]) {
+    const n = correct + d;
+    if (n > 100 && n !== correct) pool.push(n);
+  }
+  shuffle(pool);
+  const distract = [];
+  for (const n of pool) {
+    if (distract.length >= 3) break;
+    if (!distract.includes(n)) distract.push(n);
+  }
+  return shuffle([correct, ...distract]);
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* distractors for the big 4-5 digit units: nudge the suffix (±2,±4),
+   the floor digit (±100) or the building (±1000) so wrong answers stay
+   tempting and on-pattern. */
+function makeBigOptions(correct) {
+  const pool = [];
+  for (const d of [-2, 2, -4, 4, -6, 6, -100, 100, -200, 200, -1000, 1000]) {
+    const n = correct + d;
+    if (n > 0 && n !== correct) pool.push(n);
+  }
+  shuffle(pool);
+  const distract = [];
+  for (const n of pool) {
+    if (distract.length >= 3) break;
+    if (!distract.includes(n)) distract.push(n);
+  }
+  return shuffle([correct, ...distract]);
+}
+
+function buildStageGroup(i) {
+  const st = STAGES[i];
+  const g = new THREE.Group();
+  scene.add(g);
+  const raycastList = [], blankStates = [];
+  let buildingState = null;
+
+  if (st.type === 'tower') {
+    buildTowerShell(g, st.label);
+    buildTowerAccess(g);
+    if (st.kind === 'example') {
+      buildTowerFacade(g, (fi, ii) => ({ type: 'num', value: (fi + 1) * 100 + st.suffixes[ii] }),
+        raycastList, blankStates);
+      addTowerArrows(g);
+    } else {
+      const blankSet = new Set(st.blanks);
+      buildTowerFacade(g, (fi, ii) => {
+        const v = (fi + 1) * 100 + st.suffixes[ii];
+        return { type: blankSet.has(v) ? 'blank' : 'num', value: v };
+      }, raycastList, blankStates);
+    }
+  } else if (st.type === 'row') {
+    buildSlabShell(g, RW, RD, RFLOORS, RFH);
+    const named = st.kind === 'example' || !st.chooseBuilding;
+    const banner = addTopBanner(g, RH, RHALF_D, named ? `Building ${st.building}` : 'Building ?');
+    buildRowFacade(g, st.floors, raycastList, blankStates);
+    if (st.kind === 'example') addRowGuides(g);
+    if (st.kind === 'quiz' && st.chooseBuilding) {
+      buildingState = {
+        value: st.building, solved: false, plate: banner,
+        options: shuffle([...st.buildingOptions]),
+        header: 'Which building is this?<small>Read the leading digit(s)</small>',
+        solvedText: v => `Building ${v}`, plateOpts: BANNER_OPTS,
+      };
+    }
+  } else if (st.type === 'block') {
+    buildSlabShell(g, BW, BD, BFLOORS, BFH);
+    buildBlockAccess(g);
+    addTopBanner(g, BH, BHALF_D, `Building ${st.building}`);
+    addBlockSideSigns(g, `Building ${st.building}`);
+    const blanksMap = st.blanks || {};
+    const cell = (isFront, fi, di) => {
+      const value = blockUnit(st.building, isFront, fi, di);
+      return { value, mask: blanksMap[value] || null };
+    };
+    buildBlockFacade(g, 1, true, (fi, di) => cell(true, fi, di), raycastList, blankStates);
+    buildBlockFacade(g, -1, false, (fi, di) => cell(false, fi, di), raycastList, blankStates);
+    if (st.kind === 'example') addBlockGuides(g);
+  } else if (st.type === 'seq') {
+    buildSeqStructure(g, st.building);
+    const blanksMap = st.blanks || {};
+    buildSeqFacade(g, d => ({ value: st.base + d, mask: blanksMap[d] || null }),
+      raycastList, blankStates);
+    // solid walk-up block — read the doors around the outside
+  } else {
+    buildShell(g, st.number);
+    if (st.kind === 'example') {
+      const u = (fo, fi, ii) => ({ type: 'num', value: st.start + fo * 4 + fi * 2 + ii });
+      buildFacade(g, 1, true, u, raycastList, blankStates);
+      buildFacade(g, -1, false, u, raycastList, blankStates);
+      addArrows(g);
+    } else {
+      const blankSet = new Set(st.blanks);
+      buildFacade(g, 1, true, (fo, fi, ii) => {
+        const v = st.start + fi * 2 + ii;
+        return { type: blankSet.has(v) ? 'blank' : 'num', value: v };
+      }, raycastList, blankStates);
+      // back of a course building carries no numbers (its units belong to the next building)
+      buildFacade(g, -1, false, () => ({ type: 'none' }), raycastList, blankStates);
+    }
+  }
+
+  g.userData = { raycastList, blankStates, buildingState };
+  return g;
+}
+
+/* ============================================================
+   UI + state
+   ============================================================ */
+const ui = {
+  prompt: document.getElementById('prompt'),
+  quiz: document.getElementById('quiz'),
+  qhead: document.getElementById('qhead'),
+  qopts: document.getElementById('qopts'),
+  qmsg: document.getElementById('qmsg'),
+  back: document.getElementById('back'),
+  continueBtn: document.getElementById('continue'),
+  next: document.getElementById('next'),
+  viewbar: document.getElementById('viewbar'),
+};
+for (const btn of ui.viewbar.querySelectorAll('button[data-view]'))
+  btn.onclick = () => setSeqView(btn.dataset.view);
+
+/* ============================================================
+   Part 5 mini-map — the 20-door loop seen from above. Shows the
+   direction reversal on the right wall, which wall the camera is
+   looking at, and where the camera is standing.
+   world x -> svg x, world z -> svg y (front = bottom edge).
+   ============================================================ */
+const mmBox = document.getElementById('minimap');
+const mmSvg = mmBox && mmBox.querySelector('svg');
+const MM_NS = 'http://www.w3.org/2000/svg';
+const MM = { cx: 66, cy: 100, s: 5, rx: 52, ry: 88 };   // 5 svg px per world unit
+const mmX = wx => MM.cx + wx * MM.s;
+const mmY = wz => MM.cy + wz * MM.s;
+
+function mmNode(tag, attrs) {
+  const n = document.createElementNS(MM_NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  mmSvg.appendChild(n);
+  return n;
+}
+function mmLine(x1, y1, x2, y2, stroke, w) {
+  return mmNode('line', { x1, y1, x2, y2, stroke, 'stroke-width': w, 'stroke-linecap': 'round' });
+}
+function mmText(x, y, str, anchor) {
+  const t = mmNode('text', { x, y, 'text-anchor': anchor, fill: 'var(--c-door, #eef2f6)', 'font-size': 11,
+    'font-family': 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' });
+  t.textContent = str;
+  return t;
+}
+/* a reading-order arrow with a solid head */
+function mmArrow(x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len, head = 6;
+  const c = 'var(--c-path, #ffd54a)';
+  mmLine(x1, y1, x2 - ux * head, y2 - uy * head, c, 2);
+  const px = -uy, py = ux;
+  mmNode('polygon', { fill: c, points:
+    `${x2},${y2} ${x2 - ux * head + px * 3.4},${y2 - uy * head + py * 3.4} ${x2 - ux * head - px * 3.4},${y2 - uy * head - py * 3.4}` });
+}
+
+function mmDraw(st, az) {
+  while (mmSvg.firstChild) mmSvg.removeChild(mmSvg.firstChild);
+  const L = mmX(-SQHW), R = mmX(SQHW), B = mmY(-SQHD), F = mmY(SQHD);
+
+  // the building footprint
+  mmNode('rect', { x: L, y: B, width: R - L, height: F - B, fill: 'none', stroke: '#9fb0c0', 'stroke-width': 1.5 });
+
+  // which wall is facing the camera (0 = front, +pi/2 = right)
+  const q = Math.round(az / (Math.PI / 2));
+  const face = ['back', 'left', 'front', 'right', 'back'][Math.max(0, Math.min(4, q + 2))];
+  const hl = 'var(--c-path, #ffd54a)';
+  if (face === 'front') mmLine(L, F, R, F, hl, 3);
+  else if (face === 'back') mmLine(L, B, R, B, hl, 3);
+  else if (face === 'left') mmLine(L, B, L, F, hl, 3);
+  else mmLine(R, B, R, F, hl, 3);
+
+  // reading order: up the left wall, across the back, across the front, DOWN the right
+  mmArrow(mmX(-SQHW) + 8, mmY(7.5), mmX(-SQHW) + 8, mmY(-7.5));
+  mmArrow(mmX(-3), mmY(-SQHD) + 8, mmX(3), mmY(-SQHD) + 8);
+  mmArrow(mmX(-3), mmY(SQHD) - 8, mmX(3), mmY(SQHD) - 8);
+  mmArrow(mmX(SQHW) - 8, mmY(-7.5), mmX(SQHW) - 8, mmY(7.5));
+
+  // one tick + number per ground-floor door
+  const solved = new Set();
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (ud) for (const b of ud.blankStates) if (b.solved) solved.add(b.value);
+  const blanksMap = st.blanks || {};
+  for (const slot of SQ_LAYOUT) {
+    if (slot.f !== 0) continue;
+    const value = st.base + slot.d;
+    const text = (blanksMap[slot.d] && !solved.has(value)) ? '?' : String(value);
+    if (slot.face === 'L' || slot.face === 'R') {
+      const y = mmY(slot.a), out = slot.face === 'L' ? -1 : 1, x = slot.face === 'L' ? L : R;
+      mmLine(x, y, x + out * 5, y, '#9fb0c0', 1.5);
+      mmText(x + out * 8, y + 4, text, slot.face === 'L' ? 'end' : 'start');
+    } else {
+      const x = mmX(slot.a), out = slot.face === 'F' ? 1 : -1, y = slot.face === 'F' ? F : B;
+      mmLine(x, y, x, y + out * 5, '#9fb0c0', 1.5);
+      mmText(x, y + out * 16 + (out > 0 ? 0 : 4), text, 'middle');
+    }
+  }
+
+  // "you are here" wedge, pointing back at the building
+  const px = MM.cx + Math.sin(az) * MM.rx, py = MM.cy + Math.cos(az) * MM.ry;
+  const d = Math.hypot(MM.cx - px, MM.cy - py) || 1;
+  const ux = (MM.cx - px) / d, uy = (MM.cy - py) / d, nx = -uy, ny = ux;
+  mmNode('polygon', { fill: '#ffd9a0', points:
+    `${px + ux * 7},${py + uy * 7} ${px + nx * 4.5},${py + ny * 4.5} ${px - nx * 4.5},${py - ny * 4.5}` });
+}
+
+let mmSig = null;
+function mmSync(force) {
+  if (!mmSvg) return;
+  try {
+    const st = currentStage;
+    const on = !!st && st.type === 'seq';
+    mmBox.classList.toggle('hidden', !on);
+    if (!on) { mmSig = null; return; }
+    const az = controls.getAzimuthalAngle();
+    let n = 0;
+    const ud = groups[currentIndex] && groups[currentIndex].userData;
+    if (ud) for (const b of ud.blankStates) if (b.solved) n++;
+    const sig = currentIndex + '|' + n + '|' + Math.round(az * 40);
+    if (!force && sig === mmSig) return;
+    mmSig = sig;
+    mmDraw(st, az);
+  } catch (e) { /* stage state not ready yet */ }
+}
+document.addEventListener('stagechange', () => mmSync(true));
+document.addEventListener('blanksolved', () => mmSync(true));
+controls.addEventListener('change', () => mmSync());
+(function mmLoop() { mmSync(); requestAnimationFrame(mmLoop); })();
+
+// jump-to-part menu: skip straight to the first (example) building of any part
+const partStart = {};
+STAGES.forEach((s, idx) => { if (!(s.part in partStart)) partStart[s.part] = idx; });
+const jumpBtns = [...document.querySelectorAll('#jumpbar button[data-part]')];
+for (const btn of jumpBtns)
+  btn.onclick = () => showStage(partStart[Number(btn.dataset.part)]);
+
+// responsive: publish the prompt banner's rendered height so phone layouts can sit below it
+// offsetHeight is the border box, so the same constant works at every padding size
+new ResizeObserver(([e]) => document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px'))
+  .observe(document.getElementById('prompt'));
+
+/* ---- prompt banner copy: one amber headline + a short plain-language body ----
+   `short` is used on phones (<=640px) so the banner stays above the building. */
+const plSpan = (cls, txt) => `<span class="pl pl-${cls}">${txt}</span>`;
+
+const PROMPTS = {
+  p1example: {
+    title: 'Part 1 · Numbers count up in order',
+    body:  'Ground floor 101, 102 — upstairs 103, 104 — then it continues round the back (<span class="nb">105–108</span>). ' +
+           'The <b>yellow arrows</b> show the reading order. <b>Drag</b> to look around.',
+    short: '101, 102 downstairs; 103, 104 upstairs. Follow the <b>yellow arrows</b>. Drag to look.',
+  },
+  p1quiz: {
+    title: n => `Building ${n} · Follow the same pattern`,
+    body:  'Click a door marked <b>?</b>, then pick the number that continues the count.',
+  },
+  p2example: {
+    title: 'Part 2 · The first digit is the floor',
+    body:  'Floor 1 is ' + plSpan('floor', '1') + '__, floor 2 is ' + plSpan('floor', '2') + '__, and so on. ' +
+           'Straight up a column only the first digit changes.',
+    short: 'Floor 1 = 1__, floor 2 = 2__. Up a column, only the first digit changes.',
+  },
+  p2quiz: {
+    title: (n, d) => `Building ${n} · ${d} — floor digit first`,
+    body:  'Click a door marked <b>?</b>. Read its floor first, then its column.',
+  },
+  p3example: {
+    title: 'Part 3 · Leading digits name the building',
+    body:  'Every unit here starts with <b>1</b>, so this is Building 1. Then the floor, then the door: ' +
+           plSpan('building', '1') + '·' + plSpan('floor', '1') + '·' + plSpan('door', '09') + '.',
+    short: 'Building · floor · door: ' + plSpan('building', '1') + '·' + plSpan('floor', '1') + '·' + plSpan('door', '09') +
+           '. Every unit starts with 1 — Building 1.',
+  },
+  p3quiz: {
+    title: n => `Building ${n} · Fill the doors`,
+    body:  'Click a door with a <b>partial number</b> (like 71▢5 — one digit missing) and pick the full number. ' +
+           'When every door is done, the roof sign asks for the building.',
+    short: 'Click a <b>partial number</b> (like 71▢5), pick the full one. Then name the building.',
+  },
+  p4example: {
+    title: 'Part 4 · Numbers wrap front and back',
+    body:  'Each front door has a door directly <b>behind</b> it, and the count carries on there. ' +
+           'Study the front, then <b>drag</b> to spin round and check the back.',
+    short: 'The count continues on the doors <b>behind</b>. Drag to spin and check the back.',
+  },
+  p4quiz: {
+    title: n => `Building ${n} · Front and back`,
+    body:  'Drag to spin the building. Click a door with a <b>partial number</b> and pick the full unit.',
+  },
+  p5example: {
+    title: 'Part 5 · No floor digit — one running count',
+    body:  n => `Building ${n} counts <span class="nb">601 → 620</span> around the outside, floor by floor. ` +
+           'Floor 1 holds the lowest (601) <i>and</i> the highest (<span class="nb">617–620</span>). ' +
+           'Use <b>Front / Back / Left / Right</b> to walk round.',
+    short: '<span class="nb">601 → 620</span> runs round the building. Floor 1 has 601 <i>and</i> <span class="nb">617–620</span>. Walk round with the buttons.',
+  },
+  p5quiz: {
+    title: n => `Building ${n} · One running count`,
+    body:  'Walk round with the buttons. Click a door with a <b>partial number</b> and pick the full unit.',
+  },
+  nameBuilding: {
+    title: 'All doors filled ✓',
+    body:  'Now click the <b>roof sign</b> and choose the building number.',
+  },
+};
+
+/* pick the row for a stage and fill in its building label / difficulty */
+function promptFor(st) {
+  const row = PROMPTS[`p${st.part}${st.kind === 'example' ? 'example' : 'quiz'}`] || PROMPTS.p1quiz;
+  const n = st.label ?? st.building ?? st.number;
+  const d = st.difficulty;
+  const val = v => (typeof v === 'function' ? v(n, d) : v);
+  return { title: val(row.title), body: val(row.body), short: val(row.short) };
+}
+
+/* render headline + body into #prompt; phones get the shorter body when there is one */
+function setPrompt({ title, body, short }) {
+  const useShort = short && matchMedia('(max-width: 640px)').matches;
+  ui.prompt.innerHTML = `<div class="ptitle">${title}</div><div class="pbody">${useShort ? short : body}</div>`;
+}
+
+const groups = {};
+const celebrated = new Set();
+let currentIndex = -1, currentStage = null;
+let blanks = [];        // raycast targets for the active building
+let activeBlank = null; // blank whose options are open
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+/* ---- camera framing -------------------------------------------------
+   One canonical desktop pose per stage type. Portrait phones back the
+   camera off and widen the lens so the whole building still fits, rather
+   than making the learner pinch-zoom on every stage. ---- */
+const POSES = {
+  tower: { pos: [7, TH * 0.5, 38],  tgt: [0, TH * 0.42, 0] },
+  row:   { pos: [0, RH * 0.85, 32], tgt: [0, RH * 0.5, 0] },
+  block: { pos: [10, BH * 0.5, 42], tgt: [0, BH * 0.42, 0] },
+  // low enough that the walkway lips don't clip the floor-1 plates
+  seq:   { pos: [-30, 9, 34],       tgt: [0, 4.5, 0] },
+  plex:  { pos: [5, H * 0.6, 25],   tgt: [0, H * 0.45, 0] },
+};
+const SEQ_VIEWS = {
+  front: [0, 9, 38], back: [0, 9, -38], left: [-40, 9, 0], right: [40, 9, 0],
+};
+const SEQ_VIEW_TARGET = [0, 4.5, 0];
+/* tuned at 390x844: the Part 3 row keeps all five doors plus the stair on
+   screen with ~7% margin each side */
+const PORTRAIT_BACKOFF = 1.55;
+
+const MOVE_MS = 350;      // stage change + walk-around buttons
+const RESET_MS = 450;     // Reset view chip
+const INTRO_MS = 1400;    // one-time "this rotates" swing
+const INTRO_HOLD_MS = 300;
+const INTRO_SWING_DEG = -18;
+
+const reduceMotionMQ = matchMedia('(prefers-reduced-motion: reduce)');
+function prefersReducedMotion() { return reduceMotionMQ.matches; }
+
+function poseFor(st) {
+  const p = POSES[st && st.type] || POSES.plex;
+  const pos = new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2]);
+  const tgt = new THREE.Vector3(p.tgt[0], p.tgt[1], p.tgt[2]);
+  // portrait: pull straight back along the view ray, keeping the framing
+  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  return { pos, tgt };
+}
+
+/* portrait phones widen the lens so a 24-wide row still fits across */
+function applyViewportFov() {
+  const fov = camera.aspect < 1 ? Math.min(74, 50 / Math.sqrt(camera.aspect)) : 50;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+}
+
+/* ---- eased camera moves --------------------------------------------
+   Cubic ease-out on its own rAF loop. Controls are disabled while the
+   camera is in flight; a new call cancels the one in progress. Under
+   reduced motion every move becomes an instant cut. ---- */
+let flyRAF = 0, flying = false, flySeq = 0;
+
+function flyTo(pos, tgt, ms = MOVE_MS) {
+  flySeq++;
+  if (flyRAF) { cancelAnimationFrame(flyRAF); flyRAF = 0; }
+  if (prefersReducedMotion()) ms = 0;
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  const land = () => {
+    flyRAF = 0; flying = false;
+    camera.position.copy(pos); controls.target.copy(tgt);
+    controls.enabled = true; controls.update();
+    updateResetChip();
+  };
+  if (ms <= 0 || (p0.distanceTo(pos) < 1e-3 && t0.distanceTo(tgt) < 1e-3)) { land(); return; }
+  flying = true; controls.enabled = false;
+  const t0ms = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0ms) / ms);
+    const e = 1 - Math.pow(1 - k, 3);          // ease-out, no overshoot
+    camera.position.lerpVectors(p0, pos, e);
+    controls.target.lerpVectors(t0, tgt, e);
+    controls.update();
+    if (k < 1) flyRAF = requestAnimationFrame(step);
+    else land();
+  };
+  flyRAF = requestAnimationFrame(step);
+}
+
+/* one-time swing on the very first framing: start 18 degrees off the
+   resting pose and glide in, so "the building rotates" is shown, not told */
+let introRunning = false;
+function introSwing(pos, tgt) {
+  if (prefersReducedMotion()) { flyTo(pos, tgt, 0); return; }
+  const sph = new THREE.Spherical().setFromVector3(pos.clone().sub(tgt));
+  sph.theta += THREE.MathUtils.degToRad(INTRO_SWING_DEG);
+  const from = new THREE.Vector3().setFromSpherical(sph).add(tgt);
+  introRunning = true;                         // the chip must not flash during the swing
+  flyTo(from, tgt, 0);
+  const seq = flySeq;                          // abandon if anything else moves the camera
+  setTimeout(() => {
+    if (flySeq !== seq) { introRunning = false; return; }
+    flyTo(pos, tgt, INTRO_MS);
+    setTimeout(() => { introRunning = false; updateResetChip(); }, INTRO_MS + 60);
+  }, INTRO_HOLD_MS);
+}
+
+let firstFrame = true;
+function frameStage(st) {
+  applyViewportFov();
+  markSeqViewButton(null);          // a stage change is not one of the walk-around views
+  const { pos, tgt } = poseFor(st);
+  if (firstFrame) { firstFrame = false; introSwing(pos, tgt); }
+  else flyTo(pos, tgt, MOVE_MS);
+}
+
+/* the Front/Back/Left/Right buttons for the Part 5 dollhouse */
+function setSeqView(view) {
+  const v = SEQ_VIEWS[view];
+  if (!v) return;
+  const tgt = new THREE.Vector3(SEQ_VIEW_TARGET[0], SEQ_VIEW_TARGET[1], SEQ_VIEW_TARGET[2]);
+  const pos = new THREE.Vector3(v[0], v[1], v[2]);
+  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  markSeqViewButton(view);
+  flyTo(pos, tgt, MOVE_MS);
+}
+
+function markSeqViewButton(view) {
+  for (const b of document.querySelectorAll('#viewbar button[data-view]'))
+    b.classList.toggle('active', b.dataset.view === view);
+}
+
+/* ---- Reset view ------------------------------------------------------
+   No camera lock during quizzes — exploring matters — but a chip appears
+   as soon as the learner has drifted well away from the stage pose. ---- */
+const resetChip = document.getElementById('resetview');
+
+function driftedFromPose() {
+  if (!currentStage) return false;
+  const { pos, tgt } = poseFor(currentStage);
+  return camera.position.distanceTo(pos) > 4 || controls.target.distanceTo(tgt) > 1.5;
+}
+function updateResetChip() {
+  if (!resetChip) return;
+  if (flying || introRunning) return;          // don't flicker mid-glide
+  resetChip.classList.toggle('hidden', !driftedFromPose());
+}
+function resetView() {
+  if (!currentStage) return;
+  const { pos, tgt } = poseFor(currentStage);
+  markSeqViewButton(null);
+  flyTo(pos, tgt, RESET_MS);
+}
+if (resetChip) resetChip.onclick = resetView;
+
+let dragging = false;
+controls.addEventListener('change', updateResetChip);
+controls.addEventListener('start', () => {
+  dragging = true; flySeq++;                   // a touch of the mouse abandons a pending intro swing
+  markSeqViewButton(null);
+});
+controls.addEventListener('end', () => { dragging = false; updateResetChip(); });
+
+/* rotate the camera about the orbit target — doc 07 binds this to the
+   arrow keys so the scene is reachable without a pointer */
+function orbitBy(dAzDeg, dPolDeg) {
+  const sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+  sph.theta += THREE.MathUtils.degToRad(dAzDeg);
+  sph.phi = THREE.MathUtils.clamp(
+    sph.phi + THREE.MathUtils.degToRad(dPolDeg), controls.minPolarAngle, controls.maxPolarAngle);
+  camera.position.setFromSpherical(sph).add(controls.target);
+  controls.update();
+}
+
+function doorsSolved() {
+  const ud = groups[currentIndex]?.userData;
+  return !!ud && ud.blankStates.length > 0 && ud.blankStates.every(s => s.solved);
+}
+function allSolved() {
+  const ud = groups[currentIndex]?.userData;
+  if (!ud) return false;
+  const doorsDone = ud.blankStates.every(s => s.solved);
+  const bldDone = !ud.buildingState || ud.buildingState.solved;
+  return (ud.blankStates.length > 0 || ud.buildingState) && doorsDone && bldDone;
+}
+
+function showStage(i) {
+  currentIndex = i;
+  currentStage = STAGES[i];
+  for (const b of jumpBtns) b.classList.toggle('active', Number(b.dataset.part) === currentStage.part);
+  if (!groups[i]) groups[i] = buildStageGroup(i);
+  for (const k in groups) groups[k].visible = (Number(k) === i);
+  blanks = groups[i].userData.raycastList;
+
+  closeQuiz();
+  ui.next.classList.add('hidden');
+  ui.continueBtn.classList.add('hidden');
+  ui.back.classList.add('hidden');
+  controls.autoRotate = false;
+
+  setPrompt(promptFor(currentStage));
+  if (currentStage.kind === 'example') {
+    ui.continueBtn.textContent = 'Next ▸';
+    ui.continueBtn.classList.remove('hidden');
+    if (currentIndex > 0) ui.back.classList.remove('hidden');
+  } else {
+    ui.back.classList.remove('hidden');
+  }
+  ui.prompt.classList.remove('hidden');
+
+  if (currentStage.type === 'seq') ui.viewbar.classList.remove('hidden');
+  else ui.viewbar.classList.add('hidden');
+
+  frameStage(currentStage);
+
+  if (currentStage.kind === 'quiz') resumeQuizState();
+
+  document.dispatchEvent(new CustomEvent('stagechange', { detail: { index: i, stage: currentStage } }));
+}
+
+/* re-entering a quiz: pick up where the learner left off (door blanks, then
+   the building-number step, then the Next button) */
+function resumeQuizState() {
+  const ud = groups[currentIndex].userData;
+  if (!ud.blankStates.every(s => s.solved)) return;   // still has doors to fill
+  if (ud.buildingState && !ud.buildingState.solved) {
+    setPrompt(PROMPTS.nameBuilding);
+    openQuiz(ud.buildingState);
+  } else {
+    showNext();   // already finished (no confetti on a revisit)
+  }
+}
+
+/* ---- quiz interaction ---- */
+/* ---- quiz panel: option formatting, feedback, auto-close ---- */
+
+/* one short rule per part, appended after a second wrong pick on the same blank */
+const RULE_BY_PART = {
+  1: 'Doors count on in order.',
+  2: 'First digit = floor.',
+  3: 'Leading digits = building.',
+  4: 'Building, then floor, then door.',
+  5: 'One count runs around the whole building.',
+};
+
+/* which kind of question is open: the stage type, or 'building' for the
+   name-the-building step */
+function quizType(bstate) {
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (ud && ud.buildingState === bstate) return 'building';
+  return currentStage ? currentStage.type : 'plex';
+}
+
+/* digit places of a unit number -> [{text, place}].
+   Doc 09 owns splitPlaces(); until it lands we split locally so the colours
+   still teach. When it exists, it wins. */
+function quizPlaces(val, type) {
+  const s = String(val);
+  if (typeof splitPlaces === 'function') {
+    const segs = splitPlaces(s, type);
+    if (segs && segs.length) return segs;
+  }
+  if (type === 'building') return [{ text: s, place: 'building' }];
+  if (type === 'tower' && s.length >= 3)
+    return [{ text: s.slice(0, -2), place: 'floor' },
+            { text: s.slice(-2), place: 'door' }];
+  if ((type === 'row' || type === 'block') && s.length >= 4)
+    return [{ text: s.slice(0, -3), place: 'building' },
+            { text: s.slice(-3, -2), place: 'floor' },
+            { text: s.slice(-2), place: 'door' }];
+  if (type === 'seq' && s.length >= 3)
+    return [{ text: s.slice(0, -2), place: 'building' },
+            { text: s.slice(-2), place: 'door' }];
+  return [{ text: s, place: 'door' }];
+}
+
+function optionHTML(idx, val, type) {
+  const segs = quizPlaces(val, type);
+  return `<span class="ltr">${'abcd'[idx]}</span><span class="num">` +
+    segs.map(sg => `<span class="pl pl-${sg.place}">${sg.text}</span>`).join('') + '</span>';
+}
+
+/* the digit key above the options: one chip per place actually in play */
+function renderQuizKey(type, segs) {
+  const key = document.getElementById('qkey');
+  if (!key) return;
+  const show = type === 'building' || type === 'tower' || type === 'row' ||
+               type === 'block' || type === 'seq';
+  if (!show) { key.classList.add('hidden'); return; }
+  const places = [];
+  for (const sg of segs) if (!places.includes(sg.place)) places.push(sg.place);
+  key.innerHTML = places.map(pl => `<span class="pl pl-${pl}">${pl}</span>`).join('');
+  key.classList.remove('hidden');
+}
+
+/* why the pick was wrong, in <= 12 words — never reveals the answer */
+function explainWrong(chosen, correct, type) {
+  if (type === 'building') return 'Look at the digits every unit shares.';
+  if (type === 'plex') return 'Count on from the door next to it.';
+  if (type === 'seq') return 'No floor digit here — count on from the nearest known door.';
+  const a = quizPlaces(chosen, type), b = quizPlaces(correct, type);
+  const at = pl => { const sg = a.find(x => x.place === pl); return sg ? sg.text : null; };
+  const bt = pl => { const sg = b.find(x => x.place === pl); return sg ? sg.text : null; };
+  if (type === 'tower') {
+    if (at('floor') !== bt('floor')) return 'Right column, wrong floor — the first digit is the floor.';
+    if (at('door') !== bt('door')) return 'Right floor — count along the doors again.';
+  } else if (type === 'row' || type === 'block') {
+    if (at('building') !== bt('building')) return 'Right floor and door — check the leading digits: the building.';
+    if (at('floor') !== bt('floor')) return 'Right building, wrong floor.';
+    if (at('door') !== bt('door')) return 'Right building and floor — count the doors again.';
+  }
+  return 'Not quite — read the pattern again.';
+}
+
+/* auto-close after a correct answer: fast, but never taken from someone who is
+   still hovering or keyboard-focused inside the panel (and then never re-armed) */
+let quizCloseTimer = null;
+function cancelAutoClose() {
+  if (quizCloseTimer !== null) { clearTimeout(quizCloseTimer); quizCloseTimer = null; }
+}
+function armAutoClose(bstate) {
+  cancelAutoClose();
+  quizCloseTimer = setTimeout(() => {
+    quizCloseTimer = null;
+    if (activeBlank && activeBlank !== bstate) return;   // another question took over
+    const reading = ui.quiz.matches(':hover') || ui.quiz.contains(document.activeElement);
+    if (reading) return;                                 // still being read — stays put
+    closeQuiz();
+  }, 1100);
+}
+
+document.getElementById('qclose').onclick = () => closeQuiz();
+
+function openQuiz(bstate) {
+  if (bstate.solved) return;
+  cancelAutoClose();
+  activeBlank = bstate;
+  const type = quizType(bstate);
+  ui.qhead.innerHTML = bstate.header || 'Which unit is this?<small>Pick the number that matches the pattern</small>';
+  renderQuizKey(type, quizPlaces(bstate.value, type));
+  ui.qopts.innerHTML = '';
+  bstate.options.forEach((val, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.innerHTML = optionHTML(idx, val, type);
+    btn.onclick = ev => chooseOption(bstate, val, btn, ev);
+    ui.qopts.appendChild(btn);
+  });
+  ui.qmsg.textContent = '';
+  ui.qmsg.className = '';
+  ui.quiz.classList.remove('hidden');
+  document.dispatchEvent(new CustomEvent('quizopen', { detail: { bstate } }));
+}
+
+function chooseOption(bstate, val, btn, ev) {
+  if (bstate !== activeBlank || bstate.solved) return;
+  const type = quizType(bstate);
+  if (val === bstate.value) {
+    bstate.solved = true;
+    setPlateText(bstate.plate,
+      bstate.solvedText ? bstate.solvedText(val) : String(val),
+      bstate.plateOpts || {});
+    btn.classList.add('right');
+    [...ui.qopts.children].forEach(b => b.disabled = true);
+    ui.qmsg.textContent = `✓ Correct — ${val}`;
+    ui.qmsg.className = 'ok';
+    // a mouse click leaves focus on the option; drop it so the auto-close
+    // "still reading" test only holds for real keyboard users
+    if (ev && ev.detail > 0 && document.activeElement === btn) btn.blur();
+    checkComplete(bstate);
+    if (activeBlank === bstate) armAutoClose(bstate);
+  } else {
+    btn.disabled = true;
+    btn.classList.add('wrong');
+    bstate.wrongCount = (bstate.wrongCount || 0) + 1;
+    let msg = explainWrong(val, bstate.value, type);
+    const rule = currentStage && RULE_BY_PART[currentStage.part];
+    if (bstate.wrongCount >= 2 && rule) msg += ' ' + rule;
+    ui.qmsg.textContent = msg;
+    ui.qmsg.className = 'bad';
+  }
+}
+
+function closeQuiz() {
+  cancelAutoClose();
+  activeBlank = null;
+  ui.quiz.classList.add('hidden');
+  document.dispatchEvent(new CustomEvent('quizclose', { detail: {} }));
+}
+
+function checkComplete(bstate) {
+  if (!bstate) bstate = activeBlank;            // doc 05 will pass it explicitly
+  if (bstate) {                                 // reward *every* correct answer
+    popPlate(bstate);
+    markSolved(bstate);
+    document.dispatchEvent(new CustomEvent('blanksolved', { detail: { bstate, index: currentIndex } }));
+  }
+  if (!doorsSolved()) return;
+  const bs = groups[currentIndex].userData.buildingState;
+  if (bs && !bs.solved) {                     // all units in — now name the building
+    setPrompt(PROMPTS.nameBuilding);
+    openQuiz(bs);
+    return;
+  }
+  markStageComplete(currentIndex);          // completed Set is the source of truth
+  if (!celebrated.has(currentIndex)) {
+    celebrated.add(currentIndex);
+    if (completed.size === STAGES.length) fireFinale();   // this stage finished the course
+    else fireConfetti('');
+  }
+  showNext();
+}
+
+function showNext() {
+  const isLast = currentIndex === STAGES.length - 1;
+  const nextStage = STAGES[currentIndex + 1];
+  if (isLast) {
+    const fi = firstIncomplete();
+    ui.next.textContent = fi === -1 ? 'Start over ▸' : `Finish Part ${STAGES[fi].part} ▸`;
+  }
+  else if (nextStage && nextStage.kind === 'example') ui.next.textContent = `Next: Part ${nextStage.part} ▸`;
+  else ui.next.textContent = 'Next ▸';
+  ui.next.classList.remove('hidden');
+}
+
+/* ============================================================
+   reward + progress: every correct answer gets its own feedback
+   ============================================================ */
+const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* 320 ms scale pop (ease-out-back) + a 500 ms green tint on the plate */
+function popPlate(bstate) {
+  const p = bstate && bstate.plate;
+  if (!p) return;
+  const reduced = REDUCED();
+  const white = new THREE.Color(0xffffff), tint = new THREE.Color(0xc8ffd8);
+  const outBack = x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+  // start on the next frame: setPlateText resets material.color just before us
+  requestAnimationFrame(() => {
+    const t0 = performance.now(), mat = p.material;
+    (function step(t) {
+      const e = t - t0;
+      if (!reduced) {
+        const k = Math.min(1, e / 320);
+        const bump = k < 0.5 ? outBack(k / 0.5) : 1 - (k - 0.5) / 0.5;
+        const sc = 1 + 0.18 * bump;
+        p.scale.set(sc, sc, 1);
+      }
+      if (mat && mat.color) mat.color.copy(white).lerp(tint, Math.sin(Math.PI * Math.min(1, e / 500)));
+      if (e < 500) requestAnimationFrame(step);
+      else { p.scale.set(1, 1, 1); if (mat && mat.color) mat.color.copy(white); }
+    })(performance.now());
+  });
+  if (!reduced) plateBurst(p);
+}
+
+/* a persistent green dot in the plate's top-right corner: "you solved this one" */
+function markSolved(bstate) {
+  const p = bstate && bstate.plate;
+  if (!p || p.userData.solvedDot) return;
+  const par = p.geometry && p.geometry.parameters;
+  if (!par) return;
+  const pw = par.width, ph = par.height;
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(ph * 0.14, 20),
+    new THREE.MeshBasicMaterial({ color: 0x57c97e, fog: false }));
+  dot.position.set(pw / 2 - ph * 0.18, ph / 2 - ph * 0.18, 0.004);
+  p.add(dot);
+  p.userData.solvedDot = dot;
+}
+
+/* ---- 14-segment course progress bar in the jump bar ---- */
+const completed = new Set();
+const progressEl = document.getElementById('progress');
+const jbTitleEl = document.querySelector('#jumpbar .jbtitle');
+const progSegs = STAGES.map((st, i) => {
+  const seg = document.createElement('span');
+  seg.className = 'seg' + (i > 0 && st.part !== STAGES[i - 1].part ? ' part' : '');
+  if (progressEl) progressEl.appendChild(seg);
+  return seg;
+});
+
+function updateProgress() {
+  for (let i = 0; i < progSegs.length; i++) {
+    const done = completed.has(i);
+    progSegs[i].classList.toggle('done', done);
+    progSegs[i].classList.toggle('now', !done && i === currentIndex);
+  }
+  if (jbTitleEl && currentIndex >= 0)
+    jbTitleEl.textContent = `Part ${STAGES[currentIndex].part} · Building ${currentIndex + 1} of ${STAGES.length}`;
+}
+function markStageComplete(i) { completed.add(i); updateProgress(); }
+document.addEventListener('stagechange', updateProgress);
+
+/* lowest stage not yet in `completed`, or -1 once every stage is — jumping
+   between parts is allowed, so "next" isn't always currentIndex + 1 */
+function firstIncomplete() {
+  for (let i = 0; i < STAGES.length; i++) if (!completed.has(i)) return i;
+  return -1;
+}
+
+/* ---- end-of-course summary ---- */
+const finaleEl = document.getElementById('finale');
+let finaleShown = false;   // once per run, however the last stage got finished
+function fireFinale() {
+  if (finaleShown) return;
+  finaleShown = true;
+  fireConfetti('cannons');
+  showFinale();
+}
+function showFinale() {
+  if (!finaleEl) return;
+  const open = () => finaleEl.classList.remove('hidden');
+  if (REDUCED()) open(); else setTimeout(open, 900);
+}
+function hideFinale() { if (finaleEl) finaleEl.classList.add('hidden'); }
+const fcloseBtn = document.getElementById('fclose');
+if (fcloseBtn) fcloseBtn.onclick = hideFinale;
+const fagainBtn = document.getElementById('fagain');
+if (fagainBtn) fagainBtn.onclick = () => { hideFinale(); resetCourse(); showStage(0); };
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && finaleEl && !finaleEl.classList.contains('hidden')) hideFinale();
+});
+
+/* ---- buttons ---- */
+function resetCourse() {
+  for (const k of Object.keys(groups)) {
+    const g = groups[k];
+    scene.remove(g);
+    g.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) { o.material.map?.dispose(); o.material.dispose(); }
+    });
+    delete groups[k];
+  }
+  celebrated.clear();
+  completed.clear();
+  finaleShown = false;
+  hideFinale();
+}
+
+ui.continueBtn.onclick = () => {
+  markStageComplete(currentIndex);
+  if (completed.size === STAGES.length) fireFinale();   // an example stage can finish the course too
+  showStage(currentIndex + 1);
+};
+ui.back.onclick = () => showStage(Math.max(0, currentIndex - 1));
+ui.next.onclick = () => {
+  if (currentIndex < STAGES.length - 1) showStage(currentIndex + 1);
+  else {
+    const fi = firstIncomplete();
+    if (fi === -1) { hideFinale(); resetCourse(); showStage(0); } // "Start over" — fresh run from Part 1
+    else showStage(fi);                                           // jump to the first part still unfinished
+  }
+};
+
+/* ---- click a blank door/plate to open its options ---- */
+
+/* Which blank does a screen point mean? Plates win outright; the (much bigger)
+   door mesh only counts when its own plate faces the camera and the hit sits
+   beside or below that plate — so a click on the wall between Part 5's stacked
+   doors can no longer open a door on the far side of the building. */
+const pickV = new THREE.Vector3(), pickN = new THREE.Vector3(), pickQ = new THREE.Quaternion();
+function pickBlank(clientX, clientY) {
+  if (!blanks || !blanks.length) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  let door = null;
+  for (const h of raycaster.intersectObjects(blanks, false)) {
+    const bs = h.object.userData.bstate;
+    if (!bs || bs.solved || !bs.plate) continue;
+    if (h.object === bs.plate) return bs;                 // the number itself: always wins
+    if (!door && nearItsPlate(h.point, bs.plate)) door = bs;
+  }
+  return door;
+}
+function nearItsPlate(point, plate) {
+  plate.getWorldPosition(pickV);
+  pickN.set(0, 0, 1).applyQuaternion(plate.getWorldQuaternion(pickQ));
+  if (pickN.dot(pickV.clone().sub(camera.position)) > 0) return false;  // plate faces away
+  const dy = pickV.y - point.y;                            // plate sits above its door
+  return Math.hypot(pickV.x - point.x, pickV.z - point.z) <= 1.6 && dy >= -0.6 && dy <= 2.7;
+}
+
+let downPos = null;
+renderer.domElement.addEventListener('pointerdown', e => { downPos = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointercancel', () => { downPos = null; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  if (moved > 6 || currentStage.kind !== 'quiz') return; // a drag, or no quiz here
+
+  const bs = pickBlank(e.clientX, e.clientY);
+  if (bs) openQuiz(bs);
+});
+
+/* ============================================================
+   08 — discoverability in the 3D scene: a pulsing halo behind
+   every unsolved blank, a pointer cursor + hover tint, an
+   "N doors left" chip, a first-run drag hint and a "?" button.
+   Listens to `stagechange` / `blanksolved`; when those are not
+   dispatched it reconciles the same state from its own loop.
+   ============================================================ */
+{
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const canvas = renderer.domElement;
+  const chip = document.getElementById('doorsleft');
+  const hint = document.getElementById('draghint');
+  const helpBtn = document.getElementById('helpbtn');
+  const HINT_FULL = hint.innerHTML;
+  const HINT_TIP = '<div>Click a door marked <b>?</b> — the glowing ones.</div>';
+
+  const stageUD = () => (groups[currentIndex] && groups[currentIndex].userData) || null;
+  const isQuizStage = () => !!currentStage && currentStage.kind === 'quiz';
+  const quizIsOpen = () => !ui.quiz.classList.contains('hidden');
+
+  /* ---- halo behind an unsolved plate ---- */
+  function addHalo(bs, fw, fh) {
+    if (!bs || bs.halo || bs.solved || !bs.plate || !bs.plate.geometry.parameters) return;
+    const { width: pw, height: ph } = bs.plate.geometry.parameters;
+    const halo = new THREE.Mesh(
+      new THREE.PlaneGeometry(pw * fw, ph * fh),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd54a, transparent: true, opacity: 0.55, depthWrite: false, fog: false,
+      }));
+    halo.position.z = -0.006;        // between the wall and the plate
+    halo.renderOrder = -1;
+    bs.plate.add(halo);
+    bs.halo = halo;
+  }
+  function clearBlank(bs) {
+    if (!bs) return;
+    if (bs.halo) {
+      bs.plate.remove(bs.halo);
+      bs.halo.geometry.dispose();
+      bs.halo.material.dispose();
+      bs.halo = null;
+    }
+    if (bs.plate && bs.plate.material) {       // drop any leftover hover tint
+      bs.plate.material.color.set('#ffffff');
+      bs.plate.scale.set(1, 1, 1);
+    }
+    if (hovered === bs) hovered = null;
+  }
+  function bannerHalo(ud) {                    // the roof sign is the last question
+    const bs = ud.buildingState;
+    if (bs && !bs.solved && ud.blankStates.every(s => s.solved)) addHalo(bs, 1.06, 1.2);
+  }
+
+  /* ---- "N doors left" chip ---- */
+  function updateChip(ud) {
+    if (!ud || !isQuizStage()) { chip.className = 'hidden'; return; }
+    const left = ud.blankStates.filter(s => !s.solved).length;
+    const bs = ud.buildingState;
+    if (left > 0) {
+      chip.className = '';
+      chip.innerHTML = `<b>${left}</b> door${left === 1 ? '' : 's'} left`;
+    } else if (bs && !bs.solved) {
+      chip.className = '';
+      chip.textContent = 'Name the building';
+    } else {
+      chip.className = 'done';
+      chip.textContent = 'Done ✓';
+    }
+  }
+
+  /* ---- stage / solve bookkeeping ---- */
+  let stageIndex = -1, chipSig = '';
+  function onStage() {
+    const ud = stageUD();
+    if (!ud) return;
+    stageIndex = currentIndex;
+    if (isQuizStage()) {
+      for (const s of ud.blankStates) if (!s.solved) addHalo(s, 1.16, 1.34);
+      bannerHalo(ud);
+    }
+    chipSig = '';
+    tipAt = performance.now();
+    tipUsed = false;
+    firstRunHint();
+  }
+  function reconcile(now) {
+    const ud = stageUD();
+    if (!ud) return;
+    if (currentIndex !== stageIndex) onStage();
+    for (const s of ud.blankStates) if (s.solved && (s.halo || s === hovered)) clearBlank(s);
+    const bs = ud.buildingState;
+    if (bs && bs.solved && bs.halo) clearBlank(bs);
+    if (isQuizStage()) bannerHalo(ud);
+    const sig = currentIndex + ':' + ud.blankStates.reduce((n, s) => n + (s.solved ? 1 : 0), 0) +
+      ':' + (bs ? (bs.solved ? 1 : 0) : '-') + ':' + (isQuizStage() ? 'q' : 'e');
+    if (sig !== chipSig) { chipSig = sig; updateChip(ud); }
+    tipCheck(now, ud);
+  }
+  document.addEventListener('stagechange', () => onStage());
+  document.addEventListener('blanksolved', e => clearBlank(e.detail && e.detail.bstate));
+
+  /* ---- cursor + hover tint (one raycast per frame at most) ---- */
+  let hovered = null, hoverPt = null, hoverDirty = false, dragging = false;
+  canvas.style.cursor = 'grab';
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;     // touch never hovers; the halo carries the signal
+    hoverPt = { x: e.clientX, y: e.clientY };
+    hoverDirty = true;
+  });
+  canvas.addEventListener('pointerleave', () => { hoverPt = null; hoverDirty = true; });
+  controls.addEventListener('start', () => { dragging = true; canvas.style.cursor = 'grabbing'; });
+  controls.addEventListener('end', () => { dragging = false; hoverDirty = true; });
+  function updateHover() {
+    hoverDirty = false;
+    const hit = (hoverPt && isQuizStage()) ? pickBlank(hoverPt.x, hoverPt.y) : null;
+    if (hit !== hovered) {
+      if (hovered && hovered.plate) {
+        hovered.plate.material.color.set('#ffffff');
+        hovered.plate.scale.set(1, 1, 1);
+      }
+      hovered = hit;
+      if (hovered && hovered.plate) {
+        hovered.plate.material.color.set('#fff1c2');
+        hovered.plate.scale.set(1.06, 1.06, 1);
+      }
+    }
+    if (!dragging) canvas.style.cursor = hovered ? 'pointer' : 'grab';
+  }
+
+  /* ---- first-run drag hint, inactivity tip, "?" button ---- */
+  let hintTimer = 0, hideTimer = 0, firstStage = true, awaitingDrag = false;
+  let tipAt = 0, tipUsed = false;
+  const seen = {
+    get() { try { return localStorage.getItem('sf.hintSeen') === '1'; } catch (e) { return false; } },
+    set() { try { localStorage.setItem('sf.hintSeen', '1'); } catch (e) { /* private mode */ } },
+  };
+  function showHint(html, ms) {
+    clearTimeout(hintTimer); clearTimeout(hideTimer);
+    hint.innerHTML = html;
+    hint.classList.remove('hidden');
+    requestAnimationFrame(() => hint.classList.add('show'));
+    hintTimer = setTimeout(hideHint, ms);
+  }
+  function hideHint() {
+    clearTimeout(hintTimer);
+    if (awaitingDrag) { awaitingDrag = false; seen.set(); }
+    hint.classList.remove('show');
+    hideTimer = setTimeout(() => {
+      if (!hint.classList.contains('show')) hint.classList.add('hidden');
+    }, 340);
+  }
+  function firstRunHint() {
+    if (!firstStage) return;
+    firstStage = false;
+    if (seen.get()) return;
+    awaitingDrag = true;
+    showHint(HINT_FULL, 7000);
+  }
+  function tipCheck(now, ud) {
+    if (tipUsed || !isQuizStage()) return;
+    if (quizIsOpen() || hint.classList.contains('show') || ud.blankStates.some(s => s.solved)) {
+      tipAt = now;
+      return;
+    }
+    if (now - tipAt > 10000) { tipUsed = true; showHint(HINT_TIP, 5000); }
+  }
+  let hintDown = null;
+  canvas.addEventListener('pointerdown', e => { hintDown = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('pointercancel', () => { hintDown = null; });
+  canvas.addEventListener('pointerup', () => { hintDown = null; });
+  canvas.addEventListener('pointermove', e => {
+    if (!hintDown) return;
+    if (Math.hypot(e.clientX - hintDown.x, e.clientY - hintDown.y) > 20 &&
+        hint.classList.contains('show')) hideHint();
+  });
+  helpBtn.addEventListener('click', () => showHint(HINT_FULL, 6000));
+
+  /* ---- our own loop: pulse + reconcile (doc 02 owns tick()) ---- */
+  (function pulse(now) {
+    requestAnimationFrame(pulse);
+    reconcile(now);
+    if (hoverDirty) updateHover();
+    const ud = stageUD();
+    if (!ud) return;
+    const o = reduceMotion.matches
+      ? 0.6
+      : 0.35 + 0.3 * (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 2 * 0.9));
+    for (const s of ud.blankStates) if (s.halo) s.halo.material.opacity = (s === hovered ? 0.9 : o);
+    if (ud.buildingState && ud.buildingState.halo) ud.buildingState.halo.material.opacity = o;
+  })(performance.now());
+}
+
+/* ============================================================
+   confetti (lightweight 2D canvas overlay)
+   ============================================================ */
+const cc = document.createElement('canvas');
+cc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50';
+document.body.appendChild(cc);
+const cctx = cc.getContext('2d');
+function sizeConfetti() { cc.width = innerWidth; cc.height = innerHeight; }
+sizeConfetti();
+
+let confetti = [];
+const CONFETTI_COLORS = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', '#ff9800'];
+function fireConfetti(mode) {
+  if (REDUCED()) return;                       // no big motion for reduced-motion users
+  const colors = CONFETTI_COLORS;
+  if (mode === 'cannons') {                    // the finale: two cannons from the bottom corners
+    for (const side of [0, 1]) {
+      const dir = side === 0 ? 1 : -1;
+      for (let i = 0; i < 120; i++) {
+        confetti.push({
+          x: side === 0 ? 0 : innerWidth,
+          y: innerHeight * 0.8,
+          vx: dir * (6 + Math.random() * 8),
+          vy: -12 - Math.random() * 6,
+          g: 0.22 + Math.random() * 0.12,
+          rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45,
+          w: 6 + Math.random() * 7, h: 8 + Math.random() * 9,
+          color: colors[i % colors.length],
+        });
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < 170; i++) {              // per-building burst
+    confetti.push({
+      x: innerWidth / 2 + (Math.random() - 0.5) * 240,
+      y: innerHeight * 0.32,
+      vx: (Math.random() - 0.5) * 10,
+      vy: -7 - Math.random() * 9,
+      g: 0.22 + Math.random() * 0.12,
+      rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45,
+      w: 6 + Math.random() * 7, h: 8 + Math.random() * 9,
+      color: colors[i % colors.length],
+    });
+  }
+}
+
+/* 14 small particles rising from one plate's position on screen */
+function plateBurst(plate) {
+  if (REDUCED() || !plate) return;
+  const v = plate.getWorldPosition(new THREE.Vector3()).project(camera);
+  if (v.z > 1) return;                         // behind the camera
+  const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight;
+  const colors = ['#57c97e', '#7ee0a0', '#ffd54a'];
+  for (let i = 0; i < 14; i++) {
+    confetti.push({
+      x: x + (Math.random() - 0.5) * 26,
+      y: y + (Math.random() - 0.5) * 16,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -4 - Math.random() * 3,
+      g: 0.16 + Math.random() * 0.08,
+      rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.5,
+      w: 4 + Math.random() * 2, h: 4 + Math.random() * 2,
+      color: colors[i % colors.length],
+    });
+  }
+}
+
+function drawConfetti() {
+  cctx.clearRect(0, 0, cc.width, cc.height);
+  if (!confetti.length) return;
+  confetti = confetti.filter(p => p.y < innerHeight + 40);
+  for (const p of confetti) {
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+    cctx.save();
+    cctx.translate(p.x, p.y); cctx.rotate(p.rot);
+    cctx.fillStyle = p.color;
+    cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    cctx.restore();
+  }
+}
+
+/* ============================================================
+   accessibility (doc 07) — keyboard, focus, ARIA, scene text
+   ============================================================ */
+const sceneDescEl = document.getElementById('scene-desc');
+const doorListEl = document.getElementById('doorlist');
+
+/* the canvas is a real, focusable image with a text description */
+// tab order: part navigation should come before the 3D canvas and the door list
+for (const id of ['minimap', 'viewbar', 'jumpbar']) {
+  const el = document.getElementById(id);
+  if (el) document.body.insertBefore(el, app);
+}
+renderer.domElement.tabIndex = 0;
+renderer.domElement.setAttribute('role', 'img');
+renderer.domElement.setAttribute('aria-label', '3D view of the building. Use arrow keys to look around.');
+renderer.domElement.setAttribute('aria-describedby', 'scene-desc');
+
+/* ---- scene description + a keyboard door list ---- */
+/* doc 10 toggles the .active class on the jump buttons; the ARIA state is ours */
+function a11yMarkCurrentPart() {
+  if (!currentStage) return;
+  for (const b of jumpBtns) {
+    if (Number(b.dataset.part) === currentStage.part) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  }
+}
+const A11Y_ORD = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
+
+/* which wall a plate sits on, from its yaw */
+function a11yFace(plate) {
+  const y = ((plate.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  if (Math.abs(y - Math.PI / 2) < 0.4) return 'right';
+  if (Math.abs(y - Math.PI * 1.5) < 0.4) return 'left';
+  if (Math.abs(y - Math.PI) < 0.4) return 'back';
+  return 'front';
+}
+/* position along that wall, increasing left-to-right as the viewer sees it */
+function a11yAlong(plate, face) {
+  const p = plate.position;
+  return face === 'front' ? p.x : face === 'back' ? -p.x : face === 'left' ? p.z : -p.z;
+}
+/* every floor in the course is 3.2 units high and plates sit ~2.5 above it */
+function a11yFloor(plate) { return Math.round((plate.position.y - 2.5) / 3.2) + 1; }
+/* every number plate in a building group: a flat sign sitting one plate-height
+   above a floor slab (this skips roof banners, side signs, arrows and windows) */
+function a11yPlates(group) {
+  const out = [];
+  group.traverse(o => {
+    if (!o.isMesh || !o.geometry || o.geometry.type !== 'PlaneGeometry') return;
+    const k = Math.round((o.position.y - 2.5) / 3.2);
+    if (k >= 0 && Math.abs(o.position.y - (2.5 + 3.2 * k)) < 0.15) out.push(o);
+  });
+  return out;
+}
+
+/* the partial number printed on a blank plate, taken from the stage data */
+function a11yMask(bstate) {
+  const st = currentStage;
+  if (!st) return '?';
+  if (st.type === 'row' && st.floors) {
+    for (const row of st.floors)
+      for (const cell of row)
+        if (Array.isArray(cell) && cell[0] === bstate.value) return cell[1];
+  } else if (st.type === 'block' && st.blanks) {
+    return st.blanks[bstate.value] || '?';
+  } else if (st.type === 'seq' && st.blanks) {
+    return st.blanks[bstate.value - st.base] || '?';
+  }
+  return '?';
+}
+function a11ySpokenMask(mask) {
+  if (mask === '?') return 'no number yet';
+  return mask.replace(/_+/g, ' blank ').replace(/\s+/g, ' ').trim();
+}
+
+/* ---- one sentence describing the building the camera is looking at ---- */
+function a11yStageText() {
+  const st = currentStage;
+  if (!st) return '';
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  let text;
+  if (st.type === 'tower') {
+    const lo = 100 + Math.min(...st.suffixes), hi = 400 + Math.max(...st.suffixes);
+    text = `Four-storey building ${st.label} with three doors per floor, unit numbers ${lo} to ${hi}; ` +
+           `the first digit is the floor.`;
+  } else if (st.type === 'row') {
+    const all = st.floors.flat().map(c => (Array.isArray(c) ? c[0] : c));
+    const named = st.kind === 'example' || !st.chooseBuilding;
+    text = `Two-storey ${named ? `building ${st.building}` : 'building, its number still hidden,'} ` +
+           `with five doors per floor, unit numbers ${Math.min(...all)} to ${Math.max(...all)}; ` +
+           `the leading digits name the building and the next digit is the floor.`;
+  } else if (st.type === 'block') {
+    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them; ` +
+           `five-digit units where the leading digits are the building, then the floor, then the door.`;
+  } else if (st.type === 'seq') {
+    text = `Three-storey building ${st.building} with twenty doors around all four sides, ` +
+           `unit numbers ${st.base + 1} to ${st.base + 20}; one running count with no floor digit.`;
+  } else {
+    const last = st.kind === 'example' ? st.start + 7 : st.start + 3;
+    text = `Two-storey building ${st.number} with four doors, two on each floor, ` +
+           `unit numbers ${st.start} to ${last} counting up in order.`;
+  }
+  if (st.kind === 'example') return text + ' This is a worked example — every door already shows its number.';
+  const left = ud ? ud.blankStates.filter(b => !b.solved).length : 0;
+  const bld = ud && ud.buildingState && !ud.buildingState.solved;
+  if (left) return `${text} ${left} door${left === 1 ? ' is' : 's are'} blank — use the door list to fill ${left === 1 ? 'it' : 'them'} in.`;
+  if (bld) return `${text} Every door is filled in — now choose the building number.`;
+  return `${text} Every door is filled in.`;
+}
+
+function a11yDescribeStage() {
+  if (!sceneDescEl) return;
+  const text = a11yStageText();
+  if (sceneDescEl.textContent !== text) sceneDescEl.textContent = text;
+}
+
+/* ---- a real button per unsolved blank, so Tab reaches every door ---- */
+function a11yRebuildDoorList() {
+  if (!doorListEl) return;
+  doorListEl.innerHTML = '';
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  if (!ud || !currentStage || currentStage.kind !== 'quiz') return;
+
+  // rank every blank among ALL the plates sharing its floor and wall
+  const rank = new Map();
+  const buckets = new Map();
+  for (const plate of a11yPlates(groups[currentIndex])) {
+    const key = a11yFace(plate) + '/' + a11yFloor(plate);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(plate);
+  }
+  for (const [key, list] of buckets) {
+    const face = key.split('/')[0];
+    list.sort((x, y) => a11yAlong(x, face) - a11yAlong(y, face));
+    list.forEach((plate, i) => rank.set(plate, i));
+  }
+
+  // read them out in walking order: front wall first, then left, back, right
+  const faceOrder = { front: 0, left: 1, back: 2, right: 3 };
+  const open = ud.blankStates.filter(b => !b.solved).sort((x, y) => {
+    const fx = a11yFace(x.plate), fy = a11yFace(y.plate);
+    return (faceOrder[fx] - faceOrder[fy]) || (a11yFloor(x.plate) - a11yFloor(y.plate)) ||
+           (a11yAlong(x.plate, fx) - a11yAlong(y.plate, fy));
+  });
+
+  for (const b of open) {
+    const face = a11yFace(b.plate), floor = a11yFloor(b.plate);
+    const pos = rank.has(b.plate) ? rank.get(b.plate) : 0;
+    const ord = A11Y_ORD[pos] || `number ${pos + 1}`;
+    const mask = a11yMask(b);
+    const where = `floor ${floor}, ${ord} from the left on the ${face}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `Door showing ${mask.replace(/_/g, '▢')}, ${where} — open its options`;
+    btn.setAttribute('aria-label', `Door showing ${a11ySpokenMask(mask)}, ${where} — open its options`);
+    btn.onclick = () => openQuiz(b);
+    doorListEl.appendChild(btn);
+  }
+
+  const bs = ud.buildingState;
+  if (bs && !bs.solved && ud.blankStates.every(x => x.solved)) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Choose the building number — open its options';
+    btn.onclick = () => openQuiz(bs);
+    doorListEl.appendChild(btn);
+  }
+}
+
+/* ---- focus management + keyboard map ---- */
+let a11yReturnFocus = null;
+
+function a11yOnQuizOpen() {
+  const prev = document.activeElement;
+  if (prev && prev !== document.body && !ui.quiz.contains(prev)) a11yReturnFocus = prev;
+  setTimeout(() => {
+    const first = ui.qopts.querySelector('button.opt:not([disabled])');
+    if (first) first.focus();
+  }, 0);
+}
+function a11yOnQuizClose() {
+  const back = a11yReturnFocus;
+  a11yReturnFocus = null;
+  setTimeout(() => {
+    if (back && back.isConnected) back.focus();
+    else renderer.domElement.focus();
+  }, 0);
+}
+
+/* orbit by keyboard. doc 02 owns orbitBy(); until it lands, turn the camera
+   here so the arrow keys still work. */
+function a11yOrbit(dAz, dEl) {
+  if (typeof orbitBy === 'function') { orbitBy(dAz, dEl); return; }
+  const off = camera.position.clone().sub(controls.target);
+  const sph = new THREE.Spherical().setFromVector3(off);
+  sph.theta += dAz * Math.PI / 180;
+  sph.phi = Math.min(Math.max(sph.phi + dEl * Math.PI / 180, 0.08), controls.maxPolarAngle);
+  camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+  controls.update();
+}
+function a11yResetView() {
+  if (typeof resetView === 'function') resetView();
+  else if (currentStage) frameStage(currentStage);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  const quizOpen = !!activeBlank && !ui.quiz.classList.contains('hidden');
+
+  if (quizOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeQuiz(); return; }
+    const opts = [...ui.qopts.querySelectorAll('button.opt:not([disabled])')];
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && opts.length) {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      const at = opts.indexOf(document.activeElement);
+      const to = at < 0 ? (step > 0 ? 0 : opts.length - 1) : (at + step + opts.length) % opts.length;
+      opts[to].focus();
+      return;
+    }
+    const k = e.key.toLowerCase();
+    const idx = '1234'.indexOf(k) >= 0 ? '1234'.indexOf(k) : 'abcd'.indexOf(k);
+    if (idx >= 0) {
+      const btn = [...ui.qopts.querySelectorAll('button.opt')][idx];
+      if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+      return;
+    }
+    return;   // the quiz owns the keyboard while it is open
+  }
+
+  if (e.key === 'Home') { e.preventDefault(); a11yResetView(); return; }
+
+  // camera keys only from the canvas or the page background — never steal
+  // Enter/Space/arrows from another control
+  if (t && t !== document.body && t !== renderer.domElement &&
+      typeof t.closest === 'function' && t.closest('button, a[href], [tabindex]:not(canvas)')) return;
+
+  switch (e.key) {
+    case 'ArrowLeft':  e.preventDefault(); a11yOrbit(-15, 0); break;
+    case 'ArrowRight': e.preventDefault(); a11yOrbit(15, 0); break;
+    case 'ArrowUp':    e.preventDefault(); a11yOrbit(0, -10); break;
+    case 'ArrowDown':  e.preventDefault(); a11yOrbit(0, 10); break;
+    default: {
+      if (!currentStage || currentStage.type !== 'seq') return;
+      const view = { f: 'front', b: 'back', l: 'left', r: 'right' }[e.key.toLowerCase()];
+      if (view && typeof setSeqView === 'function') { e.preventDefault(); setSeqView(view); }
+    }
+  }
+});
+
+/* ---- wiring: the doc 05/10 events when they exist, a cheap poll otherwise.
+   Every handler is idempotent, so firing from both sources is harmless. ---- */
+let a11ySig = null, a11yQuizWasOpen = false;
+function a11ySync() {
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  const sig = currentIndex + '|' +
+    (ud ? ud.blankStates.filter(b => b.solved).length + '/' + ud.blankStates.length : '-') + '|' +
+    (ud && ud.buildingState ? (ud.buildingState.solved ? 'b1' : 'b0') : '-');
+  if (sig !== a11ySig) {
+    a11ySig = sig;
+    a11yMarkCurrentPart();
+    a11yDescribeStage();
+    a11yRebuildDoorList();
+  }
+  const open = !!activeBlank && !ui.quiz.classList.contains('hidden');
+  if (open !== a11yQuizWasOpen) {
+    a11yQuizWasOpen = open;
+    if (open) a11yOnQuizOpen(); else a11yOnQuizClose();
+  }
+}
+for (const ev of ['stagechange', 'blanksolved', 'quizopen', 'quizclose'])
+  document.addEventListener(ev, a11ySync);
+setInterval(a11ySync, 200);
+
+/* ============================================================
+   loop + resize
+   ============================================================ */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  applyViewportFov();
+  // re-frame on orientation / window changes, unless a drag is under way
+  if (currentStage && !dragging) { const { pos, tgt } = poseFor(currentStage); flyTo(pos, tgt, 0); }
+  sizeConfetti();
+});
+(function tick() {
+  controls.update();
+  renderer.render(scene, camera);
+  drawConfetti();
+  requestAnimationFrame(tick);
+})();
+
+showStage(0);
+</script>
+</body>
+</html>
