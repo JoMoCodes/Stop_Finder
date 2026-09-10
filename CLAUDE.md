@@ -31,12 +31,13 @@ sky, ground/road, the `build*Shell` / `build*Facade` / `*Access` builders, plus
 environment props). The `STAGES` array, unit math, quiz, prompts, finale, DOM,
 CSS and accessibility code are identical across all four files, so a curriculum
 change has to be applied to all four. Each course page carries a `#lookbar`
-site bar on every layout: a prominent amber **Home** button plus a compact
-**Appearance** button whose four looks drop out on hover / tap / Enter (bottom
-right on desktop, under the jump bar on portrait phones, top right in
-landscape; a small inline script after the nav handles open / close). The
-`#jumpbar` also keeps a Home link (`a.jbhome`, first button) back to the live
-site `https://jomocodes.github.io/Stop_Finder/`.
+site bar on every layout: a prominent amber **Home** button (the only Home
+control; it links to the live site `https://jomocodes.github.io/Stop_Finder/`)
+plus a compact **Appearance** button whose four looks drop out on hover / tap /
+Enter. Desktop: bottom right, menu opens upward. Portrait phones: a stacked
+two-row list at the bottom left, menu opens upward. Landscape phones: top
+right, menu opens downward. A small inline script after the nav handles
+open / close.
 Design notes and inspiration sources: `docs/apartment-course-review/realistic/`.
 
 ### Adding a course
@@ -56,7 +57,7 @@ Structure top-to-bottom:
 - **DOM**: `#finale` (end-of-course summary), `#app` (canvas mount), sr-only
   `#scene-desc` / `#doorlist`, `#prompt` (top banner), `#quiz` (options panel
   with `#qclose` / `#qkey`), `#viewbar` (Part 5 Front/Back/Left/Right),
-  `#minimap` (Part 5 top-down map), `#jumpbar` (Home link + parts 1-5 + `#progress`),
+  `#minimap` (Part 5 top-down map), `#jumpbar` (parts 1-5 + `#progress`),
   `#doorsleft` / `#draghint` / `#helpbtn`, `#bottombar` (Back / Next),
   `#resetview`.
 - **Import map + module** start: Three.js via CDN, then `OrbitControls`.

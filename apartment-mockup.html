@@ -99,8 +99,8 @@
      Collapsed it shows only Home + Appearance; the four looks drop out of the
      Appearance button on hover (mouse), tap / click, or Enter (keyboard).
      Desktop: bottom right, left of the ? button, menu opens upward.
-     Phones: see the media queries at the end (portrait sits under the jump bar,
-     landscape sits top right; both open the menu downward). */
+     Phones: see the media queries at the end (portrait is a stacked list at the
+     bottom left, menu opens upward; landscape sits top right, menu opens downward). */
   #lookbar {
     position: fixed; right: 74px; bottom: 28px; z-index: 11;
     display: flex; align-items: center; gap: 4px;
@@ -194,16 +194,6 @@
     display: flex; align-items: center; justify-content: center;
   }
   #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
-  /* home: back to the site menu; lives in the jump bar so it is reachable on every layout, phones included */
-  #jumpbar a.jbhome {
-    width: 40px; height: 40px; border-radius: 50%; margin-right: 4px; flex: none;
-    display: flex; align-items: center; justify-content: center; text-decoration: none;
-    font-size: 19px; line-height: 1; color: #eef2f6; background: rgba(255,255,255,0.10);
-    border: 1px solid rgba(255,255,255,0.20); box-shadow: 0 8px 22px rgba(0,0,0,0.35);
-    transition: transform .1s ease, background .12s ease;
-  }
-  #jumpbar a.jbhome:hover { transform: translateY(-2px); background: rgba(255,255,255,0.18); }
-  #jumpbar a.jbhome:focus-visible { outline: 3px solid #ffd54a; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(20,24,30,.9); }
 
   /* course progress: one segment per building */
   #progress { display: flex; gap: 3px; margin-top: 8px; height: 6px; }
@@ -285,7 +275,6 @@
   @media (pointer: coarse) {
     button { min-height: 44px; }
     #jumpbar button.jbtn { width: 44px; height: 44px; }
-    #jumpbar a.jbhome { width: 44px; height: 44px; }
     button.opt { min-height: 52px; }
     #lookbar a.lk-home, #lookbar button.lk-toggle, #lookbar .lk-list a { min-height: 44px; }
     #qclose { width: 44px; height: 44px; }
@@ -311,23 +300,28 @@
     #jumpbar .jbtns { gap: 8px; }
     #progress { margin-top: 6px; }
 
-    /* Home + Appearance bar: its own row under the jump bar, menu drops downward */
-    #lookbar { top: calc(var(--prompt-h, 140px) + 16px + 74px); left: 8px; right: auto; bottom: auto; }
+    /* Home + Appearance bar: bottom left, stacked as a two-row list above the
+       Back / Next row; the Appearance menu opens upward from it */
+    #lookbar { top: auto; bottom: 70px; left: 8px; right: auto;
+      flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; border-radius: 16px; }
+    #lookbar a.lk-home, #lookbar button.lk-toggle { justify-content: flex-start; padding: 0 14px 0 12px; border-radius: 12px; }
     #lookbar button.lk-toggle .lk-current { display: none; }
-    #lookbar .lk-menu { left: 0; right: auto; top: 100%; bottom: auto; padding: 8px 0 0; }
+    #lookbar button.lk-toggle .lk-caret { margin-left: auto; }
+    #lookbar .lk-menu { left: 0; right: auto; }
 
-    /* stacked under the jump bar and the site bar so the three never collide on narrow phones */
-    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px + 62px); right: 8px; left: auto; }
+    /* stacked under the jump bar so the two never collide on narrow phones */
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px); right: 8px; left: auto; }
 
     #bottombar { bottom: 12px; gap: 8px; width: calc(100% - 16px); justify-content: center; }
     #bottombar button { padding: 12px 18px; font-size: 15px; min-height: 46px; }
 
-    #viewbar { top: auto; bottom: 70px; left: 8px; transform: none;
+    /* Part 5 walk-around row sits above the Home + Appearance list */
+    #viewbar { top: auto; bottom: 186px; left: 8px; transform: none;
       flex-direction: row; width: auto; gap: 6px; padding: 8px; }
     #viewbar .vbtitle { display: none; }
-    #viewbar button.vbtn { min-width: 60px; min-height: 44px; padding: 10px 6px; font-size: 14px; }
+    #viewbar button.vbtn { min-width: 54px; min-height: 44px; padding: 10px 6px; font-size: 14px; }
 
-    #helpbtn   { right: 8px; bottom: auto; top: calc(var(--prompt-h, 140px) + 16px + 74px + 62px + 50px); left: auto; width: 44px; height: 44px; }
+    #helpbtn   { right: 8px; bottom: auto; top: calc(var(--prompt-h, 140px) + 16px + 74px + 50px); left: auto; width: 44px; height: 44px; }
     #resetview { right: 8px; bottom: 122px; left: auto; padding: 0; width: 44px; height: 44px; }
     #resetview .rv-label { display: none; }
     #minimap   { right: 8px; bottom: 166px; left: auto; top: auto; width: 88px; }
@@ -430,11 +424,10 @@
 <!-- Part 5: top-down map of the 20-door loop, with "you are here" -->
 <div id="minimap" class="hidden" aria-hidden="true"><svg viewBox="0 0 132 200"></svg><div class="mmnote">9–16 upstairs, back &amp; front</div></div>
 
-<!-- jump menu: skip to the first building of any part -->
+<!-- jump menu: skip to the first building of any part (Home lives in #lookbar) -->
 <div id="jumpbar" role="navigation" aria-label="Jump to part">
   <div class="jbtitle">Jump to part</div>
   <div class="jbtns">
-    <a class="jbhome" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Home: back to the Stop Finder menu" title="Home">⌂</a>
     <button class="ghost jbtn" data-part="1" aria-label="Part 1: numbers count up in order">1</button>
     <button class="ghost jbtn" data-part="2" aria-label="Part 2: first digit is the floor">2</button>
     <button class="ghost jbtn" data-part="3" aria-label="Part 3: leading digits name the building">3</button>
