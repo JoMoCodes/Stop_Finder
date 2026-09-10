@@ -24,14 +24,16 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 | `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
 | `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). |
 | `track.js`              | Course run tracking, shared by every page: listens to the course's `document` events and sends anonymous events to Umami. Setup and the event list: `docs/tracking.md`. |
+| `report.js`             | The end-of-run report, shared by every course page: listens to the same `document` events, keeps the run record (per question / building / part, on an active clock), and renders the report into the `#finale` dialog when the course completes. What it shows, the grade model and the copy: `docs/report.md`; the design reviews it came from: `docs/run-report/`. |
 
 ### The three realistic looks
 Each `apartment-realistic-*.html` is a copy of `apartment-mockup.html` with **only the
 visual layer** reworked (colours, materials, procedural canvas textures, lighting,
 sky, ground/road, the `build*Shell` / `build*Facade` / `*Access` builders, plus
-environment props). The `STAGES` array, unit math, quiz, prompts, finale, DOM,
+environment props). The `STAGES` array, unit math, quiz, prompts, finale shell, DOM,
 CSS and accessibility code are identical across all four files, so a curriculum
-change has to be applied to all four. Each course page carries a `#lookbar`
+change has to be applied to all four (the report's contents live in the shared
+`report.js`, so a report change is made once). Each course page carries a `#lookbar`
 site bar on every layout: a prominent amber **Home** button (the only Home
 control; it links to the live site `https://jomocodes.github.io/Stop_Finder/`)
 plus a compact **Appearance** button whose four looks drop out on hover / tap /
@@ -55,7 +57,9 @@ Structure top-to-bottom:
   rules, then **all width/orientation media queries at the end** (phone
   portrait ≤640px turns `#quiz` into a bottom sheet; landscape phones;
   `pointer: coarse` tap targets; tablets). Keep new media queries there.
-- **DOM**: `#finale` (end-of-course summary), `#app` (canvas mount), sr-only
+- **DOM**: `#finale` (the end-of-run report dialog: an empty `#report` that
+  `report.js` fills, plus the `#fagain` / `#fclose` buttons the course wires),
+  `#app` (canvas mount), sr-only
   `#scene-desc` / `#doorlist`, `#prompt` (top banner), `#quiz` (options panel
   with `#qclose` / `#qkey`), `#viewbar` (Part 5 Front/Back/Left/Right),
   `#minimap` (Part 5 top-down map), `#jumpbar` (parts 1-5 + `#progress`),
@@ -84,15 +88,19 @@ Structure top-to-bottom:
 - **Quiz logic:** `openQuiz` / `chooseOption` (per-digit-place explanations
   on a wrong pick) / `closeQuiz`; door plates are clickable via raycasting,
   with hover tint, pulsing halos and `pickBlank()` for precision.
-- **Flow + reward:** `checkComplete` / `showNext` / `resetCourse`, `popPlate`,
-  `markSolved`, progress bar, `fireConfetti` (per building, cannons at the
-  end), `#finale`.
+- **Flow + reward:** `checkComplete` / `showNext` / `resetCourse` /
+  `retryPart` (rebuilds one part for the report's "Try Part N again"),
+  `popPlate`, `markSolved`, progress bar, `fireConfetti` (per building,
+  cannons at the end), `fireFinale` (dispatches `coursecomplete`, then shows
+  `#finale`; the report inside it is rendered by `report.js`).
 - **Accessibility block:** keyboard map (Tab / Enter / 1-4 / arrows / Home /
   F,B,L,R / Escape), live regions, per-stage scene description and door list.
 - **Events on `document`** connect the regions without shared function bodies:
   `stagechange`, `blanksolved`, `quizopen`, `quizclose`, `answer`,
-  `stagecomplete`, `coursecomplete`, `coursereset`. Prefer listening to
-  these over editing `showStage` or the quiz functions (`track.js` does).
+  `stagecomplete`, `coursecomplete`, `coursereset`, `partreset` (after
+  `retryPart`), and inbound `retrypart` (the report asking for a part reset).
+  Prefer listening to these over editing `showStage` or the quiz functions
+  (`track.js` and `report.js` do).
 
 The five parts teach progressively: **(1)** sequential numbering on a 2-story
 4-plex → **(2)** 3-digit units where the first digit = floor → **(3)** 4–5 digit
