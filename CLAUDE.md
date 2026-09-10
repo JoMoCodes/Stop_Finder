@@ -18,7 +18,7 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 
 | File                    | What it is                                              |
 |-------------------------|---------------------------------------------------------|
-| `index.html`            | Landing page; one card per course/look (the menu).      |
+| `index.html`            | Landing page (the menu). One **Apartments** card fans out the three realistic looks on hover / focus / tap; the classic look is reached from a course's `#lookbar`. |
 | `apartment-mockup.html` | 3D apartment-number course, **classic look** (Three.js). See map below. |
 | `apartment-realistic-a.html` | Same course, **Sunbelt garden-style** look (brick/stucco, breezeway railings, parking, warm low sun). |
 | `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
@@ -31,12 +31,15 @@ sky, ground/road, the `build*Shell` / `build*Facade` / `*Access` builders, plus
 environment props). The `STAGES` array, unit math, quiz, prompts, finale, DOM,
 CSS and accessibility code are identical across all four files, so a curriculum
 change has to be applied to all four. Each course page carries a `#lookbar`
-switcher (bottom right, hidden on phones) linking the four looks and the menu.
+switcher (bottom right, hidden on phones) linking the four looks and the menu,
+and a **Home** link (`a.jbhome`, first in `#jumpbar`, visible on every layout)
+back to the live site `https://jomocodes.github.io/Stop_Finder/`.
 Design notes and inspiration sources: `docs/apartment-course-review/realistic/`.
 
 ### Adding a course
 1. Create a new `*.html` at the root (copy an existing one as a starting point).
-2. Add a card `<a class="card" href="...">` to `index.html`.
+2. Add a card `<a class="card" href="...">` to `index.html` (or a new option
+   inside the Apartments card if it is another look of that course).
 3. Keep it dependency-free — CDN import map only, no build step.
 4. If the file grows complex, give its folder/area its own `CLAUDE.md` rather
    than expanding this one.
@@ -50,7 +53,7 @@ Structure top-to-bottom:
 - **DOM**: `#finale` (end-of-course summary), `#app` (canvas mount), sr-only
   `#scene-desc` / `#doorlist`, `#prompt` (top banner), `#quiz` (options panel
   with `#qclose` / `#qkey`), `#viewbar` (Part 5 Front/Back/Left/Right),
-  `#minimap` (Part 5 top-down map), `#jumpbar` (parts 1-5 + `#progress`),
+  `#minimap` (Part 5 top-down map), `#jumpbar` (Home link + parts 1-5 + `#progress`),
   `#doorsleft` / `#draghint` / `#helpbtn`, `#bottombar` (Back / Next),
   `#resetview`.
 - **Import map + module** start: Three.js via CDN, then `OrbitControls`.
