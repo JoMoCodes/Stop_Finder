@@ -95,22 +95,70 @@
     display: flex; align-items: center; justify-content: center;
   }
 
-  /* look switcher: the classic build and the realistic variants stay one click apart.
-     Sits left of the ? button so it never meets the prompt banner; hidden on phones
-     (the menu page lists every look). */
+  /* site bar: a prominent Home button plus a compact "Appearance" switcher.
+     Collapsed it shows only Home + Appearance; the four looks drop out of the
+     Appearance button on hover (mouse), tap / click, or Enter (keyboard).
+     Desktop: bottom right, left of the ? button, menu opens upward.
+     Phones: see the media queries at the end (portrait sits under the jump bar,
+     landscape sits top right; both open the menu downward). */
   #lookbar {
     position: fixed; right: 74px; bottom: 28px; z-index: 11;
-    display: flex; align-items: center; gap: 2px; height: 40px;
-    padding: 0 8px 0 6px; border-radius: 999px; font-size: 12px; color: #9fb0c0;
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 6px 4px 4px; border-radius: 999px; font-size: 13px; color: #9fb0c0;
     background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
     border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
-  #lookbar .lk-title { margin: 0 4px 0 6px; }
-  #lookbar a { color: #eef2f6; text-decoration: none; padding: 5px 9px; border-radius: 999px; }
-  #lookbar a:hover { background: rgba(255,255,255,0.12); }
-  #lookbar a[aria-current="page"] { background: #57c97e; color: #08130c; font-weight: 600; }
-  #lookbar a:focus-visible { outline: 2px solid #ffd54a; outline-offset: 1px; }
-  #lookbar a.lk-home { font-size: 15px; padding: 3px 8px; }
+  #lookbar a.lk-home {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px 0 10px;
+    border-radius: 999px; text-decoration: none; font-weight: 700; font-size: 13px;
+    color: #1a1400; background: #ffd54a; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    transition: transform .1s ease, background .12s ease;
+  }
+  #lookbar a.lk-home svg { width: 16px; height: 16px; flex: none; }
+  #lookbar a.lk-home:hover { background: #ffe07a; transform: translateY(-1px); }
+  #lookbar a.lk-home:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(20,24,30,.9); }
+  #lookbar button.lk-toggle {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px 0 12px;
+    border-radius: 999px; background: transparent; box-shadow: none; border: none;
+    font-size: 13px; font-weight: 500; color: #9fb0c0; transition: background .12s ease;
+  }
+  #lookbar button.lk-toggle:hover { transform: none; background: rgba(255,255,255,0.12); }
+  #lookbar button.lk-toggle .lk-current { color: #eef2f6; font-weight: 600; }
+  #lookbar button.lk-toggle .lk-caret { font-size: 10px; color: #9fb0c0; transition: transform .15s ease; }
+  #lookbar.open button.lk-toggle { background: rgba(255,255,255,0.12); color: #eef2f6; }
+  #lookbar.open button.lk-toggle .lk-caret { transform: rotate(180deg); }
+  /* the drop-out menu: .lk-menu is a transparent hover bridge, .lk-list is the panel */
+  #lookbar .lk-menu {
+    position: absolute; right: 0; bottom: 100%; padding-bottom: 8px;
+    opacity: 0; visibility: hidden; transform: translateY(6px); pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease, visibility 0s linear .15s;
+  }
+  #lookbar .lk-list {
+    display: flex; flex-direction: column; gap: 2px; min-width: 200px; padding: 6px;
+    border-radius: 14px; background: rgba(20,24,30,0.96); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #lookbar .lk-list a {
+    display: flex; align-items: baseline; gap: 8px; min-height: 32px; padding: 6px 12px;
+    border-radius: 10px; text-decoration: none; white-space: nowrap;
+    color: #eef2f6; font-size: 14px; font-weight: 600;
+  }
+  #lookbar .lk-list a small { color: #9fb0c0; font-size: 12px; font-weight: 400; }
+  #lookbar .lk-list a:hover { background: rgba(255,255,255,0.12); }
+  #lookbar .lk-list a[aria-current="page"] { background: #57c97e; color: #08130c; }
+  #lookbar .lk-list a[aria-current="page"] small { color: rgba(8,19,12,0.72); }
+  #lookbar .lk-list a:focus-visible { outline: 2px solid #ffd54a; outline-offset: 1px; }
+  #lookbar.open .lk-menu {
+    opacity: 1; visibility: visible; transform: none; pointer-events: auto;
+    transition: opacity .15s ease, transform .15s ease, visibility 0s;
+  }
+  @media (hover: hover) {
+    #lookbar:hover .lk-menu {
+      opacity: 1; visibility: visible; transform: none; pointer-events: auto;
+      transition: opacity .15s ease, transform .15s ease, visibility 0s;
+    }
+    #lookbar:hover button.lk-toggle .lk-caret { transform: rotate(180deg); }
+  }
 
   /* left-side "walk around" buttons (Part 5) */
   #viewbar {
@@ -239,6 +287,7 @@
     #jumpbar button.jbtn { width: 44px; height: 44px; }
     #jumpbar a.jbhome { width: 44px; height: 44px; }
     button.opt { min-height: 52px; }
+    #lookbar a.lk-home, #lookbar button.lk-toggle, #lookbar .lk-list a { min-height: 44px; }
     #qclose { width: 44px; height: 44px; }
   }
 
@@ -262,8 +311,13 @@
     #jumpbar .jbtns { gap: 8px; }
     #progress { margin-top: 6px; }
 
-    /* stacked under the jump bar so the two never collide on narrow phones */
-    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px); right: 8px; left: auto; }
+    /* Home + Appearance bar: its own row under the jump bar, menu drops downward */
+    #lookbar { top: calc(var(--prompt-h, 140px) + 16px + 74px); left: 8px; right: auto; bottom: auto; }
+    #lookbar button.lk-toggle .lk-current { display: none; }
+    #lookbar .lk-menu { left: 0; right: auto; top: 100%; bottom: auto; padding: 8px 0 0; }
+
+    /* stacked under the jump bar and the site bar so the three never collide on narrow phones */
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px + 62px); right: 8px; left: auto; }
 
     #bottombar { bottom: 12px; gap: 8px; width: calc(100% - 16px); justify-content: center; }
     #bottombar button { padding: 12px 18px; font-size: 15px; min-height: 46px; }
@@ -273,7 +327,7 @@
     #viewbar .vbtitle { display: none; }
     #viewbar button.vbtn { min-width: 60px; min-height: 44px; padding: 10px 6px; font-size: 14px; }
 
-    #helpbtn   { right: 8px; bottom: auto; top: calc(var(--prompt-h, 140px) + 16px + 74px + 50px); left: auto; width: 44px; height: 44px; }
+    #helpbtn   { right: 8px; bottom: auto; top: calc(var(--prompt-h, 140px) + 16px + 74px + 62px + 50px); left: auto; width: 44px; height: 44px; }
     #resetview { right: 8px; bottom: 122px; left: auto; padding: 0; width: 44px; height: 44px; }
     #resetview .rv-label { display: none; }
     #minimap   { right: 8px; bottom: 166px; left: auto; top: auto; width: 88px; }
@@ -324,9 +378,11 @@
     #helpbtn { display: none; }
     #resetview { right: 8px; bottom: 112px; left: auto; padding: 0; width: 44px; height: 44px; }
     #resetview .rv-label { display: none; }
-  }
-  @media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
-    #lookbar { display: none; }
+
+    /* Home + Appearance bar: top right, below the quiz column when that is open */
+    #lookbar { top: 8px; right: 8px; bottom: auto; left: auto; z-index: 10; }
+    #lookbar button.lk-toggle .lk-current { display: none; }
+    #lookbar .lk-menu { top: 100%; bottom: auto; padding: 8px 0 0; }
   }
 </style>
 </head>
@@ -405,15 +461,43 @@
 
 <button id="helpbtn" class="ghost" aria-label="How to use the controls">?</button>
 
-<!-- look switcher: same course, different visual treatment; the classic build is always reachable -->
-<nav id="lookbar" aria-label="Choose a look">
-  <a class="lk-home" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Back to the course menu">⌂</a>
-  <span class="lk-title">Look:</span>
-  <a href="apartment-mockup.html" title="Classic look (the original flat-colour build)">Classic</a>
-  <a href="apartment-realistic-a.html" aria-current="page" title="Realistic look A: Sunbelt garden-style walk-up">Sunbelt</a>
-  <a href="apartment-realistic-b.html" title="Realistic look B: Midwest brick walk-up">Brick</a>
-  <a href="apartment-realistic-c.html" title="Realistic look C: contemporary suburban community">Suburban</a>
+<!-- site bar: Home + compact Appearance switcher (same course, different visual treatment).
+     Collapsed by default; the looks drop out on hover, tap / click or Enter. -->
+<nav id="lookbar" aria-label="Home and appearance">
+  <a class="lk-home" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Home: back to the Stop Finder menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v10h13V10" /><path d="M10 20v-6h4v6" />
+    </svg>
+    <span>Home</span>
+  </a>
+  <button class="lk-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lk-menu">
+    <span class="lk-title">Appearance</span><span class="lk-current">Sunbelt</span><span class="lk-caret" aria-hidden="true">▼</span>
+  </button>
+  <div class="lk-menu" id="lk-menu">
+    <div class="lk-list" role="group" aria-label="Appearance">
+      <a href="apartment-mockup.html" title="Classic look (the original flat-colour build)">Classic <small>flat-colour original</small></a>
+      <a href="apartment-realistic-a.html" aria-current="page" title="Realistic look A: Sunbelt garden-style walk-up">Sunbelt <small>garden-style walk-up</small></a>
+      <a href="apartment-realistic-b.html" title="Realistic look B: Midwest brick walk-up">Brick <small>Midwest brick walk-up</small></a>
+      <a href="apartment-realistic-c.html" title="Realistic look C: contemporary suburban community">Suburban <small>contemporary community</small></a>
+    </div>
+  </div>
 </nav>
+<script>
+/* Appearance menu: click / Enter toggles, Escape and focus-out close, tap outside closes.
+   Mouse hover is handled in CSS (hover: hover) so touch taps never double-toggle. */
+(() => {
+  const bar = document.getElementById('lookbar');
+  const btn = bar.querySelector('.lk-toggle');
+  const isOpen = () => bar.classList.contains('open');
+  const setOpen = (on) => { bar.classList.toggle('open', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+  btn.addEventListener('click', () => setOpen(!isOpen()));
+  document.addEventListener('pointerdown', (e) => { if (isOpen() && !bar.contains(e.target)) setOpen(false); });
+  bar.addEventListener('focusout', (e) => { if (isOpen() && !bar.contains(e.relatedTarget)) setOpen(false); });
+  bar.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isOpen()) { e.stopPropagation(); e.preventDefault(); setOpen(false); btn.focus(); }
+  });
+})();
+</script>
 
 <div id="bottombar" role="group" aria-label="Course navigation">
   <button id="back" class="ghost hidden">◀ Back</button>
