@@ -512,6 +512,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import './track.js';   // course run tracking (see track.js / docs/tracking.md)
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* ============================================================
@@ -2726,7 +2727,7 @@ function openQuiz(bstate) {
   ui.qmsg.textContent = '';
   ui.qmsg.className = '';
   ui.quiz.classList.remove('hidden');
-  document.dispatchEvent(new CustomEvent('quizopen', { detail: { bstate } }));
+  document.dispatchEvent(new CustomEvent('quizopen', { detail: { bstate, type } }));
 }
 
 function chooseOption(bstate, val, btn, ev) {
@@ -2738,6 +2739,9 @@ function chooseOption(bstate, val, btn, ev) {
       bstate.solvedText ? bstate.solvedText(val) : String(val),
       bstate.plateOpts || {});
     btn.classList.add('right');
+    document.dispatchEvent(new CustomEvent('answer', { detail: {
+      bstate, picked: val, correct: true, attempt: (bstate.wrongCount || 0) + 1, type,
+    } }));
     [...ui.qopts.children].forEach(b => b.disabled = true);
     ui.qmsg.textContent = `✓ Correct — ${val}`;
     ui.qmsg.className = 'ok';
@@ -2750,6 +2754,10 @@ function chooseOption(bstate, val, btn, ev) {
     btn.disabled = true;
     btn.classList.add('wrong');
     bstate.wrongCount = (bstate.wrongCount || 0) + 1;
+    document.dispatchEvent(new CustomEvent('answer', { detail: {
+      bstate, picked: val, correct: false, attempt: bstate.wrongCount, type,
+      chosen: quizPlaces(val, type), expected: quizPlaces(bstate.value, type),
+    } }));
     let msg = explainWrong(val, bstate.value, type);
     const rule = currentStage && RULE_BY_PART[currentStage.part];
     if (bstate.wrongCount >= 2 && rule) msg += ' ' + rule;
@@ -2865,7 +2873,10 @@ function updateProgress() {
   if (jbTitleEl && currentIndex >= 0)
     jbTitleEl.textContent = `Part ${STAGES[currentIndex].part} · Building ${currentIndex + 1} of ${STAGES.length}`;
 }
-function markStageComplete(i) { completed.add(i); updateProgress(); }
+function markStageComplete(i) {
+  completed.add(i); updateProgress();
+  document.dispatchEvent(new CustomEvent('stagecomplete', { detail: { index: i, stage: STAGES[i] } }));
+}
 document.addEventListener('stagechange', updateProgress);
 
 /* lowest stage not yet in `completed`, or -1 once every stage is — jumping
@@ -2881,6 +2892,7 @@ let finaleShown = false;   // once per run, however the last stage got finished
 function fireFinale() {
   if (finaleShown) return;
   finaleShown = true;
+  document.dispatchEvent(new CustomEvent('coursecomplete', { detail: {} }));
   fireConfetti('cannons');
   showFinale();
 }
@@ -2913,6 +2925,7 @@ function resetCourse() {
   completed.clear();
   finaleShown = false;
   hideFinale();
+  document.dispatchEvent(new CustomEvent('coursereset', { detail: {} }));
 }
 
 ui.continueBtn.onclick = () => {
