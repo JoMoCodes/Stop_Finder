@@ -25,7 +25,7 @@
 
 export const UMAMI = {
   src: 'https://cloud.umami.is/script.js',
-  websiteId: '',   // <- paste your Umami website id here
+  websiteId: 'aef960bc-14d4-492c-8c1d-93fef7dfd959',   // <- paste your Umami website id here
 };
 
 const MAX_BUFFER = 200;
