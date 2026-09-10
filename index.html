@@ -96,5 +96,6 @@
     for (const ev of ['mouseenter', 'mouseleave', 'focusin', 'focusout']) card.addEventListener(ev, () => setTimeout(sync, 0));
     document.addEventListener('click', e => { if (!card.contains(e.target)) { card.classList.remove('open'); sync(); } });
   </script>
+  <script type="module" src="./track.js"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 | `apartment-realistic-a.html` | Same course, **Sunbelt garden-style** look (brick/stucco, breezeway railings, parking, warm low sun). |
 | `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
 | `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). |
+| `track.js`              | Course run tracking, shared by every page: listens to the course's `document` events and sends anonymous events to Umami. Setup and the event list: `docs/tracking.md`. |
 
 ### The three realistic looks
 Each `apartment-realistic-*.html` is a copy of `apartment-mockup.html` with **only the
@@ -89,8 +90,9 @@ Structure top-to-bottom:
 - **Accessibility block:** keyboard map (Tab / Enter / 1-4 / arrows / Home /
   F,B,L,R / Escape), live regions, per-stage scene description and door list.
 - **Events on `document`** connect the regions without shared function bodies:
-  `stagechange`, `blanksolved`, `quizopen`, `quizclose`. Prefer listening to
-  these over editing `showStage` or the quiz functions.
+  `stagechange`, `blanksolved`, `quizopen`, `quizclose`, `answer`,
+  `stagecomplete`, `coursecomplete`, `coursereset`. Prefer listening to
+  these over editing `showStage` or the quiz functions (`track.js` does).
 
 The five parts teach progressively: **(1)** sequential numbering on a 2-story
 4-plex → **(2)** 3-digit units where the first digit = floor → **(3)** 4–5 digit
