@@ -57,6 +57,7 @@ row / block / seq) and `stage_name`.
 | `stage_complete` | a stage's blanks are all solved (examples complete on Next) | `seconds` on the stage, `wrong` picks on it |
 | `course_complete` | the last stage finished the course | `seconds`, `wrong`, `restarts` |
 | `course_restart` | Play again / Start over | `seconds`, `wrong`, `stages_done`; a new run id follows |
+| `part_retry` | "Try Part N again" on the end-of-run report (the run id stays; that part's stages complete again) | `part`, `seconds`, `wrong` |
 | `jump` | a jump-bar click to a different part | `from_part`, `to_part`, `from` |
 | `help_open` | the ? button | stage props |
 | `view_reset` | the Reset view chip | stage props |
@@ -79,7 +80,7 @@ row / block / seq) and `stage_name`.
 
 The course dispatches these events on `document`, and `track.js` listens:
 `stagechange`, `quizopen`, `answer`, `blanksolved`, `stagecomplete`,
-`coursecomplete`, `coursereset`. The UI signals come from click listeners on
+`coursecomplete`, `coursereset`, `partreset`. The UI signals come from click listeners on
 the existing buttons and a `MutationObserver` on `#draghint`, so the course
 code itself only had to gain the `answer`, `stagecomplete`, `coursecomplete`
 and `coursereset` dispatches (identical in all four course files).

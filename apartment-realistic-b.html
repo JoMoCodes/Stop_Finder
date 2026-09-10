@@ -202,18 +202,21 @@
   #progress .seg.now { background: #ffd9a0; }
   #progress .seg.part { margin-left: 6px; }
 
-  /* end-of-course summary */
+  /* end-of-run report: the dialog shell. Its contents (and their own
+     media queries) are rendered and styled by report.js. */
   #finale {
     position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: min(520px, calc(100% - 32px)); padding: 24px 26px; border-radius: 18px;
+    width: min(580px, calc(100% - 32px)); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    padding: 20px 24px 24px; border-radius: 18px;
     background: rgba(20,24,30,0.94); backdrop-filter: blur(8px);
     border: 1px solid rgba(255,255,255,0.16); color: #eef2f6; z-index: 40;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    animation: finale-in .2s ease-out;
   }
-  #finale h2 { margin: 0 0 12px; color: #ffd9a0; font-size: 22px; }
-  #finale ol { margin: 0 0 14px; padding-left: 22px; line-height: 1.6; }
-  #finale p { color: #dfe6ee; margin: 0 0 18px; }
-  #finale div { display: flex; gap: 10px; flex-wrap: wrap; }
+  #finale:focus { outline: none; }
+  @keyframes finale-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } }
+  #finale .factions { display: flex; gap: 10px; flex-wrap: wrap; }
 
   /* right-side quiz panel */
   #quiz {
@@ -335,7 +338,8 @@
     button.opt .ltr { display: none; }
     button.opt .num { font-size: 24px; }
     #qclose { width: 44px; height: 44px; top: 4px; right: 4px; }
-    #finale { inset: 0; border-radius: 0; }
+    #finale { inset: 0; transform: none; width: auto; max-height: none; border-radius: 0;
+      padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); animation: none; }
   }
 
   /* --- very small phones: keep the Part 5 mini-map clear of the doors-left chip --- */
@@ -377,22 +381,19 @@
     #lookbar { top: 8px; right: 8px; bottom: auto; left: auto; z-index: 10; }
     #lookbar button.lk-toggle .lk-current { display: none; }
     #lookbar .lk-menu { top: 100%; bottom: auto; padding: 8px 0 0; }
+
+    #finale { inset: 8px; transform: none; width: auto; max-height: none; border-radius: 14px;
+      padding: 12px 16px 16px; animation: none; }
   }
 </style>
 </head>
 <body>
-<!-- end-of-course summary (shown after the last building) -->
-<div id="finale" class="hidden" role="dialog" aria-labelledby="ftitle">
-  <h2 id="ftitle">You read all 14 buildings</h2>
-  <ol>
-    <li><b>Count in order</b> — 101, 102, 103…</li>
-    <li><b class="pl-floor">First digit = floor</b> — <span class="pl-floor">2</span><span class="pl-door">29</span></li>
-    <li><b class="pl-building">Leading digits = building</b> — <span class="pl-building">13</span><span class="pl-floor">1</span><span class="pl-door">17</span></li>
-    <li><b>Front and back</b> — the count carries on behind</li>
-    <li><b>No floor digit</b> — one running count round the building</li>
-  </ol>
-  <p>Next time you're at a new building, look for the pattern before you ring a bell.</p>
-  <div><button id="fagain">Start over ▸</button><button id="fclose" class="ghost">Keep looking around</button></div>
+<!-- end-of-run report (shown after the last building) -->
+<div id="finale" class="hidden" role="dialog" aria-modal="true" aria-labelledby="ftitle" aria-describedby="fsum" tabindex="-1">
+  <!-- report.js fills #report from the run record and moves these two buttons into
+       place; they are declared here so the course can wire them at load -->
+  <div id="report"></div>
+  <div class="factions"><button id="fagain">Start over ▸</button><button id="fclose" class="ghost">Keep looking around</button></div>
 </div>
 
 <div id="app"></div>
@@ -513,6 +514,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import './track.js';   // course run tracking (see track.js / docs/tracking.md)
+import './report.js';  // end-of-run report (see report.js / docs/report.md)
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* ============================================================
@@ -2716,6 +2718,38 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape' && finaleEl && !finaleEl.classList.contains('hidden')) hideFinale();
 });
 
+/* "Try Part N again" from the report: rebuild only that part's buildings and
+   go back to its example. The run is not over, so the finale fires again when
+   the part's last building is done. */
+function retryPart(p) {
+  hideFinale();
+  const stagesReset = [];
+  for (let i = 0; i < STAGES.length; i++) {
+    if (STAGES[i].part !== p) continue;
+    stagesReset.push(i);
+    const g = groups[i];
+    if (g) {
+      scene.remove(g);
+      g.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) { o.material.map?.dispose(); o.material.dispose(); }
+      });
+      delete groups[i];
+    }
+    completed.delete(i);
+    celebrated.delete(i);
+  }
+  if (!stagesReset.length) return;
+  finaleShown = false;
+  updateProgress();
+  document.dispatchEvent(new CustomEvent('partreset', { detail: { part: p, stages: stagesReset } }));
+  showStage(stagesReset[0]);
+}
+document.addEventListener('retrypart', e => {
+  const p = Number(e.detail && e.detail.part);
+  if (p >= 1 && p <= 5) retryPart(p);
+});
+
 /* ---- buttons ---- */
 function resetCourse() {
   for (const k of Object.keys(groups)) {
@@ -2988,7 +3022,7 @@ renderer.domElement.addEventListener('pointerup', e => {
    confetti (lightweight 2D canvas overlay)
    ============================================================ */
 const cc = document.createElement('canvas');
-cc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50';
+cc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:39';   // above every panel, behind the #finale report (40)
 document.body.appendChild(cc);
 const cctx = cc.getContext('2d');
 function sizeConfetti() { cc.width = innerWidth; cc.height = innerHeight; }

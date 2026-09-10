@@ -4,8 +4,8 @@
    What it does
    - Listens to the events the course already dispatches on `document`
      (stagechange, quizopen, blanksolved, answer, stagecomplete,
-     coursecomplete, coursereset) plus a few UI clicks, and turns them into
-     flat analytics events.
+     coursecomplete, coursereset, partreset) plus a few UI clicks, and turns
+     them into flat analytics events.
    - Sends them to Umami (cookieless, no personal data). Each run of the
      course gets a random id so answers can be grouped per run; nothing
      identifies the person.
@@ -209,6 +209,13 @@ function wireCourse() {
     track('course_restart', { seconds: secs(run.t0), wrong: run.wrong, stages_done: run.stagesDone });
     run.id = newId(); run.t0 = performance.now(); run.wrong = 0; run.stagesDone = 0; run.restarts++;
     left.clear(); done.clear();
+  });
+
+  // "Try Part N again" on the report: that part's stages will complete again
+  document.addEventListener('partreset', e => {
+    const d = e.detail || {};
+    for (const i of d.stages || []) done.delete(i);
+    track('part_retry', { part: d.part, seconds: secs(run.t0), wrong: run.wrong });
   });
 
   /* ---- UI signals: help, camera reset, Part 5 view buttons, jump bar ---- */
