@@ -2574,7 +2574,7 @@ renderer.domElement.addEventListener('pointerup', e => {
    confetti (lightweight 2D canvas overlay)
    ============================================================ */
 const cc = document.createElement('canvas');
-cc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50';
+cc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:39';   // above every panel, behind the #finale report (40)
 document.body.appendChild(cc);
 const cctx = cc.getContext('2d');
 function sizeConfetti() { cc.width = innerWidth; cc.height = innerHeight; }
