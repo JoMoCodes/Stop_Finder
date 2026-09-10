@@ -22,9 +22,31 @@
     border-radius: 14px; padding: 18px 20px; transition: transform .12s ease, background .12s ease;
   }
   a.card:hover { transform: translateY(-2px); background: rgba(255,255,255,0.09); }
-  .card h2 { margin: 0 0 4px; font-size: 17px; }
-  .card p { margin: 0; color: #9fb0c0; font-size: 13px; line-height: 1.45; }
+  .card h2 { margin: 0; font-size: 17px; }
   .card.soon { opacity: .55; }
+
+  /* a card that fans out its variants on hover (or on focus / tap, for keyboards and phones) */
+  .card.group { cursor: default; transition: background .12s ease; }
+  .card.group:hover, .card.group:focus-within, .card.group.open { background: rgba(255,255,255,0.09); }
+  .card.group h2 .chev { display: inline-block; margin-left: 6px; color: #9fb0c0; font-size: 13px; transition: transform .15s ease; }
+  .card.group:hover h2 .chev, .card.group:focus-within h2 .chev, .card.group.open h2 .chev { transform: rotate(90deg); }
+  .card.group .opts {
+    display: grid; gap: 8px; list-style: none; margin: 0; padding: 0;
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height .2s ease, opacity .15s ease, margin .2s ease;
+  }
+  .card.group:hover .opts, .card.group:focus-within .opts, .card.group.open .opts { max-height: 240px; opacity: 1; margin-top: 12px; }
+  .card.group .opts a {
+    display: block; text-decoration: none; color: #eef2f6; font-size: 15px;
+    padding: 10px 14px; border-radius: 10px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+    transition: background .12s ease, transform .12s ease;
+  }
+  .card.group .opts a:hover { background: rgba(87,201,126,0.22); border-color: rgba(87,201,126,0.4); transform: translateX(3px); }
+  .card.group .opts a:focus-visible { outline: 2px solid #ffd54a; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .card, .card .opts, .card .opts a, .card h2 .chev { transition: none; }
+  }
   .tag {
     float: right; font-size: 11px; padding: 2px 9px; border-radius: 999px;
     background: rgba(120,200,140,0.18); color: #9be3ad; border: 1px solid rgba(120,200,140,0.3);
@@ -36,40 +58,43 @@
 </head>
 <body>
   <h1>Stop Finder</h1>
-  <div class="sub">Address-pattern recognition — prototype. The 3D course comes in four looks; every look teaches the same five parts.</div>
+  <div class="sub">Address-pattern recognition — prototype.</div>
 
   <div class="grid">
-    <a class="card" href="apartment-realistic-a.html">
+    <div class="card group" id="apartments" tabindex="0" aria-expanded="false">
       <span class="tag">live</span>
-      <h2>3D Apartment — Sunbelt look</h2>
-      <p>The same course in a garden-style complex: brick and stucco, breezeway stairs with railings, nose-in parking and late-afternoon light. Walk around buildings and click any door to decode its unit number.</p>
-    </a>
-
-    <a class="card" href="apartment-realistic-b.html">
-      <span class="tag">live</span>
-      <h2>3D Apartment — Brick look</h2>
-      <p>A Midwest brick walk-up on a real street: stone sills and lintels, steel stairs and walkways, parked cars, street trees and neighbours in the distance.</p>
-    </a>
-
-    <a class="card" href="apartment-realistic-c.html">
-      <span class="tag">live</span>
-      <h2>3D Apartment — Suburban look</h2>
-      <p>A contemporary lap-siding community: white railings, landscaped beds, a kerbed drive with parking and lampposts, golden-hour shadows.</p>
-    </a>
-
-    <a class="card" href="apartment-mockup.html">
-      <span class="tag alt">classic</span>
-      <h2>3D Apartment — Classic look</h2>
-      <p>The original flat-colour build of the course. Same five parts, same numbers; the lightest to run on older phones.</p>
-    </a>
+      <h2>Apartments <span class="chev" aria-hidden="true">▸</span></h2>
+      <ul class="opts" aria-label="Apartment course looks">
+        <li><a href="apartment-realistic-a.html">Sunbelt</a></li>
+        <li><a href="apartment-realistic-b.html">Brick</a></li>
+        <li><a href="apartment-realistic-c.html">Suburban</a></li>
+      </ul>
+    </div>
 
     <div class="card soon">
       <span class="tag wip">coming soon</span>
       <h2>2D Address Grid</h2>
-      <p>Find a house from its number using the odd/even side and hundred-block rules.</p>
     </div>
   </div>
 
   <div class="foot">Work in progress — pieces are being built and tuned.</div>
+
+  <script>
+    // Hover reveals the looks; on touch screens (no hover) a tap on the card toggles them instead.
+    const card = document.getElementById('apartments');
+    const sync = () => card.setAttribute('aria-expanded', String(card.classList.contains('open') || card.matches(':hover, :focus-within')));
+    const noHover = matchMedia('(hover: none)').matches;
+    card.addEventListener('click', e => {
+      if (e.target.closest('a') || !noHover) return;
+      card.classList.toggle('open'); sync();
+    });
+    card.addEventListener('keydown', e => {
+      if (e.target !== card) return;
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.classList.toggle('open'); sync(); }
+      if (e.key === 'Escape') { card.classList.remove('open'); sync(); }
+    });
+    for (const ev of ['mouseenter', 'mouseleave', 'focusin', 'focusout']) card.addEventListener(ev, () => setTimeout(sync, 0));
+    document.addEventListener('click', e => { if (!card.contains(e.target)) { card.classList.remove('open'); sync(); } });
+  </script>
 </body>
 </html>
