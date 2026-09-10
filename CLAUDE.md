@@ -100,4 +100,5 @@ rather than `file://` (e.g. `python3 -m http.server` from the repo root, then
 visit `index.html`). Opening directly from disk can break module loading.
 
 ## Workflow
-- Develop on a feature branch; don't commit straight to `main` (it's live).
+- Commit each iteration straight to `main` (it deploys live to Pages) unless the
+  owner says otherwise for a given change.
