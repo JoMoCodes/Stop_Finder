@@ -761,7 +761,7 @@ const CSS = `
 #report summary::-webkit-details-marker { display: none; }
 #report summary::before { content: '▸'; position: absolute; left: 6px; top: 9px; color: #9fb0c0; font-size: 14px; }
 #report details[open] > summary::before { content: '▾'; }
-#report summary:hover { background: rgba(255,255,255,.06); }
+@media (hover: hover) { #report summary:hover { background: rgba(255,255,255,.06); } }   /* no stuck highlight after a tap */
 #report .fname { display: block; font-size: 15px; font-weight: 600; }
 #report .frow { display: grid; grid-template-columns: minmax(80px, 1fr) auto 52px; gap: 10px; align-items: center; margin-top: 6px;
   font-size: 14px; font-variant-numeric: tabular-nums; }
