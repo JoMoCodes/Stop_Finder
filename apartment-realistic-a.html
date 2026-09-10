@@ -146,6 +146,16 @@
     display: flex; align-items: center; justify-content: center;
   }
   #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
+  /* home: back to the site menu; lives in the jump bar so it is reachable on every layout, phones included */
+  #jumpbar a.jbhome {
+    width: 40px; height: 40px; border-radius: 50%; margin-right: 4px; flex: none;
+    display: flex; align-items: center; justify-content: center; text-decoration: none;
+    font-size: 19px; line-height: 1; color: #eef2f6; background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.20); box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+    transition: transform .1s ease, background .12s ease;
+  }
+  #jumpbar a.jbhome:hover { transform: translateY(-2px); background: rgba(255,255,255,0.18); }
+  #jumpbar a.jbhome:focus-visible { outline: 3px solid #ffd54a; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(20,24,30,.9); }
 
   /* course progress: one segment per building */
   #progress { display: flex; gap: 3px; margin-top: 8px; height: 6px; }
@@ -227,6 +237,7 @@
   @media (pointer: coarse) {
     button { min-height: 44px; }
     #jumpbar button.jbtn { width: 44px; height: 44px; }
+    #jumpbar a.jbhome { width: 44px; height: 44px; }
     button.opt { min-height: 52px; }
     #qclose { width: 44px; height: 44px; }
   }
@@ -367,6 +378,7 @@
 <div id="jumpbar" role="navigation" aria-label="Jump to part">
   <div class="jbtitle">Jump to part</div>
   <div class="jbtns">
+    <a class="jbhome" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Home: back to the Stop Finder menu" title="Home">⌂</a>
     <button class="ghost jbtn" data-part="1" aria-label="Part 1: numbers count up in order">1</button>
     <button class="ghost jbtn" data-part="2" aria-label="Part 2: first digit is the floor">2</button>
     <button class="ghost jbtn" data-part="3" aria-label="Part 3: leading digits name the building">3</button>
@@ -395,7 +407,7 @@
 
 <!-- look switcher: same course, different visual treatment; the classic build is always reachable -->
 <nav id="lookbar" aria-label="Choose a look">
-  <a class="lk-home" href="index.html" aria-label="Back to the course menu">⌂</a>
+  <a class="lk-home" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Back to the course menu">⌂</a>
   <span class="lk-title">Look:</span>
   <a href="apartment-mockup.html" title="Classic look (the original flat-colour build)">Classic</a>
   <a href="apartment-realistic-a.html" aria-current="page" title="Realistic look A: Sunbelt garden-style walk-up">Sunbelt</a>
