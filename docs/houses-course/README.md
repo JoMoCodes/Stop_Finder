@@ -88,12 +88,54 @@ street"), and after a second miss the part's rule is appended.
 | click an arrow on the road · a dot on the map · double-click the road | walk to that viewpoint (eased step, instant under reduced motion) |
 | walk bar | turn left 45° · walk to the viewpoint ahead (or turn round at a dead end) · turn right 45° |
 | ← → / A D · ↑ ↓ / W S · PgUp PgDn · Home | turn 20° · walk ahead / back · tilt · face down the street again |
-| click a house marked `?` | open its options; 1–4 / a–d pick, Esc closes |
+| click a house marked `?` | open its options; 1–4 / a–d pick, Esc closes. The camera walks to the viewpoint in front of the house and faces its number (see *Reading a number* below) |
+| click any other house | walk up to it and face its number, so a neighbour can be read from a phone |
+| the "N houses left" chip | walk to the nearest house still to fill in and face it |
+| Appearance (bottom right; bottom left on a phone) | switch between the four looks of the course: Classic, Sunbelt, Brick, Suburban |
 
 The Reset view chip appears when the view is zoomed, tilted well up or down,
 or facing backwards. The first-run hint, the "click a glowing house" tip, the
 `?` help button, the "N houses left" chip and the halos behind unsolved plates
 work as in the apartment course.
+
+## Reading a number
+
+On a phone the plates are a few pixels wide from down the street, and the
+options sheet covers the bottom of the screen, so the course brings the number
+to the learner rather than the other way round:
+
+- When a house's options open (a tap, or the house list for screen readers),
+  the camera **walks to the viewpoint that sees the plate best** (the nearest
+  one that looks at it roughly face-on) and **turns to put the plate at the
+  centre of the free part of the screen** — below the prompt, above the sheet
+  on a portrait phone, beside the panel on desktop and landscape. The step and
+  the turn run together (instant under reduced motion). On phone layouts the
+  field of view also tightens until the plate is about 80 CSS px wide, and
+  opens out again when the options close, still facing the house, unless the
+  learner has looked elsewhere in the meantime. Nothing moves when the plate is
+  already readable and in view.
+- A tap on **any other house** does the same walk-up, which is how a neighbour
+  is read on a phone (the tap picks the nearest house under the finger, so a
+  house in front never opens one behind it).
+- The **"N houses left" chip** is a button: it walks to the nearest unsolved
+  house that is not already readable on screen.
+- While the sheet is open on a phone the prompt shrinks to its title and the
+  jump bar, chip, hint and reset chip step aside, so the house has the top
+  two-thirds of the screen. On touch screens the copy says *tap* rather than
+  *click*.
+
+These walk-ups are reported to `track.js` as `walk` events with `via` =
+`frame` (options opened), `look` (a numbered house tapped) or `find` (the chip).
+
+## Looks
+
+The course has four looks, chosen from the Appearance menu in the site bar or
+from the Houses card on the landing page. `houses.html` is the classic
+flat-colour build; `houses-realistic-a/b/c.html` are copies of it with only the
+visual layer replaced (colours, lighting, sky, materials and procedural
+textures, street furniture, `buildHouse`, the two scene builders). Everything
+above — layouts, streets, quiz, camera, map, report, accessibility — is
+identical in all four. What each look is, and how it is built: `looks.md`.
 
 ## Accessibility
 

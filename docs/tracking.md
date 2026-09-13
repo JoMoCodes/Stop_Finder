@@ -42,7 +42,7 @@ If you self-host Umami, change `src` to your instance's `script.js`.
 ## What is tracked
 
 Every event carries: `look` (which page: `apartment-mockup`,
-`apartment-realistic-a` …, `houses`), `device` (phone / tablet / desktop by width),
+`apartment-realistic-a` …, `houses`, `houses-realistic-a` …), `device` (phone / tablet / desktop by width),
 `input` (touch / pointer), `motion` (reduced / full), `run` (random id) and
 `t` (seconds since the run started). Stage events also carry `stage` (index
 in `STAGES`), `part` (1–5), `kind` (example / quiz), `type` (apartments: plex /
@@ -64,7 +64,7 @@ tower / row / block / seq; houses: street / block / court / loop) and
 | `help_open` | the ? button | stage props |
 | `view_reset` | the Reset view chip | stage props |
 | `view_switch` | apartments: Part 5 Front / Back / Left / Right; houses: the walk bar | `view` (front / back / left / right, or turn-left / walk / turn-right) |
-| `walk` | houses only: a step to another viewpoint | `via` (chevron / map / key / button / road / console), `node` |
+| `walk` | houses only: a step to another viewpoint | `via` (chevron / map / key / button / road / console, or the walk-ups: `frame` when a house's options open, `look` when a numbered house is tapped, `find` from the "houses left" chip), `node` |
 | `hint_shown` | the first-run drag hint or the "click a glowing door" tip | `hint` (controls / tip) |
 | `leave` | the tab is hidden (best effort; once per stage per run) | `seconds`, `stages_done` |
 
