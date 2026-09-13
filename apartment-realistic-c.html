@@ -441,7 +441,8 @@
 
   /* --- phones, portrait: geometry of the folded frame --- */
   @media (max-width: 640px) {
-    body.stage-quiz #jumpbar { top: calc(var(--prompt-h, 140px) + 8px); left: 8px; right: 100px; }
+    /* the strip stops short of the chip on its row; --chip-w is the chip's rendered width (script) */
+    body.stage-quiz #jumpbar { top: calc(var(--prompt-h, 140px) + 8px); left: 8px; right: calc(var(--chip-w, 84px) + 16px); }
     body.stage-quiz #jumpbar.expanded, body.stage-quiz #jumpbar.peek { right: 8px; }
     body.stage-quiz #doorsleft { top: calc(var(--prompt-h, 140px) + 8px); right: 8px; padding: 0 12px; height: 32px; line-height: 32px; font-size: 13px; }
     body.stage-quiz #jumpbar.expanded ~ #doorsleft, body.stage-quiz #jumpbar.peek ~ #doorsleft { visibility: hidden; }
@@ -2115,6 +2116,8 @@ function buildStageGroup(i) {
         header: 'Which building is this?<small>Read the leading digit(s)</small>',
         solvedText: v => `Building ${v}`, plateOpts: BANNER_OPTS,
       };
+      banner.userData.bstate = buildingState;    // a click on the roof sign reopens the choices
+      raycastList.push(banner);
     }
   } else if (st.type === 'block') {
     buildSlabShell(g, BW, BD, BFLOORS, BFH);
@@ -2299,6 +2302,13 @@ new ResizeObserver(([e]) => {
   document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px');
   if (typeof applyViewOffset === 'function') requestAnimationFrame(() => applyViewOffset());
 }).observe(document.getElementById('prompt'));
+// ... and the "doors left" chip's width, so the phone progress strip stops short of it
+// ("Name the building" is wider than "2 doors left"). Not updated while the chip is folded
+// away for screen readers, so the strip keeps its width while the options are open.
+new ResizeObserver(([e]) => {
+  const w = e.target.offsetWidth;
+  if (w > 8) document.documentElement.style.setProperty('--chip-w', w + 'px');
+}).observe(document.getElementById('doorsleft'));
 
 /* ---- prompt banner copy: one amber headline + a short plain-language body ----
    `short` is used on phones (<=640px) so the banner stays above the building. */
@@ -3108,6 +3118,14 @@ ui.next.onclick = () => {
    door mesh only counts when its own plate faces the camera and the hit sits
    beside or below that plate — so a click on the wall between Part 5's stacked
    doors can no longer open a door on the far side of the building. */
+/* an unsolved plate the learner may open now. The roof sign (the building
+   question) waits until every door is filled — the moment its halo and its
+   entry in the keyboard door list appear. */
+function pickable(bs) {
+  if (!bs || bs.solved || !bs.plate) return false;
+  const ud = groups[currentIndex] && groups[currentIndex].userData;
+  return !ud || bs !== ud.buildingState || ud.blankStates.every(s => s.solved);
+}
 const pickV = new THREE.Vector3(), pickN = new THREE.Vector3(), pickQ = new THREE.Quaternion();
 function pickBlank(clientX, clientY) {
   if (!blanks || !blanks.length) return null;
@@ -3118,7 +3136,7 @@ function pickBlank(clientX, clientY) {
   let door = null;
   for (const h of raycaster.intersectObjects(blanks, false)) {
     const bs = h.object.userData.bstate;
-    if (!bs || bs.solved || !bs.plate) continue;
+    if (!pickable(bs)) continue;
     if (h.object === bs.plate) return bs;                 // the number itself: always wins
     if (!door && nearItsPlate(h.point, bs.plate)) door = bs;
   }
@@ -3143,7 +3161,7 @@ function nearestBlank(clientX, clientY) {
   let best = null, bestD = SNAP_PX;
   for (const o of blanks) {
     const bs = o.userData.bstate;
-    if (!bs || bs.solved || !bs.plate || seen.has(bs)) continue;
+    if (!pickable(bs) || seen.has(bs)) continue;
     seen.add(bs);
     bs.plate.getWorldPosition(snapV);
     pickN.set(0, 0, 1).applyQuaternion(bs.plate.getWorldQuaternion(pickQ));

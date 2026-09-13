@@ -103,7 +103,8 @@ Structure top-to-bottom:
   decides each door's number/blank. **`STAGES` and the unit math are the
   curriculum; change them deliberately.**
 - **UI + state:** `ui`, mini-map drawing, jump-bar wiring, `ResizeObserver`
-  publishing `--prompt-h`, the `PROMPTS` table + `setPrompt` (headline + body
+  publishing `--prompt-h` (and one publishing `--chip-w`, the doors-left chip's width,
+  which the phone progress strip stops short of), the `PROMPTS` table + `setPrompt` (headline + body
   + phone-short variant; on phones a quiz instruction folds to its headline
   (`#prompt.brief`) except on the first quiz building of a part, and "click"
   reads "tap" on touch screens), `POSES` + `frameStage` / `flyTo` / `setSeqView` /
@@ -113,7 +114,8 @@ Structure top-to-bottom:
   free band of the screen with a view offset (`bandRect` / `applyViewOffset`).
 - **Quiz logic:** `openQuiz` / `chooseOption` (per-digit-place explanations
   on a wrong pick) / `closeQuiz`; door plates are clickable via raycasting,
-  with hover tint, pulsing halos and `pickBlank()` for precision; on touch
+  with hover tint, pulsing halos and `pickBlank()` for precision (`pickable()` also admits
+  the roof sign that names a Part 3 building once every door is filled); on touch
   screens a tap that misses snaps to the nearest unsolved plate (`nearestBlank`)
   and the halo never shrinks below 48 px on screen.
 - **Flow + reward:** `checkComplete` / `showNext` / `resetCourse` /
