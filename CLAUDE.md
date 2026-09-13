@@ -18,12 +18,15 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 
 | File                    | What it is                                              |
 |-------------------------|---------------------------------------------------------|
-| `index.html`            | Landing page (the menu). One **Apartments** card fans out the three realistic looks on hover / focus / tap; the classic look is reached from a course's `#lookbar` Appearance menu. |
+| `index.html`            | Landing page (the menu). The **Apartments** and **Houses** cards each fan out their three realistic looks on hover / focus / tap; a classic look is reached from the course's `#lookbar` Appearance menu. |
 | `apartment-mockup.html` | 3D apartment-number course, **classic look** (Three.js). See map below. |
 | `apartment-realistic-a.html` | Same course, **Sunbelt garden-style** look (brick/stucco, breezeway railings, parking, warm low sun). |
 | `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
 | `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). |
-| `houses.html`           | **Houses** course: house-numbering patterns taught in a **Street View** style scene (Three.js). The learner stands at eye height on the road, drags to look round and walks between viewpoints. One look only. See map below and `docs/houses-course/README.md`. |
+| `houses.html`           | **Houses** course, **classic look**: house-numbering patterns taught in a **Street View** style scene (Three.js). The learner stands at eye height on the road, drags to look round and walks between viewpoints. See map below and `docs/houses-course/README.md`. |
+| `houses-realistic-a.html` | Same course, **Sunbelt** look (stucco ranch houses, tile roofs, gravel yards, palms and cacti, block walls, desert mountains, hard sun). |
+| `houses-realistic-b.html` | Same course, **Brick** look (Midwest bungalows and foursquares with porches and dormers, autumn maples in a grass parkway, a yard lamp post carrying the number, low crisp sun). |
+| `houses-realistic-c.html` | Same course, **Suburban** look (new-build two-storeys in lap siding with stone bases, garage gables, gabled porches, black mailboxes, golden hour). |
 | `track.js`              | Course run tracking, shared by every page: listens to the course's `document` events and sends anonymous events to Umami. Setup and the event list: `docs/tracking.md`. |
 | `report.js`             | The end-of-run report, shared by every course page: listens to the same `document` events, keeps the run record (per question / building / part, on an active clock), and renders the report into the `#finale` dialog when the course completes. The apartment curriculum is its default; another course describes itself through the exported `configure()` (titles, digit places, copy, `stageName` / `maskFor` / `splitPlaces`) — `houses.html` does this. What it shows, the grade model and the copy: `docs/report.md`; the design reviews it came from: `docs/run-report/`. |
 
@@ -43,6 +46,22 @@ two-row list at the bottom left, menu opens upward. Landscape phones: top
 right, menu opens downward. A small inline script after the nav handles
 open / close.
 Design notes and inspiration sources: `docs/apartment-course-review/realistic/`.
+
+### The three Houses looks
+The same pattern: each `houses-realistic-*.html` is a copy of `houses.html` with **only the
+visual layer** replaced — the `COLOR` table, renderer / lights / sky / fog, the material and
+texture helpers (`mat` / `box` / `slab` keep their signatures), ground and asphalt, the street
+furniture builders (`buildRoad` … `buildCar`, plus the look's trees, plants, lamps), `buildHouse`,
+`buildWalks` / `buildRoadZ`, and `buildStreetScene` / `buildCourtScene` (the guide boards inside
+them are unchanged). Layouts, `STAGES`, `makeOptionsFor`, the quiz, the camera and framing, the map,
+the report wiring, the lookbar and the accessibility code are byte-identical across all four files,
+so a curriculum, camera or UI change in `houses.html` has to be applied to the other three too
+(the visual layer of a look is a contiguous set of segments, so a file diff shows exactly what a
+look changes). The realistic looks share one material per colour / texture, tile procedural canvas
+textures in metres, add `decor` houses beyond the course, and merge each house (and the rest of a
+stage) into one mesh per material with `mergeGroup`, which keeps a street at ~100–330 draw calls
+including the shadow pass. Plates and chevrons carry `userData.keep` so they are never merged.
+Design notes: `docs/houses-course/looks.md`.
 
 ### Adding a course
 1. Create a new `*.html` at the root (copy an existing one as a starting point).
@@ -127,6 +146,16 @@ Same skeleton as the apartment course (same panel ids, same `document` events, s
   chevrons on the road (`placeChevrons`), the `#viewbar` walk bar (turn · walk ·
   turn), the `#minimap` dots, double-click / click on the road, arrow keys / WASD.
   `resetView` faces down the street again (Home key, `#resetview` chip).
+- **Reading a number** (`framePlate` / `frameHouse` / `frameAnyHouse`): when a house's
+  options open (`quizopen`), or a numbered house is tapped (`look` in `pickAt`), or the
+  `#doorsleft` chip is pressed (`findNextHouse`, nearest unsolved house), the camera walks to
+  the viewpoint that sees the plate best (`bestNodeFor`) and turns to put the plate at the
+  centre of the free part of the screen (`safeRect`: below the prompt, beside or above the
+  quiz, above the walk bar; `poseToward`). On phone layouts the field of view tightens until
+  the plate is `MIN_PLATE_PX` wide, and opens out again on `quizclose` unless the learner has
+  looked elsewhere. Nothing moves when the plate is already readable and in view.
+  `body.quiz-open` (toggled on `quizopen` / `quizclose`) collapses the prompt to its title and
+  hides the jump bar, chip and hint on phones so the house has the screen.
 - **Layouts**: `layoutStreet(st)` (cross street · block · cross street …, lots as
   wide as their number step) and `layoutCourt(st)` (main street, entrance, bulb).
   `buildHouse` draws one house in a local frame (front wall at the origin, local +z
@@ -137,7 +166,8 @@ Same skeleton as the apartment course (same panel ids, same `document` events, s
   and on the gap streets the wrong spot is outside the visible neighbours. The
   quiz's `answer` event carries the broken rule as `place` (`block` / `side` / `lot`).
 - Console handle for checking without a mouse: `sfHouses.go(i)`, `.walk(n)`,
-  `.face(deg)`, `.open(k)`, `.solve()`.
+  `.face(deg)`, `.faceHouse(k)`, `.open(k)`, `.frame(k)`, `.find()`, `.pick(x, y)`,
+  `.screenOf(k)`, `.info()` (draw calls), `.solve()`.
 - Design notes and the numbering patterns taught: `docs/houses-course/README.md`.
 
 ## Previewing

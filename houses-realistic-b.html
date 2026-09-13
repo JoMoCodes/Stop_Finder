@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Stop Finder — Houses</title>
+<title>Stop Finder — Houses · Brick</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -471,13 +471,13 @@
     <span>Home</span>
   </a>
   <button class="lk-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lk-menu">
-    <span class="lk-title">Appearance</span><span class="lk-current">Classic</span><span class="lk-caret" aria-hidden="true">▼</span>
+    <span class="lk-title">Appearance</span><span class="lk-current">Brick</span><span class="lk-caret" aria-hidden="true">▼</span>
   </button>
   <div class="lk-menu" id="lk-menu">
     <div class="lk-list" role="group" aria-label="Appearance">
-      <a href="houses.html" aria-current="page" title="Classic look (the original flat-colour build)">Classic <small>flat-colour original</small></a>
+      <a href="houses.html" title="Classic look (the original flat-colour build)">Classic <small>flat-colour original</small></a>
       <a href="houses-realistic-a.html" title="Realistic look A: Sunbelt ranch street">Sunbelt <small>stucco ranch street</small></a>
-      <a href="houses-realistic-b.html" title="Realistic look B: Midwest brick street">Brick <small>Midwest brick street</small></a>
+      <a href="houses-realistic-b.html" aria-current="page" title="Realistic look B: Midwest brick street">Brick <small>Midwest brick street</small></a>
       <a href="houses-realistic-c.html" title="Realistic look C: new-build subdivision">Suburban <small>new-build subdivision</small></a>
     </div>
   </div>
@@ -520,6 +520,7 @@
 import * as THREE from 'three';
 import './track.js';                       // course run tracking (see track.js / docs/tracking.md)
 import { configure as configureReport } from './report.js';   // end-of-run report (see report.js / docs/report.md)
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* ============================================================
    HOUSES — a Street View style course on house numbering.
@@ -556,15 +557,23 @@ const NODE_STEP = 14;                  // viewpoints along a block
 const CT = { entryLots: [[-21, -33], [-33, -45]], bulbZ: -62, bulbR: 10, ringR: 5.5,
              houseR: 17, leftPhi: [62, 105, 148], mainLots: [[-33.5, -19.5], [-19.5, -5.5], [5.5, 19.5], [19.5, 33.5]] };
 
+/* ---- BRICK LOOK: an older Midwest neighbourhood — a Chicago bungalow
+   belt or a Milwaukee streetcar suburb. Brick bungalows, foursquares and
+   gable-fronts with limestone trim, front porches on brick piers, dormers,
+   detached garages down a side drive, mature maples in the grass parkway
+   turning for autumn (with leaves on the lawns), a yard lamp post carrying
+   the number, a darker patched street, and a low crisp autumn sun. Only
+   this visual layer differs from houses.html. ---- */
 const COLOR = {
-  ground: 0x7f9a5c, lawn: [0x86a465, 0x7c9a5b, 0x8fab6a], road: 0x6d7379, roadEdge: 0x5f656b,
-  walk: 0xc9c3b8, kerb: 0xb9b3a8, drive: 0xb0aba3,
-  siding: [0xe8dcc4, 0xc9d3d9, 0xb8c4a8, 0xd9c3a3, 0xa9b7c6, 0xe3c9b0, 0xc7b8a0, 0xd7d2c4, 0xb5a48a, 0x9fb3a2, 0xd4b5a0, 0xbfc9bf],
-  trim: 0xf4f1ea, roof: [0x4a3b30, 0x5b5551, 0x6b4a3a, 0x3f4a52, 0x7a6a5a, 0x554b45],
-  door: [0x8b2f2f, 0x2f4f6b, 0x3b5f3b, 0x5a3d2b, 0x1f1f24, 0xb35a2a],
-  glass: 0x3f5266, garage: 0xe9e4d8, post: 0x3a3a3a, mailbox: 0x2b2f34, trunk: 0x6b4e35,
-  leaf: [0x4f7a3a, 0x5c8a42, 0x3f6d33, 0x6f8f3e], car: [0xc94c4c, 0x3a4c6b, 0xd8d8d8, 0x2b2b2b, 0x7a8f9e, 0xb89a4a],
-  sky: 0xbfd9ec, sign: 0x1f6b3d, arrow: 0xffd54a, chevron: 0xffffff,
+  lawn: 0x6f8f47, lawnTint: [0xffffff, 0xf2ecd8, 0xe4f0d4],
+  road: 0x55575a, walk: 0xc4bfb4, kerb: 0xbdb7ab, drive: 0xb9b3a7,
+  roof: [0x6a6a6c, 0x7a6a5c, 0x5e6c62, 0x585a60, 0x8a7a68],
+  trim: 0xf6f3ec, limestone: 0xd9d2c2, foundation: 0xbdb5a6, deck: 0x8a8378, column: 0xf1ede4,
+  door: [0x4a2b1e, 0x7a1f1f, 0x1f3a2a, 0x2b2b33, 0x8b5a3c, 0x274a6b],
+  glass: 0x2b3a48, post: 0x1d1d1f, fence: 0x8a6a4a, hedge: 0x3f6b32, shrub: [0x2f5a2a, 0x476b35, 0x5a7a3a],
+  trunk: 0x5a4636, leaf: [0xd8742a, 0xc9452c, 0xe0a83a, 0x8f9a3a, 0xb5622f],
+  car: [0x2c2f36, 0xc9c9c6, 0x2f3f66, 0x6b1f24, 0x2c4a36, 0x8a8f96, 0xe8e6df],
+  arrow: 0xffd54a, chevron: 0xffffff,
 };
 
 /* ---- one colour per number place: block (leading digits), lot (last two),
@@ -611,22 +620,25 @@ camera.rotation.order = 'YXZ';
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;     // plates, signs, arrows and halos opt out with toneMapped:false
+renderer.toneMappingExposure = 1.05;
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 app.appendChild(renderer.domElement);
 
-const hemi = new THREE.HemisphereLight(0xfff5e6, 0x6f7a5a, 0.62);
+/* a low, crisp autumn afternoon: warm sun, cool sky light, long shadows */
+const hemi = new THREE.HemisphereLight(0xd2dcea, 0x6f7a55, 0.75);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff1dc, 1.45);
+const sun = new THREE.DirectionalLight(0xffe4bc, 2.3);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
-sun.shadow.camera.left = -48; sun.shadow.camera.right = 48;
-sun.shadow.camera.top = 48;   sun.shadow.camera.bottom = -48;
-sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 240;
+sun.shadow.camera.left = -52; sun.shadow.camera.right = 52;
+sun.shadow.camera.top = 52;   sun.shadow.camera.bottom = -52;
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.05;
 scene.add(sun, sun.target);
-scene.add(new THREE.AmbientLight(0xffffff, 0.16));
-const SUN_OFFSET = new THREE.Vector3(26, 42, 30);
+scene.add(new THREE.AmbientLight(0xfff0e0, 0.1));
+const SUN_OFFSET = new THREE.Vector3(36, 30, 26);
 /* the shadow box follows the viewer: a 200 m street would otherwise need a huge map */
 function aimSun(x, z) {
   sun.target.position.set(x, 0, z);
@@ -634,41 +646,370 @@ function aimSun(x, z) {
 }
 aimSun(0, 0);
 
-/* sky dome + fog */
+/* sky dome: a pale October blue with a milky horizon and streaks of high cloud */
 const skyGeo = new THREE.SphereGeometry(1000, 32, 16);
 {
-  const col = [], top = new THREE.Color(0x6aa0d8), hor = new THREE.Color(0xe2ebf1), c = new THREE.Color();
+  const col = [], top = new THREE.Color(0x5f8fc6), mid = new THREE.Color(0xa9c4e0), hor = new THREE.Color(0xe6e6e4), c = new THREE.Color();
   const pos = skyGeo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i) / 1000, 0, 1);
-    c.copy(hor).lerp(top, Math.pow(t, 0.55)); col.push(c.r, c.g, c.b);
+    if (t < 0.22) c.copy(hor).lerp(mid, t / 0.22); else c.copy(mid).lerp(top, Math.pow((t - 0.22) / 0.78, 0.75));
+    col.push(c.r, c.g, c.b);
   }
   skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
 }
-scene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false })));
-scene.fog = new THREE.Fog(0xe2ebf1, 150, 520);
-
-/* ---- helpers ---- */
-function mat(color, opts = {}) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...opts });
+scene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ toneMapped: false, vertexColors: true, side: THREE.BackSide, fog: false })));
+scene.fog = new THREE.Fog(0xdfe2e4, 140, 560);
+{ // high thin cloud: long soft streaks
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+  const ctx = c.getContext('2d');
+  for (let i = 0; i < 26; i++) {
+    const x = 40 + Math.random() * 432, y = 30 + Math.random() * 36, rr = 24 + Math.random() * 40;
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, rr);
+    gr.addColorStop(0, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.fillRect(x - rr, y - rr, 2 * rr, 2 * rr);
+  }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const sm = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.6, fog: false, toneMapped: false, depthWrite: false });
+  for (let i = 0; i < 7; i++) {
+    const sp = new THREE.Sprite(sm);
+    const ang = (i / 7) * Math.PI * 2 + 0.4, R = 620;
+    sp.position.set(Math.cos(ang) * R, 170 + Math.random() * 120, Math.sin(ang) * R);
+    sp.scale.set(320 + Math.random() * 200, 40 + Math.random() * 30, 1);
+    scene.add(sp);
+  }
 }
-function box(parent, w, h, d, color, x, y, z, opts = {}) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, opts));
+
+/* ---- helpers: procedural textures, shared materials (one per colour or
+   texture, so a house merges into a handful of draw calls), boxes whose
+   texture tiles in metres on every face, and the merge itself ---- */
+const rnd = (a, b) => a + Math.random() * (b - a);
+function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function speckle(ctx, w, h, n, lo, hi, alpha = 0.15, size = 1) {
+  for (let i = 0; i < n; i++) {
+    const v = Math.round(rnd(lo, hi));
+    ctx.fillStyle = `rgba(${v},${v},${v},${alpha})`;
+    ctx.fillRect(Math.random() * w, Math.random() * h, size, size);
+  }
+}
+function blotch(ctx, w, h, n, rgb, rMin, rMax, alpha) {
+  for (let i = 0; i < n; i++) {
+    const x = Math.random() * w, y = Math.random() * h, r = rnd(rMin, rMax);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${rgb},${alpha})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+}
+function toTexture(c, { repeat = true, aniso = 8 } = {}) {
+  const t = new THREE.CanvasTexture(c);
+  if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(aniso, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+/* running-bond brick, tile = 1.6 m: eight bricks across, twenty-one courses; per-brick tone variation */
+function texBrick(hue, sat, lit) {
+  const S = 512, c = makeCanvas(S, S), ctx = c.getContext('2d');
+  ctx.fillStyle = 'hsl(30, 10%, 68%)'; ctx.fillRect(0, 0, S, S);          // mortar
+  speckle(ctx, S, S, 3000, 0, 255, 0.12, 2);
+  const rows = 21, cols = 8, bh = S / rows, bw = S / cols, j = 3;
+  for (let r = 0; r < rows; r++) {
+    const off = (r % 2) * bw / 2;
+    for (let i = -1; i <= cols; i++) {
+      const x = i * bw + off, y = r * bh, t = Math.random();
+      let hh = hue + rnd(-5, 5), ss = sat + rnd(-8, 8), ll = lit + rnd(-6, 6);
+      if (t < 0.08) ll -= 12; else if (t < 0.15) { ll += 8; ss -= 6; }
+      ctx.fillStyle = `hsl(${hh},${ss}%,${ll}%)`;
+      ctx.fillRect(x + j / 2, y + j / 2, bw - j, bh - j);
+      ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.fillRect(x + j / 2, y + bh - j, bw - j, j / 2);
+    }
+  }
+  speckle(ctx, S, S, 8000, 0, 255, 0.08, 1);
+  return toTexture(c);
+}
+function texShingle(vertical = false) {       // tile = 2 m: seven courses of asphalt shingle, neutral grey (tinted per roof)
+  const S = 512, c = makeCanvas(S, S), ctx = c.getContext('2d');
+  ctx.fillStyle = '#9a9a9a'; ctx.fillRect(0, 0, S, S);
+  const rows = 7, rh = S / rows, tw = 74;
+  for (let r = 0; r < rows; r++) {
+    const y = r * rh, off = (r % 2) * tw / 2;
+    for (let x = -tw; x < S + tw; x += tw) {
+      const v = Math.round(rnd(140, 172));
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+      ctx.fillRect(x + off + 1.5, y, tw - 3, rh - 4);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0, y + rh - 5, S, 5);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(0, y, S, 2);
+  }
+  speckle(ctx, S, S, 20000, 0, 255, 0.10, 2);
+  if (vertical) {                                // the same courses stacked along u, for a gable's slope boxes
+    const c2 = makeCanvas(S, S), ctx2 = c2.getContext('2d');
+    ctx2.translate(S / 2, S / 2); ctx2.rotate(Math.PI / 2); ctx2.drawImage(c, -S / 2, -S / 2);
+    return toTexture(c2);
+  }
+  return toTexture(c);
+}
+function texLimestone() {
+  const S = 128, c = makeCanvas(S, S), ctx = c.getContext('2d');
+  ctx.fillStyle = '#e6e0d2'; ctx.fillRect(0, 0, S, S);
+  blotch(ctx, S, S, 10, '180,170,150', 10, 40, 0.18);
+  speckle(ctx, S, S, 4000, 0, 255, 0.08, 1);
+  return toTexture(c);
+}
+function texSiding() {                         // tile = 1 m: eight courses of lap siding, neutral (tinted)
+  const S = 256, c = makeCanvas(S, S), ctx = c.getContext('2d');
+  ctx.fillStyle = '#e8e6e0'; ctx.fillRect(0, 0, S, S);
+  const rows = 8, rh = S / rows;
+  for (let r = 0; r < rows; r++) {
+    const y = r * rh;
+    const g = ctx.createLinearGradient(0, y, 0, y + rh);
+    g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(0.8, 'rgba(0,0,0,0.04)'); g.addColorStop(1, 'rgba(0,0,0,0.38)');
+    ctx.fillStyle = g; ctx.fillRect(0, y, S, rh);
+  }
+  speckle(ctx, S, S, 3000, 0, 255, 0.05, 1);
+  return toTexture(c);
+}
+function texConcrete() {                       // tile = 1.5 m: one sidewalk flag with a joint, a little stained
+  const S = 256, c = makeCanvas(S, S), ctx = c.getContext('2d');
+  ctx.fillStyle = '#c3bdb1'; ctx.fillRect(0, 0, S, S);
+  blotch(ctx, S, S, 16, '110,105,95', 20, 90, 0.14);
+  blotch(ctx, S, S, 10, '235,230,220', 20, 70, 0.12);
+  speckle(ctx, S, S, 14000, 0, 255, 0.09, 1);
+  ctx.strokeStyle = 'rgba(70,65,58,0.6)'; ctx.lineWidth = 3;
+  ctx.strokeRect(1.5, 1.5, S - 3, S - 3);
+  return toTexture(c);
+}
+function texAsphalt() {                        // tile = 4 m: dark, worn, patched, a crack or two
+  const S = 256, c = makeCanvas(S, S), ctx = c.getContext('2d');
+  ctx.fillStyle = '#55575a'; ctx.fillRect(0, 0, S, S);
+  blotch(ctx, S, S, 12, '40,40,42', 30, 90, 0.2);
+  blotch(ctx, S, S, 10, '110,110,112', 30, 90, 0.12);
+  ctx.fillStyle = 'rgba(0,0,0,0.10)';
+  for (const y of [S * 0.3, S * 0.7]) ctx.fillRect(0, y - 16, S, 32);   // wheel tracks
+  speckle(ctx, S, S, 24000, 0, 255, 0.10, 1);
+  ctx.strokeStyle = 'rgba(25,25,27,0.6)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(rnd(0, S), 0); for (let y = 0; y < S; y += 12) ctx.lineTo(rnd(0.3, 0.55) * S, y); ctx.stroke();
+  return toTexture(c);
+}
+function texLawn() {                           // tile = 3 m: a lawn going into autumn, the odd leaf
+  const S = 256, c = makeCanvas(S, S), ctx = c.getContext('2d');
+  ctx.fillStyle = '#6f8f47'; ctx.fillRect(0, 0, S, S);
+  blotch(ctx, S, S, 30, '120,150,70', 20, 70, 0.28);
+  blotch(ctx, S, S, 24, '75,105,45', 20, 70, 0.28);
+  blotch(ctx, S, S, 10, '150,140,70', 20, 50, 0.2);
+  speckle(ctx, S, S, 20000, 0, 255, 0.10, 1);
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = ['#d8742a', '#c9452c', '#e0a83a'][i % 3];
+    ctx.beginPath(); ctx.ellipse(rnd(0, S), rnd(0, S), 3, 2, rnd(0, 3), 0, 7); ctx.fill();
+  }
+  return toTexture(c);
+}
+function texWindow() {                         // a sash window: glass with a reflection, a white cross of muntins, a curtain
+  const W = 256, H = 256, c = makeCanvas(W, H), ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 70, H);
+  g.addColorStop(0, '#93a8bb'); g.addColorStop(0.4, '#3a4a5a'); g.addColorStop(1, '#26323f');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(230,222,205,0.6)'; ctx.fillRect(170, 0, 86, H);      // curtain
+  ctx.fillStyle = '#f4f1ea';
+  ctx.fillRect(0, H / 2 - 5, W, 10); ctx.fillRect(W / 2 - 4, 0, 8, H / 2);   // meeting rail and an upper muntin
+  return toTexture(c, { repeat: false });
+}
+function texDoor() {                           // a six-panel door, neutral (tinted)
+  const W = 128, H = 256, c = makeCanvas(W, H), ctx = c.getContext('2d');
+  ctx.fillStyle = '#d8d8d8'; ctx.fillRect(0, 0, W, H);
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 2; i++) {
+    const x = 14 + i * 54, y = 16 + r * 76, w = 46, h = r === 0 ? 44 : 60;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(x + 4, y + 4, w - 8, h - 8);
+  }
+  return toTexture(c, { repeat: false });
+}
+function texGarageDoor() {
+  const W = 512, H = 256, c = makeCanvas(W, H), ctx = c.getContext('2d');
+  ctx.fillStyle = '#e4e0d6'; ctx.fillRect(0, 0, W, H);
+  const rows = 4, cols = 4, ph = H / rows, pw = W / cols;
+  for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) {
+    const x = i * pw + 10, y = r * ph + 8, w = pw - 20, h = ph - 16;
+    ctx.fillStyle = 'rgba(0,0,0,0.10)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 4, y + 4, w - 8, h - 8);
+  }
+  return toTexture(c, { repeat: false });
+}
+
+/* name -> { tex, m: metres per tile, rough } */
+const TEX = {
+  brickRed:    { tex: texBrick(8, 48, 34),   m: 1.6, rough: 0.92 },
+  brickOrange: { tex: texBrick(18, 52, 42),  m: 1.6, rough: 0.92 },
+  brickBrown:  { tex: texBrick(14, 30, 27),  m: 1.6, rough: 0.92 },
+  brickBlond:  { tex: texBrick(36, 30, 62),  m: 1.6, rough: 0.92 },
+  shingle:     { tex: texShingle(),          m: 2.0, rough: 0.9 },
+  shingleV:    { tex: texShingle(true),      m: 2.0, rough: 0.9 },
+  limestone:   { tex: texLimestone(),        m: 1.0, rough: 0.85 },
+  siding:      { tex: texSiding(),           m: 1.0, rough: 0.85 },
+  concrete:    { tex: texConcrete(),         m: 1.5, rough: 0.95 },
+  asphalt:     { tex: texAsphalt(),          m: 4.0, rough: 0.98 },
+  lawn:        { tex: texLawn(),             m: 3.0, rough: 1.0 },
+  door:        { tex: texDoor(),             m: 1,   rough: 0.6, stretch: true },
+  garageDoor:  { tex: texGarageDoor(),       m: 1,   rough: 0.7, stretch: true },
+};
+const BRICKS = ['brickRed', 'brickOrange', 'brickBrown', 'brickBlond', 'brickRed', 'brickOrange'];
+const TEX_WINDOW = texWindow();
+
+const MATS = new Map();
+function shared(key, make) {
+  let m = MATS.get(key);
+  if (!m) { m = make(); m.userData.shared = true; MATS.set(key, m); }
+  return m;
+}
+/* a plain colour, shared by everything that asks for the same colour and finish */
+function mat(color, opts = {}) {
+  const { roughness = 0.9, metalness = 0, side = THREE.FrontSide, transparent = false, opacity = 1 } = opts;
+  return shared(`c|${color}|${roughness}|${metalness}|${side}|${transparent}|${opacity}`,
+    () => new THREE.MeshStandardMaterial({ color, roughness, metalness, side, transparent, opacity }));
+}
+/* a texture, optionally tinted */
+function texMat(name, opts = {}) {
+  const t = TEX[name];
+  const { color = 0xffffff, roughness = t.rough, metalness = 0, side = THREE.FrontSide } = opts;
+  return shared(`t|${name}|${color}|${roughness}|${metalness}|${side}`,
+    () => new THREE.MeshStandardMaterial({ map: t.tex, color, roughness, metalness, side }));
+}
+const MAT_GLASS = shared('glass', () => new THREE.MeshStandardMaterial({ map: TEX_WINDOW, roughness: 0.2, metalness: 0.3 }));
+const MAT_LAMP = shared('lamp', () => new THREE.MeshStandardMaterial({ color: 0xfff1cc, emissive: 0xffd28a, emissiveIntensity: 0.9, roughness: 0.4 }));
+
+/* the box's texture tiles in metres on each face: ±x faces are d wide, ±y faces d tall, ±z faces w wide */
+function scaleBoxUV(geo, w, h, d, m) {
+  const uv = geo.attributes.uv, dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  for (let f = 0; f < 6; f++) for (let i = f * 4; i < f * 4 + 4; i++) uv.setXY(i, uv.getX(i) * dims[f][0] / m, uv.getY(i) * dims[f][1] / m);
+  uv.needsUpdate = true;
+}
+function scaleUV(geo, su, sv = su) {
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
+  uv.needsUpdate = true;
+}
+function meshAt(parent, geo, material, x, y, z) {
+  const m = new THREE.Mesh(geo, material);
   m.castShadow = true; m.receiveShadow = true;
   m.position.set(x, y, z);
   parent.add(m);
   return m;
 }
-/* a flat rectangle lying on the ground (y up) */
-function slab(parent, w, d, color, x, y, z, opts = {}) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat(color, { roughness: 1, ...opts }));
+function box(parent, w, h, d, color, x, y, z, opts = {}) {
+  return meshAt(parent, new THREE.BoxGeometry(w, h, d), mat(color, opts), x, y, z);
+}
+/* a textured box (a door texture stretches once over each face instead) */
+function tbox(parent, w, h, d, name, x, y, z, opts = {}) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  if (!TEX[name].stretch) scaleBoxUV(geo, w, h, d, TEX[name].m);
+  return meshAt(parent, geo, texMat(name, opts), x, y, z);
+}
+/* a flat rectangle lying on the ground (y up): a colour, or a texture name tiled in metres */
+function slab(parent, w, d, colorOrTex, x, y, z, opts = {}) {
+  const geo = new THREE.PlaneGeometry(w, d);
+  let material;
+  if (typeof colorOrTex === 'string') { scaleUV(geo, w / TEX[colorOrTex].m, d / TEX[colorOrTex].m); material = texMat(colorOrTex, opts); }
+  else material = mat(colorOrTex, { roughness: 1, ...opts });
+  const m = new THREE.Mesh(geo, material);
   m.rotation.x = -Math.PI / 2;
   m.position.set(x, y, z);
   m.receiveShadow = true;
   parent.add(m);
   return m;
 }
+/* a hipped roof over a w x d footprint (centred, eaves at y = 0), uvs in metres so shingles course down the slope */
+function hipRoofGeo(w, d, rise, m) {
+  const swap = d > w, L = swap ? d : w, S = swap ? w : d;
+  const hl = L / 2, hs = S / 2, r = Math.max(0.01, hl - hs);
+  const A = [-hl, 0, hs], B = [hl, 0, hs], C = [hl, 0, -hs], D = [-hl, 0, -hs], E = [-r, rise, 0], F = [r, rise, 0];
+  const slope = Math.hypot(hs, rise), pos = [], uv = [];
+  const push = (p, u, v) => { pos.push(...p); uv.push(u / m, v / m); };
+  push(A, -hl, 0); push(B, hl, 0); push(F, r, slope);  push(A, -hl, 0); push(F, r, slope); push(E, -r, slope);
+  push(C, hl, 0); push(D, -hl, 0); push(E, -r, slope); push(C, hl, 0); push(E, -r, slope); push(F, r, slope);
+  push(B, hs, 0); push(C, -hs, 0); push(F, 0, slope);
+  push(D, -hs, 0); push(A, hs, 0); push(E, 0, slope);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.computeVertexNormals();
+  if (swap) geo.rotateY(Math.PI / 2);
+  return geo;
+}
+/* a shingled hip roof with soffit and fascia; returns the rise */
+function roofHip(g, w, d, h, x, z, roofC, { over = 0.7, pitch = 0.45 } = {}) {
+  const W2 = w + 2 * over, D2 = d + 2 * over;
+  const rise = Math.min(W2, D2) / 2 * pitch;
+  box(g, W2, 0.08, D2, COLOR.trim, x, h + 0.04, z);
+  for (const s of [1, -1]) {
+    box(g, W2, 0.24, 0.06, COLOR.trim, x, h + 0.2, z + s * (D2 / 2 - 0.03));
+    box(g, 0.06, 0.24, D2, COLOR.trim, x + s * (W2 / 2 - 0.03), h + 0.2, z);
+  }
+  meshAt(g, hipRoofGeo(W2, D2, rise, TEX.shingle.m), texMat('shingle', { color: roofC }), x, h + 0.32, z);
+  const ridge = Math.abs(W2 - D2);
+  if (ridge > 0.5) box(g, W2 > D2 ? ridge : 0.24, 0.1, W2 > D2 ? 0.24 : ridge, roofC, x, h + 0.32 + rise + 0.02, z, { roughness: 0.9 });
+  return rise;
+}
+/* a gable roof whose ridge runs along z (toward the street): two shingled slopes and gable ends in the wall texture */
+function roofGableZ(g, w, d, h, x, z, roofC, wallName, { over = 0.5, pitch = 0.7 } = {}) {
+  const hw = w / 2 + over, rise = hw * pitch, sl = Math.hypot(hw, rise), ang = Math.atan2(rise, hw), D2 = d + 2 * over;
+  for (const s of [1, -1]) {
+    const m = tbox(g, sl, 0.14, D2, 'shingleV', x + s * hw / 2, h + rise / 2 + 0.06, z, { color: roofC });
+    m.rotation.z = -s * ang;
+    box(g, 0.06, 0.26, D2, COLOR.trim, x + s * (hw - 0.03), h + 0.1, z);
+  }
+  const tri = new THREE.Shape();
+  tri.moveTo(-w / 2, 0); tri.lineTo(w / 2, 0); tri.lineTo(0, pitch * w / 2); tri.closePath();
+  for (const s of [1, -1]) {
+    const geo = new THREE.ShapeGeometry(tri); scaleUV(geo, 1 / TEX[wallName].m);
+    const end = meshAt(g, geo, texMat(wallName), x, h, z + s * (d / 2 - 0.01));
+    if (s < 0) end.rotation.y = Math.PI;
+  }
+  box(g, 0.24, 0.1, D2 + 0.1, roofC, x, h + rise + 0.08, z, { roughness: 0.9 });
+  return rise;
+}
+/* a small gable roof whose ridge runs along x (a porch hood, a dormer) */
+function roofGableX(g, w, d, h, x, z, roofC, { over = 0.3, pitch = 0.6 } = {}) {
+  const hd = d / 2 + over, rise = hd * pitch, sl = Math.hypot(hd, rise), ang = Math.atan2(rise, hd), W2 = w + 2 * over;
+  for (const s of [1, -1]) {
+    const m = tbox(g, W2, 0.12, sl, 'shingle', x, h + rise / 2 + 0.05, z + s * hd / 2, { color: roofC });
+    m.rotation.x = s * ang;
+  }
+  box(g, W2 + 0.1, 0.08, 0.2, roofC, x, h + rise + 0.06, z, { roughness: 0.9 });
+  return rise;
+}
 
+/* draw-call budget: every mesh in a group that shares a material is merged
+   into one mesh per material (plates, chevrons and anything marked keep stay
+   separate). A house becomes a dozen meshes instead of eighty. */
+const KEEP_ATTRS = ['position', 'normal', 'uv'];
+function mergeGroup(root, keep = () => false) {
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert();
+  const buckets = new Map();
+  root.traverse(o => {
+    if (!o.isMesh || o === root || o.userData.keep || keep(o)) return;
+    if (!buckets.has(o.material)) buckets.set(o.material, []);
+    buckets.get(o.material).push(o);
+  });
+  for (const [material, list] of buckets) {
+    if (list.length < 2) continue;
+    const geos = list.map(o => {
+      const gg = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      for (const k of Object.keys(gg.attributes)) if (!KEEP_ATTRS.includes(k)) gg.deleteAttribute(k);
+      if (!gg.attributes.uv) gg.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(gg.attributes.position.count * 2), 2));
+      if (!gg.attributes.normal) gg.computeVertexNormals();
+      gg.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+      return gg;
+    });
+    const merged = BufferGeometryUtils.mergeGeometries(geos, false);
+    for (const gg of geos) gg.dispose();
+    if (!merged) continue;
+    for (const o of list) { o.parent.remove(o); o.geometry.dispose(); }
+    const m = new THREE.Mesh(merged, material);
+    m.castShadow = true; m.receiveShadow = true;
+    root.add(m);
+  }
+}
 /* ---- plate / sign typography (same system as the apartment course) ----
    numerals that fill their plate, and a blank style that reads without
    colour: dashed frame + hollow boxes where digits are missing. */
@@ -763,7 +1104,7 @@ function makeTextTexture(text, opts = {}) {
 }
 function label(parent, text, pw, ph, texOpts = {}, matOpts = {}) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
-    new THREE.MeshBasicMaterial({ map: makeTextTexture(text, texOpts), transparent: true, ...matOpts }));
+    new THREE.MeshBasicMaterial({ toneMapped: false, map: makeTextTexture(text, texOpts), transparent: true, ...matOpts }));
   parent.add(m); return m;
 }
 /* text that reads correctly from both sides: two planes back to back */
@@ -771,7 +1112,7 @@ function labelTwoSided(parent, text, pw, ph, texOpts = {}) {
   const g = new THREE.Group();
   const tex = makeTextTexture(text, texOpts);
   for (const s of [1, -1]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ toneMapped: false, map: tex, transparent: true }));
     m.rotation.y = s > 0 ? 0 : Math.PI; m.position.z = s * 0.006;
     g.add(m);
   }
@@ -811,7 +1152,7 @@ function board(parent, lines, pw, ph, x, y, z, yaw, opts = {}) {
   const g = new THREE.Group();
   const tex = boardTexture(lines, opts);
   for (const s of [1, -1]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ toneMapped: false, map: tex, transparent: true }));
     m.rotation.y = s > 0 ? 0 : Math.PI; m.position.z = s * 0.006;
     g.add(m);
   }
@@ -826,7 +1167,7 @@ function arrow(parent, from, to, color, radius = 0.1) {
   const len = dir.length();
   const shaftLen = Math.max(0.05, len - 0.7);
   const grp = new THREE.Group();
-  const m = new THREE.MeshBasicMaterial({ color });
+  const m = new THREE.MeshBasicMaterial({ toneMapped: false, color });
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, shaftLen, 12), m);
   shaft.position.y = shaftLen / 2;
   const head = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.7, 16), m);
@@ -838,81 +1179,36 @@ function arrow(parent, from, to, color, radius = 0.1) {
   return grp;
 }
 
-/* ---- ground (shared) ---- */
-function makeGroundNoise() {
-  const S = 256, CELL = 8;
-  const c = document.createElement('canvas'); c.width = c.height = S;
-  const ctx = c.getContext('2d');
-  for (let y = 0; y < S; y += CELL) for (let x = 0; x < S; x += CELL) {
-    const v = Math.round(255 * (1 - 0.05 * Math.random()));
-    ctx.fillStyle = `rgb(${v},${v},${v})`;
-    ctx.fillRect(x, y, CELL, CELL);
-  }
-  ctx.filter = 'blur(6px)'; ctx.drawImage(c, 0, 0); ctx.filter = 'none';
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(80, 80);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200),
-  new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1, map: makeGroundNoise() }));
-ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02;
-ground.receiveShadow = true; scene.add(ground);
-
-/* asphalt with a faint speckle so long roads don't read as one flat swatch */
-function makeAsphalt() {
-  const S = 128;
-  const c = document.createElement('canvas'); c.width = c.height = S;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, S, S);
-  for (let i = 0; i < 900; i++) {
-    const v = 225 + Math.floor(Math.random() * 30);
-    ctx.fillStyle = `rgb(${v},${v},${v})`;
-    ctx.fillRect(Math.random() * S, Math.random() * S, 1.5, 1.5);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-const ASPHALT = makeAsphalt();
-function roadMat() {
-  const t = ASPHALT.clone(); t.needsUpdate = true;
-  return new THREE.MeshStandardMaterial({ color: COLOR.road, roughness: 1, map: t });
-}
-
+/* ---- ground: lawn out to the horizon; the asphalt is a shared material
+   whose wear tiles in metres ---- */
+slab(scene, 1400, 1400, 'lawn', 0, -0.02, 0, { color: 0xd9dcc8 });
+const ASPHALT = TEX.asphalt.tex;
+function roadMat() { return texMat('asphalt'); }
 /* ============================================================
    street furniture builders
    ============================================================ */
 
-/* a straight stretch of road along x from x0 to x1 (centre line z = 0),
-   with kerbs and sidewalks either side, a dashed centre line, and lawn
-   strips out to the lots */
-function buildRoad(g, x0, x1, { centreLine = true } = {}) {
+/* a straight stretch of road along x from x0 to x1 (centre line z = 0): worn
+   asphalt with a concrete gutter along each kerb, no centre line */
+function buildRoad(g, x0, x1) {
   const len = x1 - x0, cx = (x0 + x1) / 2;
-  const road = slab(g, len, HALF_ROAD * 2, COLOR.road, cx, 0.0, 0);
-  road.material = roadMat(); road.material.map.repeat.set(len / 6, 2);
-  if (centreLine) {
-    const n = Math.floor(len / 6);
-    for (let i = 0; i < n; i++) slab(g, 3, 0.16, 0xe6d27a, x0 + 3 + i * 6, 0.012, 0);
-  }
+  slab(g, len, HALF_ROAD * 2, 'asphalt', cx, 0.0, 0);
+  for (const s of [-1, 1]) slab(g, len, 0.45, 'concrete', cx, 0.01, s * (HALF_ROAD - 0.225), { color: 0xd9d4c8 });
 }
 /* a cross street running along z through the main road, between x0 and x1 */
 function buildCrossStreet(g, x0, x1, depth = 60) {
   const cx = (x0 + x1) / 2, w = x1 - x0;
-  const r = slab(g, w, depth * 2, COLOR.road, cx, 0.001, 0);
-  r.material = roadMat(); r.material.map.repeat.set(2, depth / 3);
-  for (const s of [-1, 1]) {                          // kerbs along the cross street, clear of the junction
+  slab(g, w, depth * 2, 'asphalt', cx, 0.001, 0);
+  for (const s of [-1, 1]) {
     const zc = s * (HALF_ROAD + WALK_W + (depth - HALF_ROAD - WALK_W) / 2);
     const zl = depth - HALF_ROAD - WALK_W;
     for (const e of [-1, 1]) {
       box(g, 0.32, 0.14, zl, COLOR.kerb, cx + e * (w / 2 + 0.16), 0.07, zc);
-      slab(g, WALK_W - 0.32, zl, COLOR.walk, cx + e * (w / 2 + 0.32 + (WALK_W - 0.32) / 2), 0.13, zc);
+      slab(g, 0.68, zl, 'lawn', cx + e * (w / 2 + 0.66), 0.12, zc);
+      slab(g, 1.0, zl, 'concrete', cx + e * (w / 2 + 1.5), 0.13, zc);
     }
   }
-  // a stop line at each side of the junction
-  for (const s of [-1, 1]) slab(g, w - 1, 0.4, 0xf2f2f2, cx, 0.012, s * (HALF_ROAD + 0.6));
+  for (const s of [-1, 1]) slab(g, w - 1, 0.4, 0xe8e8e8, cx, 0.012, s * (HALF_ROAD + 0.6));
 }
 
 const SIGN_OPTS = { bg: '#1f6b3d', fg: '#ffffff', font: 'bold 130px sans-serif', w: 1024, h: 200, pad: 40 };
@@ -928,47 +1224,87 @@ function buildSignPole(g, x, z, along, across, block) {
   return [a, b];
 }
 
-/* a tree: trunk + a rounded canopy (two spheres) */
-function buildTree(g, x, z, r) {
-  const h = 2.2 + r() * 1.4, cr = 1.4 + r() * 1.1;
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, h, 8), mat(COLOR.trunk));
-  trunk.position.set(x, h / 2, z); trunk.castShadow = true; g.add(trunk);
+/* a mature maple in autumn colour: a thick trunk, a few limbs, a broad crown, leaves on the ground */
+function buildTree(g, x, z, r, big = true) {
+  const h = big ? 3.2 + r() * 1.2 : 2.4 + r() * 0.8, cr = big ? 2.4 + r() * 1.2 : 1.4 + r() * 0.6;
+  const trunk = mat(COLOR.trunk);
+  meshAt(g, new THREE.CylinderGeometry(0.16 + cr * 0.05, 0.24 + cr * 0.08, h, 8), trunk, x, h / 2, z);
   const leaf = mat(COLOR.leaf[Math.floor(r() * COLOR.leaf.length)], { roughness: 0.95 });
-  const c1 = new THREE.Mesh(new THREE.SphereGeometry(cr, 12, 10), leaf);
-  c1.position.set(x, h + cr * 0.6, z); c1.castShadow = true; g.add(c1);
-  const c2 = new THREE.Mesh(new THREE.SphereGeometry(cr * 0.7, 10, 8), leaf);
-  c2.position.set(x + cr * 0.4, h + cr * 1.1, z - cr * 0.3); c2.castShadow = true; g.add(c2);
-}
-/* a low hedge / shrub row */
-function buildShrubs(g, x0, x1, z, r) {
-  const n = Math.max(1, Math.round((x1 - x0) / 1.3));
-  const leaf = mat(COLOR.leaf[Math.floor(r() * COLOR.leaf.length)]);
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * Math.PI * 2 + r(), lm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, cr * 0.9, 6), trunk);
+    lm.position.set(x + Math.sin(a) * cr * 0.3, h + cr * 0.3, z + Math.cos(a) * cr * 0.3);
+    lm.rotation.set(Math.cos(a) * 0.7, 0, -Math.sin(a) * 0.7); lm.castShadow = true; g.add(lm);
+  }
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * Math.PI * 2 + r() * 0.8, d = i === 0 ? 0 : cr * 0.45, rr = cr * (i === 0 ? 1 : 0.7 + r() * 0.2);
+    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(rr, 1), leaf);
+    c.position.set(x + Math.sin(a) * d, h + cr * 0.8 + (i === 0 ? 0 : r() * cr * 0.4), z + Math.cos(a) * d);
+    c.scale.y = 0.85; c.castShadow = true; g.add(c);
+  }
+  // fallen leaves in the tree's colour
+  const n = big ? 34 : 14;
   for (let i = 0; i < n; i++) {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(0.5 + r() * 0.2, 8, 6), leaf);
-    s.position.set(x0 + (i + 0.5) * (x1 - x0) / n, 0.45, z); s.scale.y = 0.75; s.castShadow = true; g.add(s);
+    const a = r() * Math.PI * 2, d = r() * cr * 1.6;
+    const lf = new THREE.Mesh(new THREE.CircleGeometry(0.05 + r() * 0.05, 5), leaf);
+    lf.rotation.x = -Math.PI / 2; lf.rotation.z = r() * 6; lf.position.set(x + Math.sin(a) * d, 0.03, z + Math.cos(a) * d);
+    g.add(lf);
   }
 }
-/* a parked car: body + cabin + wheels, pointing along its local x */
+/* foundation shrubs: a row of dark evergreen balls */
+function buildShrubs(g, x0, x1, z, r) {
+  const n = Math.max(1, Math.round((x1 - x0) / 1.2));
+  const leaf = mat(COLOR.shrub[Math.floor(r() * COLOR.shrub.length)]);
+  for (let i = 0; i < n; i++) {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.45 + r() * 0.2, 8, 6), leaf);
+    s.position.set(x0 + (i + 0.5) * (x1 - x0) / n, 0.42, z); s.scale.y = 0.8; s.castShadow = true; g.add(s);
+  }
+}
+/* a parked car — sedan or SUV — pointing along its local x */
 function buildCar(g, x, z, yaw, color) {
   const car = new THREE.Group();
-  box(car, 4.3, 0.7, 1.8, color, 0, 0.6, 0, { roughness: 0.5, metalness: 0.25 });
-  box(car, 2.3, 0.6, 1.6, color, -0.1, 1.25, 0, { roughness: 0.5, metalness: 0.25 });
-  box(car, 2.0, 0.5, 1.62, COLOR.glass, -0.1, 1.28, 0, { roughness: 0.25, metalness: 0.2 });
-  for (const wx of [-1.4, 1.4]) for (const wz of [-0.85, 0.85]) {
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 14), mat(0x1c1c1c));
-    w.rotation.x = Math.PI / 2; w.position.set(wx, 0.34, wz); w.castShadow = true; car.add(w);
+  const body = mat(color, { roughness: 0.35, metalness: 0.3 });
+  const glass = mat(0x1e2a36, { roughness: 0.15, metalness: 0.5 });
+  const suv = Math.abs(Math.round(x * 7 + z * 3)) % 2 === 1;
+  if (!suv) {
+    meshAt(car, new THREE.BoxGeometry(4.4, 0.62, 1.8), body, 0, 0.62, 0);
+    meshAt(car, new THREE.BoxGeometry(2.2, 0.6, 1.62), body, -0.1, 1.23, 0);
+    meshAt(car, new THREE.BoxGeometry(1.9, 0.5, 1.64), glass, -0.1, 1.26, 0);
+  } else {
+    meshAt(car, new THREE.BoxGeometry(4.7, 0.85, 1.9), body, 0, 0.78, 0);
+    meshAt(car, new THREE.BoxGeometry(2.9, 0.75, 1.8), body, -0.3, 1.58, 0);
+    meshAt(car, new THREE.BoxGeometry(2.7, 0.6, 1.82), glass, -0.3, 1.62, 0);
+  }
+  const tyre = mat(0x1c1c1c), hub = mat(0xb0b0b0, { roughness: 0.4, metalness: 0.6 });
+  for (const px of [-1.45, 1.45]) for (const pz of [-0.86, 0.86]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.26, 12), tyre);
+    w.rotation.x = Math.PI / 2; w.position.set(px, 0.36, pz); w.castShadow = true; car.add(w);
+    const hcap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.28, 10), hub);
+    hcap.rotation.x = Math.PI / 2; hcap.position.set(px, 0.36, pz); car.add(hcap);
   }
   car.position.set(x, 0, z); car.rotation.y = yaw;
   g.add(car);
 }
-
-/* ---- house styles: siding, roof colour, storeys, gable direction, garage ---- */
-const PLATE_W = 1.15, PLATE_H = 0.52;        // beside the door
-const MB_PLATE_W = 0.56, MB_PLATE_H = 0.26;  // on the mailbox
+/* a fire hydrant */
+function buildHydrant(g, x, z) {
+  const red = mat(0xc8302a, { roughness: 0.5 });
+  meshAt(g, new THREE.CylinderGeometry(0.16, 0.18, 0.75, 10), red, x, 0.375, z);
+  meshAt(g, new THREE.SphereGeometry(0.17, 10, 8), red, x, 0.8, z);
+  for (const s of [-1, 1]) meshAt(g, new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8), red, x, 0.5, z).rotation.z = Math.PI / 2 * s;
+}
+/* a street lamp: a slim pole with a cobra-head arm over the road */
+function buildLamp(g, x, z, s) {
+  box(g, 0.16, 8, 0.16, 0x6f6f6f, x, 4, z);
+  box(g, 0.1, 0.1, 2.4, 0x6f6f6f, x, 7.9, z - s * 1.1);
+  box(g, 0.3, 0.14, 0.7, 0x5a5a5a, x, 7.85, z - s * 2.3);
+}
+/* ---- house styles: bungalow, foursquare or gable-front; brick colour, roof colour ---- */
+const PLATE_W = 1.15, PLATE_H = 0.52;        // on the porch beam or beside the door
+const MB_PLATE_W = 0.56, MB_PLATE_H = 0.26;  // hanging from the yard lamp post
 
 /* a house group: the front wall's centre is at (px, 0, pz) and local +z is
    the direction it faces (toward the road). `curb` is the distance from
-   the front wall to the kerb, `lotW` the frontage. Returns { group, plates }. */
+   the front wall to the kerb, `lotW` the frontage. Returns { group, plates }.
+   A `decor` house has no number: it fills in the street beyond the course. */
 function buildHouse(parent, spec) {
   const { px, pz, facing, lotW, curb, seed, value, mask, styleHint = {} } = spec;
   const r = rng(seed);
@@ -976,102 +1312,155 @@ function buildHouse(parent, spec) {
   g.position.set(px, 0, pz);
   g.rotation.y = Math.atan2(facing.x, facing.z);
   parent.add(g);
+  const decor = !!styleHint.decor;
 
-  const storeys = styleHint.storeys ?? (r() < 0.45 ? 2 : 1);
-  const bodyH = storeys === 2 ? 5.9 : 3.3;
-  const garage = styleHint.garage ?? (lotW >= 13.5 && r() < 0.6);
-  const gW = garage ? 3.6 : 0;
-  const w = Math.min(10, lotW - 3.6 - gW);
-  const gableX = r() < 0.5;                 // ridge along the street (side gable) or toward it
-  const siding = COLOR.siding[Math.floor(r() * COLOR.siding.length)];
+  const roll = r();
+  const kind = styleHint.kind ?? (roll < 0.45 ? 'bungalow' : roll < 0.78 ? 'foursquare' : 'gable');
+  const storeys = kind === 'bungalow' ? 1 : 2;
+  const bodyH = kind === 'bungalow' ? 3.7 : 6.3;
+  const w = Math.min(9.4, lotW - 4.4);
+  const doorSide = r() < 0.5 ? -1 : 1;
+  const driveSide = -doorSide;
+  const brick = BRICKS[Math.floor(r() * BRICKS.length)];
   const roofC = COLOR.roof[Math.floor(r() * COLOR.roof.length)];
   const doorC = COLOR.door[Math.floor(r() * COLOR.door.length)];
-  const doorSide = r() < 0.5 ? -1 : 1;      // door left or right of centre
-  const bodyX = garage ? -gW / 2 * (doorSide) * 0 : 0;
+  const half = lotW / 2 - 0.15;
+  const porch = kind !== 'bungalow';
+  const pd = 2.4;                                      // porch depth
+  const deckY = porch ? 0.75 : 0.55;                   // the door sits this high above the ground
 
-  // lawn for the whole lot, a shade per lot so the frontage reads
+  // lawn for the whole lot
   if (styleHint.lawn !== false) {
-    const lawn = slab(g, lotW - 0.4, curb - 0.2 + HOUSE_D + 6, COLOR.lawn[seed % 3], 0, 0.005, (curb - 0.2 - HOUSE_D - 6) / 2);
+    const lawn = slab(g, lotW - 0.3, curb - 0.2 + HOUSE_D + 14, 'lawn', 0, 0.005, (curb - 0.2 - HOUSE_D - 14) / 2, { color: COLOR.lawnTint[seed % 3] });
     lawn.userData.lawn = true;
   }
 
-  // walls
-  box(g, w, bodyH, HOUSE_D, siding, bodyX, bodyH / 2, -HOUSE_D / 2);
-  // foundation line
-  box(g, w + 0.1, 0.35, HOUSE_D + 0.1, 0x8f8a80, bodyX, 0.17, -HOUSE_D / 2);
+  // walls: brick on a limestone foundation, with a limestone water table
+  tbox(g, w, bodyH, HOUSE_D, brick, 0, bodyH / 2, -HOUSE_D / 2);
+  box(g, w + 0.12, 0.5, HOUSE_D + 0.12, COLOR.foundation, 0, 0.25, -HOUSE_D / 2);
+  tbox(g, w + 0.16, 0.14, HOUSE_D + 0.16, 'limestone', 0, 0.57, -HOUSE_D / 2);
 
   // roof
-  const ov = 0.55, roofH = gableX ? 2.2 : 2.6;
-  const roofM = mat(roofC, { roughness: 0.8 });
-  let roof;
-  if (gableX) {                                  // ridge along local x (parallel to the street)
-    const sh = new THREE.Shape();
-    sh.moveTo(-HOUSE_D / 2 - ov, 0); sh.lineTo(HOUSE_D / 2 + ov, 0); sh.lineTo(0, roofH); sh.closePath();
-    roof = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: w + 2 * ov, bevelEnabled: false }), roofM);
-    roof.rotation.y = -Math.PI / 2;
-    roof.position.set(bodyX + w / 2 + ov, bodyH, -HOUSE_D / 2);
-  } else {                                       // ridge toward the street: the gable faces the road
-    const sh = new THREE.Shape();
-    sh.moveTo(-w / 2 - ov, 0); sh.lineTo(w / 2 + ov, 0); sh.lineTo(0, roofH); sh.closePath();
-    roof = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: HOUSE_D + 2 * ov, bevelEnabled: false }), roofM);
-    roof.position.set(bodyX, bodyH, -HOUSE_D - ov);
-    // gable wall in siding colour so the triangle isn't roof-coloured
-    const tri = new THREE.Shape();
-    tri.moveTo(-w / 2, 0); tri.lineTo(w / 2, 0); tri.lineTo(0, roofH * (w / (w + 2 * ov)));
-    const gable = new THREE.Mesh(new THREE.ShapeGeometry(tri), mat(siding));
-    gable.position.set(bodyX, bodyH, 0.01); g.add(gable);
+  if (kind === 'gable') roofGableZ(g, w, HOUSE_D, bodyH, 0, -HOUSE_D / 2, roofC, brick);
+  else {
+    const pitch = kind === 'bungalow' ? 0.55 : 0.45;
+    roofHip(g, w, HOUSE_D, bodyH, 0, -HOUSE_D / 2, roofC, { pitch });
+    // a front dormer with a small gable roof
+    const dz = -1.4, dw = 2.6, dh = 1.5, base = bodyH + 0.32 + (0.7 - dz) * pitch - 0.6;
+    tbox(g, dw, dh, 2.0, 'siding', 0, base + dh / 2, dz - 1.0, { color: 0xf4efe4 });
+    roofGableX(g, dw, 2.0, base + dh, 0, dz - 1.0, roofC, { over: 0.25, pitch: 0.65 });
+    box(g, 1.3, 0.9, 0.06, COLOR.trim, 0, base + dh / 2, dz + 0.03);
+    meshAt(g, new THREE.BoxGeometry(1.1, 0.75, 0.04), MAT_GLASS, 0, base + dh / 2, dz + 0.06);
   }
-  roof.castShadow = true; roof.receiveShadow = true; g.add(roof);
 
-  // door + frame + step, on the door side of the front
-  const dx = bodyX + doorSide * (w / 2 - 1.6);
-  box(g, 1.3, 2.3, 0.08, COLOR.trim, dx, 1.15, 0.04);
-  box(g, 1.02, 2.1, 0.1, doorC, dx, 1.05, 0.07, { roughness: 0.6 });
-  box(g, 1.7, 0.16, 0.9, 0xb9b3a8, dx, 0.08, 0.5);
-  if (r() < 0.55) {                              // small porch roof on posts, above the number plate
-    box(g, 2.6, 0.14, 1.3, roofC, dx, 3.05, 0.65);
-    for (const e of [-1, 1]) box(g, 0.12, 3.0, 0.12, COLOR.trim, dx + e * 1.2, 1.5, 1.2);
-  }
-  // windows: one beside the door, more on the other half, and upstairs
-  const win = (wx, wy, ww = 1.3, wh = 1.4) => {
-    box(g, ww + 0.2, wh + 0.2, 0.06, COLOR.trim, wx, wy, 0.03);
-    box(g, ww, wh, 0.05, COLOR.glass, wx, wy, 0.06, { roughness: 0.25, metalness: 0.15 });
+  // the entry
+  const dx = doorSide * (w / 2 - 1.5);
+  const doorAt = (x, y0, z0) => {
+    box(g, 1.3, 2.3, 0.08, COLOR.trim, x, y0 + 1.15, z0 + 0.04);
+    tbox(g, 1.02, 2.1, 0.1, 'door', x, y0 + 1.05, z0 + 0.07, { color: doorC });
   };
-  const farX = bodyX - doorSide * (w / 2 - 2.0);
-  win(farX, 1.55, 1.6, 1.4);
-  if (w >= 8.5) win(bodyX - doorSide * 0.4, 1.55, 1.2, 1.3);
-  if (storeys === 2) { win(farX, 4.45); win(dx, 4.45); if (w >= 8.5) win(bodyX - doorSide * 0.4, 4.45, 1.2, 1.3); }
-
-  // garage beside the house (on the side away from the door), with a driveway to the kerb
-  if (garage) {
-    const gx = bodyX - doorSide * (w / 2 + gW / 2);
-    box(g, gW, 2.9, HOUSE_D - 1.5, siding, gx, 1.45, -(HOUSE_D - 1.5) / 2 - 0.4);
-    box(g, gW + 0.3, 0.3, HOUSE_D - 1.2, roofC, gx, 3.0, -(HOUSE_D - 1.2) / 2 - 0.4, { roughness: 0.8 });
-    box(g, gW - 0.6, 2.3, 0.08, COLOR.garage, gx, 1.2, -0.36, { roughness: 0.7 });
-    slab(g, 3.2, curb - 0.3, COLOR.drive, gx, 0.02, (curb - 0.3) / 2 - 0.2);
+  let plateAt;
+  if (porch) {
+    // a full-width porch on a brick base: piers, tapered columns, a railing, a hip roof
+    tbox(g, w, deckY, pd, brick, 0, deckY / 2, pd / 2);
+    box(g, w + 0.1, 0.08, pd + 0.1, COLOR.deck, 0, deckY + 0.04, pd / 2);
+    const pierX = [-w / 2 + 0.35, -w / 6, w / 6, w / 2 - 0.35];
+    for (const x of pierX) {
+      tbox(g, 0.5, 1.0, 0.5, brick, x, deckY + 0.5, pd - 0.35);
+      box(g, 0.6, 0.08, 0.6, COLOR.limestone, x, deckY + 1.04, pd - 0.35);
+      meshAt(g, new THREE.CylinderGeometry(0.13, 0.19, 2.1, 10), mat(COLOR.column, { roughness: 0.7 }), x, deckY + 1.08 + 1.05, pd - 0.35);
+    }
+    for (let i = 0; i < pierX.length - 1; i++) {                 // railing between piers (a gap at the steps)
+      const a = pierX[i] + 0.25, b = pierX[i + 1] - 0.25, mid = (a + b) / 2;
+      if (Math.abs(mid - dx) < 1.6 && i !== 0 && i !== pierX.length - 2) continue;
+      box(g, b - a, 0.07, 0.08, COLOR.column, mid, deckY + 1.0, pd - 0.35);
+      for (let x = a + 0.1; x < b; x += 0.16) box(g, 0.035, 0.85, 0.035, COLOR.column, x, deckY + 0.55, pd - 0.35);
+    }
+    const porchH = deckY + 1.08 + 2.1;
+    roofHip(g, w + 0.3, pd + 0.2, porchH, 0, pd / 2 - 0.1, roofC, { over: 0.5, pitch: 0.28 });
+    box(g, w + 0.3, 0.62, 0.16, COLOR.trim, 0, porchH - 0.25, pd - 0.1);   // the beam the number sits on
+    for (let i = 0; i < 3; i++) box(g, 1.5, 0.25, 0.32, COLOR.foundation, dx, 0.125 + i * 0.25, pd + 0.9 - i * 0.32);
+    doorAt(dx, deckY, 0);
+    plateAt = [dx, porchH - 0.25, pd - 0.01];
   } else {
-    // a path from the door to the sidewalk
-    slab(g, 1.2, curb - WALK_W - 0.4, COLOR.walk, dx, 0.02, (curb - WALK_W - 0.4) / 2 + 0.6);
+    // a brick stoop, a hooded door, the number on the wall beside it
+    for (let i = 0; i < 3; i++) tbox(g, 1.7, 0.2, 1.1 - i * 0.34, brick, dx, 0.1 + i * 0.2, (1.1 - i * 0.34) / 2);
+    doorAt(dx, deckY, 0);
+    roofGableX(g, 1.9, 1.1, deckY + 2.55, dx, 0.5, roofC, { over: 0.15, pitch: 0.6 });
+    for (const e of [-1, 1]) box(g, 0.1, 0.7, 0.9, COLOR.trim, dx + e * 0.85, deckY + 2.2, 0.45);
+    plateAt = [dx + doorSide * 1.25, 1.95, 0.05];
   }
 
-  // the number: a plate over the door, and on the mailbox at the kerb
-  const shown = mask === null ? String(value) : mask;
-  const plateOpts = mask === null ? {} : { fg: BLANK_FG };
-  const plate = label(g, shown, PLATE_W, PLATE_H, plateOpts);
-  plate.position.set(dx, 2.64, 0.1);
-  const mbx = dx + doorSide * 2.2;
-  box(g, 0.1, 1.05, 0.1, COLOR.post, mbx, 0.52, curb - 0.45);
-  box(g, 0.34, 0.3, 0.58, COLOR.mailbox, mbx, 1.2, curb - 0.45, { roughness: 0.55, metalness: 0.3 });
-  const mbPlate = label(g, shown, MB_PLATE_W, MB_PLATE_H, plateOpts);
-  mbPlate.position.set(mbx, 1.2, curb - 0.45 + 0.3);
+  // windows: white sash in a limestone sill and lintel
+  const win = (wx, wy, ww = 1.2, wh = 1.5, z0 = 0) => {
+    box(g, ww + 0.16, wh + 0.16, 0.06, COLOR.trim, wx, wy, z0 + 0.03);
+    meshAt(g, new THREE.BoxGeometry(ww, wh, 0.04), MAT_GLASS, wx, wy, z0 + 0.06);
+    box(g, ww + 0.3, 0.12, 0.18, COLOR.limestone, wx, wy - wh / 2 - 0.1, z0 + 0.09);
+    box(g, ww + 0.3, 0.2, 0.05, COLOR.limestone, wx, wy + wh / 2 + 0.14, z0 + 0.03);
+  };
+  const farX = -doorSide * (w / 2 - 2.3);
+  if (kind === 'bungalow') { win(farX, deckY + 1.15, 2.6, 1.5); }
+  else { win(farX, deckY + 1.15, 1.5, 1.5); win(dx - doorSide * 1.9, deckY + 1.15, 0.7, 1.4); }
+  if (storeys === 2) { win(farX, 4.55, 1.2, 1.4); win(0, 4.55, 1.2, 1.4); win(dx, 4.55, 1.2, 1.4); }
+  for (const s of [-1, 1]) {                               // a window on each side wall, upstairs too
+    const sw = (wx, wy) => {
+      box(g, 0.06, 1.46, 1.16, COLOR.trim, s * (w / 2 + 0.03), wy, wx);
+      meshAt(g, new THREE.BoxGeometry(0.04, 1.3, 1.0), MAT_GLASS, s * (w / 2 + 0.06), wy, wx);
+    };
+    sw(-HOUSE_D * 0.6, deckY + 1.1);
+    if (storeys === 2) sw(-HOUSE_D * 0.4, 4.55);
+  }
 
-  // greenery
-  if (r() < 0.7) buildTree(g, bodyX - doorSide * (w / 2 + (garage ? gW : 0) + 1.2), curb - 2.6 - r() * 2, r);
-  if (r() < 0.5) buildShrubs(g, farX - 1.4, farX + 1.4, 0.75, r);
+  // side drive to a detached garage at the back
+  const gx = driveSide * (half - 1.3);
+  slab(g, 2.4, curb + HOUSE_D + 4.2, 'concrete', gx, 0.02, (curb - HOUSE_D - 4.2) / 2 + 0.1);
+  const gz = -(HOUSE_D + 4.2);
+  tbox(g, 5.2, 2.6, 5.6, brick, gx - driveSide * 1.3, 1.3, gz - 2.8);
+  roofGableZ(g, 5.2, 5.6, 2.6, gx - driveSide * 1.3, gz - 2.8, roofC, brick, { over: 0.35, pitch: 0.5 });
+  tbox(g, 2.6, 2.2, 0.08, 'garageDoor', gx, 1.1, gz + 0.02, { color: 0xf1ede3 });
+  // a wood fence along the left lot line from the house back
+  {
+    const z0 = -1.0, z1 = -(HOUSE_D + 14), len = z0 - z1;
+    box(g, 0.05, 1.5, len, COLOR.fence, -half, 0.85, (z0 + z1) / 2);
+    for (let z = z0; z > z1; z -= 2.4) box(g, 0.1, 1.65, 0.1, COLOR.fence, -half, 0.82, z);
+    box(g, 0.12, 0.06, len, COLOR.fence, -half, 1.62, (z0 + z1) / 2);
+  }
+  // a path from the door to the sidewalk
+  slab(g, 1.0, curb - WALK_W - pd - 1.0, 'concrete', dx, 0.02, pd + 1.0 + (curb - WALK_W - pd - 1.0) / 2);
 
-  return { group: g, plates: [plate, mbPlate] };
+  // the number: on the porch beam (or beside the door), and hanging from a yard lamp post by the walk
+  let plates = [];
+  if (!decor) {
+    const shown = mask === null ? String(value) : mask;
+    const plateOpts = mask === null ? {} : { fg: BLANK_FG };
+    box(g, PLATE_W + 0.08, PLATE_H + 0.08, 0.04, COLOR.post, plateAt[0], plateAt[1], plateAt[2] + 0.02);
+    const plate = label(g, shown, PLATE_W, PLATE_H, plateOpts);
+    plate.position.set(plateAt[0], plateAt[1], plateAt[2] + 0.045); plate.userData.keep = true;
+    const lx = dx + doorSide * 1.4, lz = curb - WALK_W - 0.6;
+    box(g, 0.08, 2.4, 0.08, COLOR.post, lx, 1.2, lz);
+    box(g, 0.3, 0.42, 0.3, COLOR.post, lx, 2.5, lz);
+    meshAt(g, new THREE.BoxGeometry(0.22, 0.3, 0.22), MAT_LAMP, lx, 2.5, lz);
+    box(g, 0.38, 0.06, 0.38, COLOR.post, lx, 2.74, lz);
+    box(g, 0.7, 0.04, 0.04, COLOR.post, lx + doorSide * 0.33, 1.6, lz);
+    box(g, MB_PLATE_W + 0.06, MB_PLATE_H + 0.06, 0.03, COLOR.post, lx + doorSide * 0.36, 1.38, lz);
+    const mbPlate = label(g, shown, MB_PLATE_W, MB_PLATE_H, plateOpts);
+    mbPlate.position.set(lx + doorSide * 0.36, 1.38, lz + 0.02); mbPlate.userData.keep = true;
+    plates = [plate, mbPlate];
+  }
+
+  // planting: shrubs under the windows, a maple in the parkway, sometimes a hedge along the walk
+  buildShrubs(g, farX - 1.6, farX + 1.6, porch ? pd + 0.7 : 0.8, r);
+  if (r() < 0.8) buildTree(g, driveSide * (half - 4.6 - r() * 1.6), curb - 0.5, r);   // in the parkway, clear of the door and the drive
+  if (r() < 0.4) buildTree(g, -driveSide * (half - 3) * r(), -(HOUSE_D + 7 + r() * 4), r);
+  if (r() < 0.3) {
+    const hz = curb - WALK_W - 0.4, edge = driveSide * (half - 2.6);
+    const a = Math.min(edge, dx + doorSide * 0.9), b = Math.max(edge, dx + doorSide * 0.9);
+    if (b - a > 1.5) box(g, b - a, 0.7, 0.5, COLOR.hedge, (a + b) / 2, 0.36, hz);
+  }
+
+  mergeGroup(g);
+  return { group: g, plates };
 }
-
 /* ---- walking chevrons: a flat arrow on the road that takes you to the
    next viewpoint (Street View's arrows). A bigger invisible disc catches
    the tap. Pooled: repositioned whenever the viewer moves. ---- */
@@ -1085,11 +1474,11 @@ const CHEV_GEO = new THREE.ShapeGeometry(chevronShape());
 const CHEV_HIT = new THREE.CircleGeometry(1.7, 20);
 function makeChevron(parent) {
   const g = new THREE.Group();
-  const m = new THREE.Mesh(CHEV_GEO, new THREE.MeshBasicMaterial({ color: COLOR.chevron, transparent: true, opacity: 0.82, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+  const m = new THREE.Mesh(CHEV_GEO, new THREE.MeshBasicMaterial({ toneMapped: false, color: COLOR.chevron, transparent: true, opacity: 0.82, depthWrite: false, fog: false, side: THREE.DoubleSide }));
   m.rotation.x = -Math.PI / 2; m.position.y = 0.05; m.renderOrder = 2;
-  const halo = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.5, 28), new THREE.MeshBasicMaterial({ color: COLOR.chevron, transparent: true, opacity: 0.3, depthWrite: false, fog: false }));
+  const halo = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.5, 28), new THREE.MeshBasicMaterial({ toneMapped: false, color: COLOR.chevron, transparent: true, opacity: 0.3, depthWrite: false, fog: false }));
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.04; halo.renderOrder = 1;
-  const hit = new THREE.Mesh(CHEV_HIT, new THREE.MeshBasicMaterial({ visible: false }));
+  const hit = new THREE.Mesh(CHEV_HIT, new THREE.MeshBasicMaterial({ toneMapped: false, visible: false }));
   hit.rotation.x = -Math.PI / 2; hit.position.y = 0.06;
   g.add(m, halo, hit);
   g.userData = { arrow: m, halo, hit };
@@ -1373,26 +1762,27 @@ function makeOptionsFor(house, st, layout) {
 /* ============================================================
    building a stage
    ============================================================ */
-/* kerb + sidewalk strips along x on both sides (or one) of the main road */
+/* kerb, a grass parkway and the sidewalk along x on both sides (or one) of the main road */
 function buildWalks(g, x0, x1, sides = [-1, 1]) {
   const len = x1 - x0, cx = (x0 + x1) / 2;
   for (const s of sides) {
     box(g, len, 0.14, 0.32, COLOR.kerb, cx, 0.07, s * (HALF_ROAD + 0.16));
-    slab(g, len, WALK_W - 0.32, COLOR.walk, cx, 0.13, s * (HALF_ROAD + 0.32 + (WALK_W - 0.32) / 2));
+    slab(g, len, 0.68, 'lawn', cx, 0.12, s * (HALF_ROAD + 0.66));
+    slab(g, len, 1.0, 'concrete', cx, 0.13, s * (HALF_ROAD + 1.5));
   }
 }
 /* a road along z (the court entrance): x centred on 0 */
 function buildRoadZ(g, z0, z1, { walks = true } = {}) {
   const len = Math.abs(z1 - z0), cz = (z0 + z1) / 2;
-  const r = slab(g, HALF_ROAD * 2, len, COLOR.road, 0, 0.0, cz);
-  r.material = roadMat(); r.material.map.repeat.set(2, len / 6);
+  slab(g, HALF_ROAD * 2, len, 'asphalt', 0, 0.0, cz);
+  for (const s of [-1, 1]) slab(g, 0.45, len, 'concrete', s * (HALF_ROAD - 0.225), 0.01, cz, { color: 0xd9d4c8 });
   if (!walks) return;
   for (const s of [-1, 1]) {
     box(g, 0.32, 0.14, len, COLOR.kerb, s * (HALF_ROAD + 0.16), 0.07, cz);
-    slab(g, WALK_W - 0.32, len, COLOR.walk, s * (HALF_ROAD + 0.32 + (WALK_W - 0.32) / 2), 0.13, cz);
+    slab(g, 0.68, len, 'lawn', s * (HALF_ROAD + 0.66), 0.12, cz);
+    slab(g, 1.0, len, 'concrete', s * (HALF_ROAD + 1.5), 0.13, cz);
   }
 }
-
 /* the coloured "12 · 05  BLOCK · LOT" key, drawn on its own canvas */
 function placeKeyTexture(segments) {
   const CW = 1024, CH = 300;
@@ -1434,7 +1824,7 @@ function addPlaceKey(g, segments, x, y, z, yaw) {
   const grp = new THREE.Group();
   const tex = placeKeyTexture(segments);
   for (const s of [1, -1]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.3), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.3), new THREE.MeshBasicMaterial({ toneMapped: false, map: tex, transparent: true }));
     m.rotation.y = s > 0 ? 0 : Math.PI; m.position.z = s * 0.006;
     grp.add(m);
   }
@@ -1448,6 +1838,15 @@ function addBoard(g, lines, x, y, z, yaw, pw = 4.4, ph = 1.4, opts = {}) {
   return board(g, lines, pw, ph, x, y, z, yaw, opts);
 }
 
+/* the street carries on past the course: a few more houses a side at each end */
+function buildDecorHouses(g, st, x0, dir, n = 3) {
+  for (let k = 0; k < n; k++) for (const s of [-1, 1]) {
+    const cx = x0 + dir * (7 + k * 14);
+    buildHouse(g, { px: cx, pz: s * FRONT_Z, facing: { x: 0, z: -s }, lotW: 14, curb: FRONT_Z - HALF_ROAD,
+      seed: hashStr(`${st.label}|decor|${dir}|${k}|${s}`), value: null, mask: null, styleHint: { decor: true } });
+  }
+}
+
 /* the straight-street scene: roads, walks, signs, cars, and the guides on an example */
 function buildStreetScene(g, st, L, seed) {
   const r = rng(seed ^ 0x9e3779b9);
@@ -1458,6 +1857,8 @@ function buildStreetScene(g, st, L, seed) {
   for (const c of L.crossings) {
     buildSignPole(g, c.x1 + 0.9, -(HALF_ROAD + 0.9), st.label, c.name, c.blockAhead);
     buildSignPole(g, c.x0 - 0.9, HALF_ROAD + 0.9, st.label, c.name, c.blockBehind);
+    buildLamp(g, c.x0 - 1.2, -(HALF_ROAD + 1.1), -1);
+    buildHydrant(g, c.x1 + 2.2, HALF_ROAD + 0.65);
   }
   // a few parked cars at the kerb, never in front of a blank house's mailbox view
   for (const b of L.blocks) {
@@ -1469,9 +1870,8 @@ function buildStreetScene(g, st, L, seed) {
       buildCar(g, x, s * 2.5, s < 0 ? 0 : Math.PI, COLOR.car[Math.floor(r() * COLOR.car.length)]);
     }
   }
-  // trees along the stubs beyond the course so the street doesn't end abruptly
-  for (const x of [L.xMin - 14, L.xMin - 30, L.xMin - 48, L.xMax + 14, L.xMax + 30, L.xMax + 48])
-    for (const s of [-1, 1]) buildTree(g, x + r() * 4, s * (7 + r() * 8), r);
+  buildDecorHouses(g, st, L.xMin, -1);
+  buildDecorHouses(g, st, L.xMax, 1);
 
   if (st.kind !== 'example') return;
   const b0 = L.blocks[0], mid = (b0.x0 + b0.x1) / 2;
@@ -1522,33 +1922,43 @@ function buildCourtScene(g, st, L, seed) {
   for (const s of [-1, 1]) {
     const z0 = -(HALF_ROAD + WALK_W), len = z0 - zTan;
     box(g, 0.32, 0.14, len, COLOR.kerb, s * (HALF_ROAD + 0.16), 0.07, z0 - len / 2);
-    slab(g, WALK_W - 0.32, len, COLOR.walk, s * (HALF_ROAD + 0.32 + (WALK_W - 0.32) / 2), 0.13, z0 - len / 2);
+    slab(g, 0.68, len, 'lawn', s * (HALF_ROAD + 0.66), 0.12, z0 - len / 2);
+    slab(g, 1.0, len, 'concrete', s * (HALF_ROAD + 1.5), 0.13, z0 - len / 2);
   }
   // the bulb: asphalt disc, kerb ring, sidewalk ring, and lawn all round
   const disc = new THREE.Mesh(new THREE.CircleGeometry(CT.bulbR, 48), roadMat());
+  scaleUV(disc.geometry, 2 * CT.bulbR / TEX.asphalt.m);
   disc.rotation.x = -Math.PI / 2; disc.position.set(0, 0.006, CT.bulbZ); disc.receiveShadow = true; g.add(disc);
-  const ring = (r0, r1, y, color) => {
-    const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 56), mat(color, { roughness: 1 }));
-    m.rotation.x = -Math.PI / 2; m.position.set(0, y, CT.bulbZ); m.receiveShadow = true; g.add(m); return m;
+  const ring = (r0, r1, y, material, m) => {
+    const geo = new THREE.RingGeometry(r0, r1, 56);
+    if (m) scaleUV(geo, 2 * r1 / m);
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.rotation.x = -Math.PI / 2; mesh.position.set(0, y, CT.bulbZ); mesh.receiveShadow = true; g.add(mesh); return mesh;
   };
-  ring(CT.bulbR, CT.bulbR + 0.32, 0.14, COLOR.kerb);
-  ring(CT.bulbR + 0.32, CT.bulbR + WALK_W, 0.13, COLOR.walk);
-  ring(CT.bulbR + WALK_W, CT.bulbR + WALK_W + 24, 0.008, COLOR.lawn[1]);
+  ring(CT.bulbR, CT.bulbR + 0.32, 0.14, mat(COLOR.kerb, { roughness: 1 }));
+  ring(CT.bulbR + 0.32, CT.bulbR + WALK_W, 0.13, texMat('concrete'), TEX.concrete.m);
+  ring(CT.bulbR + WALK_W, CT.bulbR + WALK_W + 24, 0.008, texMat('lawn', { color: COLOR.lawnTint[1] }), TEX.lawn.m);
   // lawns for the entrance lots, one slab per side
   for (const s of [-1, 1]) {
     const z0 = CT.entryLots[0][0], z1 = CT.entryLots[CT.entryLots.length - 1][1];
-    slab(g, 16, z0 - z1 + 4, COLOR.lawn[0], s * (HALF_ROAD + WALK_W + 8), 0.006, (z0 + z1) / 2 - 2);
+    slab(g, 16, z0 - z1 + 4, 'lawn', s * (HALF_ROAD + WALK_W + 8), 0.006, (z0 + z1) / 2 - 2, { color: COLOR.lawnTint[0] });
   }
   // signs at the mouth: the court's name reads from the main street
   buildSignPole(g, HALF_ROAD + WALK_W + 0.9, -(HALF_ROAD + 0.9), st.main.name, st.label, null);
   buildSignPole(g, -(HALF_ROAD + WALK_W + 0.9), -(HALF_ROAD + 0.9), st.main.name, st.label, null);
   addBoard(g, ['NO OUTLET'], HALF_ROAD + WALK_W + 1.0, 2.1, -(HALF_ROAD + WALK_W + 2.2), 0, 2.0, 0.9,
     { bg: '#f2c230', fg: '#1a1400', accent: '#1a1400', size: 110 });
+  buildLamp(g, -(HALF_ROAD + WALK_W + 1.2), -(HALF_ROAD + WALK_W + 4), -1);
+  buildHydrant(g, HALF_ROAD + WALK_W + 2.0, HALF_ROAD + 0.65);
   // a couple of parked cars on the main street
   buildCar(g, -22, 2.5, Math.PI, COLOR.car[0]);
   buildCar(g, 24, -2.5, 0, COLOR.car[2]);
   buildCar(g, 6.4, -30, Math.PI / 2, COLOR.car[4]);
-  for (const x of [-44, -52, 44, 52]) for (const s of [-1, 1]) buildTree(g, x + r() * 4, s * (7 + r() * 8), r);
+  // the main street carries on both ways, and maples ring the bulb
+  buildDecorHouses(g, st, -36, -1, 2);
+  buildDecorHouses(g, st, 36, 1, 2);
+  for (const deg of [30, 100, 165, 195, 260, 330])
+    buildTree(g, -(CT.bulbR + WALK_W + 3) * Math.sin(deg * Math.PI / 180), CT.bulbZ + (CT.bulbR + WALK_W + 3) * Math.cos(deg * Math.PI / 180), r);
   buildTree(g, 0, CT.bulbZ - CT.houseR - 12, r);   // behind the houses at the top of the bulb
   if (st.kind !== 'example') return;
   addBoard(g, ['ROUND THE COURT', 'odd left · even right', 'the sides meet at the far end'],
@@ -1565,7 +1975,6 @@ function buildCourtScene(g, st, L, seed) {
     }
   }
 }
-
 function buildStageGroup(i) {
   const st = STAGES[i];
   const g = new THREE.Group();
@@ -1595,6 +2004,7 @@ function buildStageGroup(i) {
     });
     blankStates.push(bstate);
   });
+  mergeGroup(g, o => o.userData.house !== undefined);          // roads, walks, trees, cars: one mesh per material
   const chevrons = [0, 1, 2, 3].map(() => makeChevron(g));
   g.userData = { raycastList, blankStates, lookList, layout, chevrons, st, node: layout.start };
   return g;
@@ -2477,7 +2887,7 @@ function markSolved(bstate) {
     if (!par) continue;
     const pw = par.width, ph = par.height;
     const dot = new THREE.Mesh(new THREE.CircleGeometry(ph * 0.14, 20),
-      new THREE.MeshBasicMaterial({ color: 0x57c97e, fog: false }));
+      new THREE.MeshBasicMaterial({ toneMapped: false, color: 0x57c97e, fog: false }));
     dot.position.set(pw / 2 - ph * 0.18, ph / 2 - ph * 0.18, 0.004);
     p.add(dot);
     p.userData.solvedDot = dot;
@@ -2540,7 +2950,7 @@ function disposeGroup(g) {
   scene.remove(g);
   g.traverse(o => {
     if (o.geometry && o.geometry !== CHEV_GEO && o.geometry !== CHEV_HIT) o.geometry.dispose();
-    if (o.material) { if (o.material.map && o.material.map !== ASPHALT) o.material.map.dispose(); o.material.dispose(); }
+    if (o.material && !o.material.userData.shared) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
   });
 }
 /* "Try Part N again" from the report: rebuild only that part's streets */
@@ -2609,7 +3019,7 @@ let hintOnDrag = null;
       if (p.userData.halo || !p.geometry.parameters) continue;
       const { width: pw, height: ph } = p.geometry.parameters;
       const halo = new THREE.Mesh(new THREE.PlaneGeometry(pw * 1.16, ph * 1.4),
-        new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, opacity: 0.55, depthWrite: false, fog: false }));
+        new THREE.MeshBasicMaterial({ toneMapped: false, color: 0xffd54a, transparent: true, opacity: 0.55, depthWrite: false, fog: false }));
       halo.position.z = -0.006;
       halo.renderOrder = -1;
       p.add(halo);

@@ -71,30 +71,37 @@
       </ul>
     </div>
 
-    <a class="card" href="houses.html">
+    <div class="card group" id="houses" tabindex="0" aria-expanded="false">
       <span class="tag">live</span>
-      <h2>Houses</h2>
-    </a>
+      <h2>Houses <span class="chev" aria-hidden="true">▸</span></h2>
+      <ul class="opts" aria-label="Houses course looks">
+        <li><a href="houses-realistic-a.html">Sunbelt</a></li>
+        <li><a href="houses-realistic-b.html">Brick</a></li>
+        <li><a href="houses-realistic-c.html">Suburban</a></li>
+      </ul>
+    </div>
   </div>
 
   <div class="foot">Work in progress — pieces are being built and tuned.</div>
 
   <script>
-    // Hover reveals the looks; on touch screens (no hover) a tap on the card toggles them instead.
-    const card = document.getElementById('apartments');
-    const sync = () => card.setAttribute('aria-expanded', String(card.classList.contains('open') || card.matches(':hover, :focus-within')));
+    // Hover reveals a course's looks; on touch screens (no hover) a tap on the card toggles them instead.
     const noHover = matchMedia('(hover: none)').matches;
-    card.addEventListener('click', e => {
-      if (e.target.closest('a') || !noHover) return;
-      card.classList.toggle('open'); sync();
-    });
-    card.addEventListener('keydown', e => {
-      if (e.target !== card) return;
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.classList.toggle('open'); sync(); }
-      if (e.key === 'Escape') { card.classList.remove('open'); sync(); }
-    });
-    for (const ev of ['mouseenter', 'mouseleave', 'focusin', 'focusout']) card.addEventListener(ev, () => setTimeout(sync, 0));
-    document.addEventListener('click', e => { if (!card.contains(e.target)) { card.classList.remove('open'); sync(); } });
+    const cards = [...document.querySelectorAll('.card.group')];
+    for (const card of cards) {
+      const sync = () => card.setAttribute('aria-expanded', String(card.classList.contains('open') || card.matches(':hover, :focus-within')));
+      card.addEventListener('click', e => {
+        if (e.target.closest('a') || !noHover) return;
+        card.classList.toggle('open'); sync();
+      });
+      card.addEventListener('keydown', e => {
+        if (e.target !== card) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.classList.toggle('open'); sync(); }
+        if (e.key === 'Escape') { card.classList.remove('open'); sync(); }
+      });
+      for (const ev of ['mouseenter', 'mouseleave', 'focusin', 'focusout']) card.addEventListener(ev, () => setTimeout(sync, 0));
+      document.addEventListener('click', e => { if (!card.contains(e.target)) { card.classList.remove('open'); sync(); } });
+    }
   </script>
   <script type="module" src="./track.js"></script>
 </body>
