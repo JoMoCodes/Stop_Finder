@@ -385,6 +385,100 @@
     #finale { inset: 8px; transform: none; width: auto; max-height: none; border-radius: 14px;
       padding: 12px 16px 16px; animation: none; }
   }
+
+  /* ============================================================
+     CHROME STATES ON PHONES
+     The worked example that opens each part keeps every panel in place
+     (the tutorial). On quiz buildings the frame folds so the building
+     owns the screen: the prompt keeps its headline (tap it for the
+     instruction), and the jump bar becomes a progress strip (tap it, or
+     finish a part, and the part buttons show). Home + Appearance are one
+     menu button on every phone layout. Body classes come from the
+     "chrome" block in the script: .stage-quiz / .stage-example on every
+     stage change, .quiz-open while the options are open.
+     ============================================================ */
+  #jumpbar .jbnow, #jumpbar .jbtoggle, #lookbar .lk-menubtn, #lookbar .lk-list a.lk-home2 { display: none; }
+  #prompt .pbody:empty { display: none; }
+  @keyframes jbpulse { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  #jumpbar.peek button.jbtn.pulse { animation: jbpulse .6s ease-out .15s 1; }
+
+  @media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
+    /* the prompt: headline only on quiz buildings; tap to unfold the instruction */
+    #prompt.brief { cursor: pointer; }
+    #prompt.brief:not(.expanded) { padding: 8px 12px; }
+    #prompt.brief:not(.expanded) .ptitle { margin-bottom: 0; }
+    #prompt.brief .ptitle::after { content: '▾'; float: right; margin-left: 10px; color: #9fb0c0; font-size: 14px; }
+    #prompt.brief.expanded .ptitle::after { content: '▴'; }
+    #prompt.brief:not(.expanded) .pbody {                       /* still read by screen readers */
+      position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+    /* the jump bar: caption + progress strip; .expanded (tap) or .peek (a part finished) shows the buttons */
+    body.stage-quiz #jumpbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+      padding: 6px 12px; min-height: 32px; border-radius: 999px; cursor: pointer; }
+    body.stage-quiz #jumpbar .jbnow { display: block; order: 1; color: #eef2f6; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    body.stage-quiz #jumpbar #progress { order: 2; flex: 1 1 60px; margin-top: 0; height: 6px; }
+    body.stage-quiz #jumpbar .jbtoggle { display: flex; order: 3; width: 28px; height: 28px; min-height: 0; margin: -4px -6px -4px 0;
+      padding: 0; border-radius: 50%; font-size: 13px; align-items: center; justify-content: center; }
+    body.stage-quiz #jumpbar .jbtns { display: none; order: 4; flex-basis: 100%; justify-content: space-between; }
+    body.stage-quiz #jumpbar.expanded, body.stage-quiz #jumpbar.peek { border-radius: 16px; cursor: default; }
+    body.stage-quiz #jumpbar.expanded .jbtns, body.stage-quiz #jumpbar.peek .jbtns { display: flex; }
+    body.stage-quiz #jumpbar.expanded .jbtoggle, body.stage-quiz #jumpbar.peek .jbtoggle { transform: rotate(180deg); }
+    /* the folded strip looks 32px tall but answers to a 44px-tall tap */
+    body.stage-quiz #jumpbar:not(.expanded):not(.peek)::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
+
+    /* Home + Appearance: one menu button; the list holds Home (amber) and the four looks */
+    #lookbar { padding: 0; background: none; border: none; box-shadow: none; backdrop-filter: none; }
+    #lookbar > a.lk-home, #lookbar > button.lk-toggle { display: none; }
+    #lookbar .lk-menubtn { display: flex; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%;
+      align-items: center; justify-content: center; font-size: 22px; line-height: 1; color: #eef2f6;
+      background: rgba(20,24,30,0.90); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.20); box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
+    #lookbar .lk-menubtn:hover { transform: none; background: rgba(255,255,255,0.14); }
+    #lookbar.open .lk-menubtn { background: rgba(255,255,255,0.14); }
+    #lookbar .lk-list a.lk-home2 { display: flex; margin-bottom: 4px; color: #1a1400; background: #ffd54a; font-weight: 700; }
+    #lookbar .lk-list a.lk-home2:hover { background: #ffe07a; }
+    #lookbar .lk-list a.lk-home2 small { color: rgba(26,20,0,0.7); }
+  }
+
+  /* --- phones, portrait: geometry of the folded frame --- */
+  @media (max-width: 640px) {
+    body.stage-quiz #jumpbar { top: calc(var(--prompt-h, 140px) + 8px); left: 8px; right: 100px; }
+    body.stage-quiz #jumpbar.expanded, body.stage-quiz #jumpbar.peek { right: 8px; }
+    body.stage-quiz #doorsleft { top: calc(var(--prompt-h, 140px) + 8px); right: 8px; padding: 0 12px; height: 32px; line-height: 32px; font-size: 13px; }
+    body.stage-quiz #jumpbar.expanded ~ #doorsleft, body.stage-quiz #jumpbar.peek ~ #doorsleft { visibility: hidden; }
+    /* the bottom row: menu button · Back / Next · help */
+    #lookbar { top: auto; bottom: 12px; left: 8px; right: auto; }
+    #lookbar .lk-menu { left: 0; right: auto; bottom: 100%; padding-bottom: 8px; }
+    #helpbtn { top: auto; bottom: 12px; right: 8px; left: auto; }
+    #resetview { bottom: 64px; }
+    #minimap { bottom: 116px; }
+    #viewbar { bottom: 64px; }
+    #draghint { top: auto; bottom: 130px; }
+  }
+
+  /* --- phones, landscape: geometry of the folded frame --- */
+  @media (max-height: 520px) and (orientation: landscape) {
+    body.stage-quiz #jumpbar { top: auto; bottom: 8px; left: 8px; width: 236px; }
+    body.stage-quiz #jumpbar.expanded, body.stage-quiz #jumpbar.peek { width: 284px; }
+    #lookbar { top: 8px; right: 8px; bottom: auto; left: auto; }
+    #lookbar .lk-menu { top: 100%; bottom: auto; right: 0; left: auto; padding: 8px 0 0; }
+    #helpbtn { display: flex; top: 60px; right: 8px; bottom: auto; left: auto; width: 44px; height: 44px; }
+    #minimap { right: 8px; top: 112px; left: auto; bottom: auto; width: 88px; }
+    #viewbar { left: 250px; }
+    #viewbar button.vbtn { min-width: 44px; padding: 8px 4px; font-size: 13px; }
+    #draghint { top: calc(var(--prompt-h, 140px) + 8px); }
+    /* the options column: a 2x2 grid keeps the feedback line on screen */
+    #qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button.opt { min-height: 48px; padding: 8px 6px; justify-content: center; }
+    button.opt .ltr { display: none; }
+    button.opt .num { font-size: 20px; }
+  }
+
+  /* --- phones, options open: the hint, help and reset chips step aside; the chip and the instruction stay for screen readers --- */
+  @media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
+    body.quiz-open #helpbtn, body.quiz-open #draghint, body.quiz-open #resetview { display: none; }
+    body.quiz-open #doorsleft, body.quiz-open #prompt .pbody {
+      position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  }
 </style>
 </head>
 <body>
@@ -428,7 +522,9 @@
 <!-- jump menu: skip to the first building of any part (Home lives in #lookbar) -->
 <div id="jumpbar" role="navigation" aria-label="Jump to part">
   <div class="jbtitle">Jump to part</div>
-  <div class="jbtns">
+  <div class="jbnow"></div>
+  <button class="ghost jbtoggle" type="button" aria-expanded="false" aria-controls="jbtns" aria-label="Show the part buttons">▾</button>
+  <div class="jbtns" id="jbtns">
     <button class="ghost jbtn" data-part="1" aria-label="Part 1: numbers count up in order">1</button>
     <button class="ghost jbtn" data-part="2" aria-label="Part 2: first digit is the floor">2</button>
     <button class="ghost jbtn" data-part="3" aria-label="Part 3: leading digits name the building">3</button>
@@ -458,6 +554,7 @@
 <!-- site bar: Home + compact Appearance switcher (same course, different visual treatment).
      Collapsed by default; the looks drop out on hover, tap / click or Enter. -->
 <nav id="lookbar" aria-label="Home and appearance">
+  <button class="lk-menubtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lk-menu" aria-label="Menu: Home and appearance">⋯</button>
   <a class="lk-home" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Home: back to the Stop Finder menu">
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v10h13V10" /><path d="M10 20v-6h4v6" />
@@ -468,7 +565,8 @@
     <span class="lk-title">Appearance</span><span class="lk-current">Classic</span><span class="lk-caret" aria-hidden="true">▼</span>
   </button>
   <div class="lk-menu" id="lk-menu">
-    <div class="lk-list" role="group" aria-label="Appearance">
+    <div class="lk-list" role="group" aria-label="Home and appearance">
+      <a class="lk-home2" href="https://jomocodes.github.io/Stop_Finder/">Home <small>back to the menu</small></a>
       <a href="apartment-mockup.html" aria-current="page" title="Classic look (the original flat-colour build)">Classic <small>flat-colour original</small></a>
       <a href="apartment-realistic-a.html" title="Realistic look A: Sunbelt garden-style walk-up">Sunbelt <small>garden-style walk-up</small></a>
       <a href="apartment-realistic-b.html" title="Realistic look B: Midwest brick walk-up">Brick <small>Midwest brick walk-up</small></a>
@@ -482,9 +580,15 @@
 (() => {
   const bar = document.getElementById('lookbar');
   const btn = bar.querySelector('.lk-toggle');
+  const mbtn = bar.querySelector('.lk-menubtn');          // the one-button bar on phones
   const isOpen = () => bar.classList.contains('open');
-  const setOpen = (on) => { bar.classList.toggle('open', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+  const setOpen = (on) => {
+    bar.classList.toggle('open', on);
+    btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (mbtn) mbtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  };
   btn.addEventListener('click', () => setOpen(!isOpen()));
+  if (mbtn) mbtn.addEventListener('click', () => setOpen(!isOpen()));
   document.addEventListener('pointerdown', (e) => { if (isOpen() && !bar.contains(e.target)) setOpen(false); });
   bar.addEventListener('focusout', (e) => { if (isOpen() && !bar.contains(e.relatedTarget)) setOpen(false); });
   bar.addEventListener('keydown', (e) => {
@@ -1657,8 +1761,10 @@ for (const btn of jumpBtns)
 
 // responsive: publish the prompt banner's rendered height so phone layouts can sit below it
 // offsetHeight is the border box, so the same constant works at every padding size
-new ResizeObserver(([e]) => document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px'))
-  .observe(document.getElementById('prompt'));
+new ResizeObserver(([e]) => {
+  document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px');
+  if (typeof applyViewOffset === 'function') requestAnimationFrame(() => applyViewOffset());
+}).observe(document.getElementById('prompt'));
 
 /* ---- prompt banner copy: one amber headline + a short plain-language body ----
    `short` is used on phones (<=640px) so the banner stays above the building. */
@@ -1721,7 +1827,12 @@ const PROMPTS = {
   },
   nameBuilding: {
     title: 'All doors filled ✓',
-    body:  'Now click the <b>roof sign</b> and choose the building number.',
+    body:  'Now the <b>building number</b> — read the leading digits every unit shares. Click the roof sign if the choices close.',
+    keep: true,                                   // a new step: never folded to the headline
+  },
+  done: {
+    title: n => `Building ${n} ✓`,
+    body:  '',
   },
 };
 
@@ -1734,10 +1845,37 @@ function promptFor(st) {
   return { title: val(row.title), body: val(row.body), short: val(row.short) };
 }
 
-/* render headline + body into #prompt; phones get the shorter body when there is one */
-function setPrompt({ title, body, short }) {
-  const useShort = short && matchMedia('(max-width: 640px)').matches;
-  ui.prompt.innerHTML = `<div class="ptitle">${title}</div><div class="pbody">${useShort ? short : body}</div>`;
+/* the two phone layouts (the same queries as the CSS) */
+const phoneMQ = [matchMedia('(max-width: 640px)'), matchMedia('(max-height: 520px) and (orientation: landscape)')];
+const isPhoneLayout = () => phoneMQ.some(m => m.matches);
+
+/* the first quiz building of a part introduces that part's interaction: its
+   instruction stays open until its first door is tapped; the later buildings
+   of the part fold to the headline */
+function firstQuizOfPart(st) {
+  const i = STAGES.indexOf(st);
+  return i > 0 && st.kind === 'quiz' && STAGES[i - 1].kind === 'example';
+}
+
+/* render headline + body into #prompt; phones get the shorter body when there is
+   one, and touch screens read "tap" where the copy says "click". On phones a quiz
+   instruction folds to its headline (`.brief`, unless the row says `keep`); the
+   learner taps the headline to read it. Re-rendered when the layout changes
+   between phone and desktop, so the wording and the fold follow. */
+let lastPrompt = null, lastPromptPhone = null;
+function setPrompt(spec) {
+  const { title, short, keep } = spec;
+  lastPrompt = spec; lastPromptPhone = isPhoneLayout();
+  let body = (short && lastPromptPhone) ? short : (spec.body || '');
+  if (matchMedia('(pointer: coarse)').matches) body = body.replace(/\b(C|c)lick\b/g, (m, c) => (c === 'C' ? 'Tap' : 'tap'));
+  const brief = !keep && !!body && !!currentStage && currentStage.kind === 'quiz' && !firstQuizOfPart(currentStage);
+  ui.prompt.dataset.keep = keep ? '1' : '';
+  ui.prompt.classList.toggle('brief', brief);
+  ui.prompt.classList.remove('expanded');
+  ui.prompt.innerHTML = `<div class="ptitle">${title}</div><div class="pbody">${body}</div>`;
+}
+function rerenderPromptIfLayoutChanged() {
+  if (lastPrompt && lastPromptPhone !== isPhoneLayout()) setPrompt(lastPrompt);
 }
 
 const groups = {};
@@ -1765,9 +1903,82 @@ const SEQ_VIEWS = {
   front: [0, 9, 38], back: [0, 9, -38], left: [-40, 9, 0], right: [40, 9, 0],
 };
 const SEQ_VIEW_TARGET = [0, 4.5, 0];
-/* tuned at 390x844: the Part 3 row keeps all five doors plus the stair on
-   screen with ~7% margin each side */
-const PORTRAIT_BACKOFF = 1.55;
+/* portrait phones: one fixed back-off (1.55x, tuned for the widest building)
+   left the narrower buildings tiny and, in the Sunbelt look, parked the Part 4
+   camera inside a neighbouring building. Each building type is framed from its
+   own footprint instead: the camera moves along the pose's view ray until the
+   building's projected width spans `fill` of the screen. The row (24 wide plus
+   a stair) lands where the old constant put it; the others come much closer.
+   Never nearer than PORTRAIT_MIN of the desktop distance. */
+const PORTRAIT_MIN = 0.75;
+const FOOTPRINT = {                         // width (x), depth (z) and share of the screen width to fill
+  tower: [TW, TD, 0.84], row: [RW, RD, 0.78], block: [BW, BD, 0.84], seq: [SQW + 4, SQD + 4, 0.75], plex: [W, D, 0.85],
+};
+function portraitPos(type, pos, tgt) {
+  const [w, d, fill] = FOOTPRINT[type] || FOOTPRINT.plex;
+  const dir = pos.clone().sub(tgt);
+  const len = dir.length();
+  const flat = Math.hypot(dir.x, dir.z) || 1;
+  const az = Math.abs(dir.z / flat), ax = Math.abs(dir.x / flat);
+  const span = w * az + d * ax;                                          // width as seen from this azimuth
+  // a face seen straight on sits half the building nearer than the target; a corner view much less so
+  const ahead = ((w * ax + d * az) / 2) * Math.pow(Math.max(az, ax), 4);
+  const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+  const need = (span / fill) / (2 * Math.tan(hfov / 2)) + ahead;
+  return dir.multiplyScalar(Math.max(need, len * PORTRAIT_MIN) / len).add(tgt);
+}
+
+/* ---- the free part of a phone screen ------------------------------------
+   Below the prompt, the progress strip and the chip; above the options sheet
+   or the bottom row (portrait); beside the options column (landscape). The
+   picture is shifted so the building sits in the middle of it — a view offset
+   on the projection matrix, so the orbit pivot, raycasting and the plate
+   burst all stay where they are. Desktop: the whole screen, no offset. ---- */
+const jumpbarEl = document.getElementById('jumpbar');
+const bottombarEl = document.getElementById('bottombar');
+const doorsleftEl = document.getElementById('doorsleft');
+function bandRect() {
+  const Wd = innerWidth, Ht = innerHeight;
+  const r = { left: 0, top: 0, right: Wd, bottom: Ht };
+  if (!isPhoneLayout()) return r;
+  const box = el => (el && !el.classList.contains('hidden') ? el.getBoundingClientRect() : null);
+  for (const el of [ui.prompt, jumpbarEl, doorsleftEl]) {
+    const b = box(el);
+    if (b && b.height > 0 && b.top < Ht * 0.4) r.top = Math.max(r.top, b.bottom);
+  }
+  const q = box(ui.quiz);
+  if (q) {
+    if (q.top > Ht * 0.45) r.bottom = Math.min(r.bottom, q.top);          // bottom sheet (portrait)
+    else if (q.left > Wd * 0.5) r.right = Math.min(r.right, q.left);      // side column (landscape)
+  }
+  for (const el of [bottombarEl, ui.viewbar, jumpbarEl]) {
+    const b = box(el);
+    if (b && b.height > 0 && b.top > Ht * 0.5) r.bottom = Math.min(r.bottom, b.top);
+  }
+  if (r.bottom - r.top < Ht * 0.3) { r.top = 0; r.bottom = Ht; }          // the chrome ate the screen: use all of it
+  return r;
+}
+let viewOff = { x: 0, y: 0 }, viewOffRAF = 0;
+function applyViewOffset(ms = 250) {
+  const r = bandRect();
+  const to = { x: Math.round(innerWidth / 2 - (r.left + r.right) / 2), y: Math.round(innerHeight / 2 - (r.top + r.bottom) / 2) };
+  if (viewOffRAF) { cancelAnimationFrame(viewOffRAF); viewOffRAF = 0; }
+  const from = { x: viewOff.x, y: viewOff.y };
+  if (prefersReducedMotion()) ms = 0;
+  const set = (x, y) => {
+    viewOff = { x, y };
+    if (!x && !y) camera.clearViewOffset();
+    else camera.setViewOffset(innerWidth, innerHeight, x, y, innerWidth, innerHeight);
+  };
+  if (ms <= 0 || (from.x === to.x && from.y === to.y)) { set(to.x, to.y); return; }
+  const t0 = performance.now();
+  const step = now => {
+    const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    set(Math.round(from.x + (to.x - from.x) * e), Math.round(from.y + (to.y - from.y) * e));
+    viewOffRAF = k < 1 ? requestAnimationFrame(step) : 0;
+  };
+  viewOffRAF = requestAnimationFrame(step);
+}
 
 const MOVE_MS = 350;      // stage change + walk-around buttons
 const RESET_MS = 450;     // Reset view chip
@@ -1782,8 +1993,8 @@ function poseFor(st) {
   const p = POSES[st && st.type] || POSES.plex;
   const pos = new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2]);
   const tgt = new THREE.Vector3(p.tgt[0], p.tgt[1], p.tgt[2]);
-  // portrait: pull straight back along the view ray, keeping the framing
-  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  // portrait: move along the view ray until the building fills the width
+  if (camera.aspect < 1) pos.copy(portraitPos(st && st.type, pos, tgt));
   return { pos, tgt };
 }
 
@@ -1812,12 +2023,27 @@ function flyTo(pos, tgt, ms = MOVE_MS) {
   };
   if (ms <= 0 || (p0.distanceTo(pos) < 1e-3 && t0.distanceTo(tgt) < 1e-3)) { land(); return; }
   flying = true; controls.enabled = false;
+  // same pivot: swing round it on an arc (a straight line would pass through the building)
+  const arc = t0.distanceTo(tgt) < 1e-3 && p0.distanceTo(tgt) > 1 && pos.distanceTo(tgt) > 1;
+  const s0 = arc ? new THREE.Spherical().setFromVector3(p0.clone().sub(tgt)) : null;
+  const s1 = arc ? new THREE.Spherical().setFromVector3(pos.clone().sub(tgt)) : null;
+  if (arc) {                                   // the short way round
+    if (s1.theta - s0.theta > Math.PI) s1.theta -= Math.PI * 2;
+    else if (s0.theta - s1.theta > Math.PI) s1.theta += Math.PI * 2;
+  }
+  const sph = new THREE.Spherical();
   const t0ms = performance.now();
   const step = (now) => {
     const k = Math.min(1, (now - t0ms) / ms);
     const e = 1 - Math.pow(1 - k, 3);          // ease-out, no overshoot
-    camera.position.lerpVectors(p0, pos, e);
-    controls.target.lerpVectors(t0, tgt, e);
+    if (arc) {
+      sph.set(s0.radius + (s1.radius - s0.radius) * e, s0.phi + (s1.phi - s0.phi) * e, s0.theta + (s1.theta - s0.theta) * e);
+      camera.position.setFromSpherical(sph).add(tgt);
+      controls.target.copy(tgt);
+    } else {
+      camera.position.lerpVectors(p0, pos, e);
+      controls.target.lerpVectors(t0, tgt, e);
+    }
     controls.update();
     if (k < 1) flyRAF = requestAnimationFrame(step);
     else land();
@@ -1858,7 +2084,7 @@ function setSeqView(view) {
   if (!v) return;
   const tgt = new THREE.Vector3(SEQ_VIEW_TARGET[0], SEQ_VIEW_TARGET[1], SEQ_VIEW_TARGET[2]);
   const pos = new THREE.Vector3(v[0], v[1], v[2]);
-  if (camera.aspect < 1) pos.sub(tgt).multiplyScalar(PORTRAIT_BACKOFF).add(tgt);
+  if (camera.aspect < 1) pos.copy(portraitPos('seq', pos, tgt));
   markSeqViewButton(view);
   flyTo(pos, tgt, MOVE_MS);
 }
@@ -1881,7 +2107,8 @@ function driftedFromPose() {
 function updateResetChip() {
   if (!resetChip) return;
   if (flying || introRunning) return;          // don't flicker mid-glide
-  resetChip.classList.toggle('hidden', !driftedFromPose());
+  const walking = !!document.querySelector('#viewbar button.vbtn.active');   // a chosen Part 5 view is not a drift
+  resetChip.classList.toggle('hidden', walking || !driftedFromPose());
 }
 function resetView() {
   if (!currentStage) return;
@@ -2061,7 +2288,10 @@ function armAutoClose(bstate) {
   quizCloseTimer = setTimeout(() => {
     quizCloseTimer = null;
     if (activeBlank && activeBlank !== bstate) return;   // another question took over
-    const reading = ui.quiz.matches(':hover') || ui.quiz.contains(document.activeElement);
+    // :hover only means "a pointer is resting here" on devices that can hover; a touch
+    // screen keeps :hover stuck on the last tapped option, which would hold the sheet open
+    const canHover = matchMedia('(hover: hover)').matches;
+    const reading = (canHover && ui.quiz.matches(':hover')) || ui.quiz.contains(document.activeElement);
     if (reading) return;                                 // still being read — stays put
     closeQuiz();
   }, 1100);
@@ -2151,7 +2381,7 @@ function checkComplete(bstate) {
   if (!celebrated.has(currentIndex)) {
     celebrated.add(currentIndex);
     if (completed.size === STAGES.length) fireFinale();   // this stage finished the course
-    else fireConfetti('');
+    else fireConfetti(STAGES[currentIndex + 1] && STAGES[currentIndex + 1].part === currentStage.part ? '' : 'part');
   }
   showNext();
 }
@@ -2217,6 +2447,7 @@ function markSolved(bstate) {
 const completed = new Set();
 const progressEl = document.getElementById('progress');
 const jbTitleEl = document.querySelector('#jumpbar .jbtitle');
+const jbNowEl = document.querySelector('#jumpbar .jbnow');
 const progSegs = STAGES.map((st, i) => {
   const seg = document.createElement('span');
   seg.className = 'seg' + (i > 0 && st.part !== STAGES[i - 1].part ? ' part' : '');
@@ -2232,6 +2463,8 @@ function updateProgress() {
   }
   if (jbTitleEl && currentIndex >= 0)
     jbTitleEl.textContent = `Part ${STAGES[currentIndex].part} · Building ${currentIndex + 1} of ${STAGES.length}`;
+  if (jbNowEl && currentIndex >= 0)             // the short caption of the phone progress strip
+    jbNowEl.textContent = `Part ${STAGES[currentIndex].part} · ${currentIndex + 1} of ${STAGES.length}`;
 }
 function markStageComplete(i) {
   completed.add(i); updateProgress();
@@ -2365,6 +2598,33 @@ function nearItsPlate(point, plate) {
   return Math.hypot(pickV.x - point.x, pickV.z - point.z) <= 1.6 && dy >= -0.6 && dy <= 2.7;
 }
 
+/* touch screens: a tap that misses every plate still opens the nearest unsolved
+   plate within SNAP_PX of the finger, as long as that plate faces the camera */
+const SNAP_PX = 32;
+const snapV = new THREE.Vector3();
+function nearestBlank(clientX, clientY) {
+  if (!blanks || !blanks.length) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const seen = new Set();
+  let best = null, bestD = SNAP_PX;
+  for (const o of blanks) {
+    const bs = o.userData.bstate;
+    if (!bs || bs.solved || !bs.plate || seen.has(bs)) continue;
+    seen.add(bs);
+    bs.plate.getWorldPosition(snapV);
+    pickN.set(0, 0, 1).applyQuaternion(bs.plate.getWorldQuaternion(pickQ));
+    if (pickN.dot(snapV.clone().sub(camera.position)) > 0) continue;   // plate faces away
+    snapV.project(camera);
+    if (snapV.z > 1) continue;                                          // behind the camera
+    const sx = rect.left + (snapV.x * 0.5 + 0.5) * rect.width;
+    const sy = rect.top + (-snapV.y * 0.5 + 0.5) * rect.height;
+    const d = Math.hypot(sx - clientX, sy - clientY);
+    if (d < bestD) { bestD = d; best = bs; }
+  }
+  return best;
+}
+const coarsePointer = matchMedia('(pointer: coarse)');
+
 let downPos = null;
 renderer.domElement.addEventListener('pointerdown', e => { downPos = { x: e.clientX, y: e.clientY }; });
 renderer.domElement.addEventListener('pointercancel', () => { downPos = null; });
@@ -2372,9 +2632,11 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (!downPos) return;
   const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
   downPos = null;
-  if (moved > 6 || currentStage.kind !== 'quiz') return; // a drag, or no quiz here
+  const slop = e.pointerType === 'touch' ? 12 : 6;      // a thumb rolls further than a mouse
+  if (moved > slop || currentStage.kind !== 'quiz') return; // a drag, or no quiz here
 
-  const bs = pickBlank(e.clientX, e.clientY);
+  let bs = pickBlank(e.clientX, e.clientY);
+  if (!bs && (e.pointerType !== 'mouse' || coarsePointer.matches)) bs = nearestBlank(e.clientX, e.clientY);
   if (bs) openQuiz(bs);
 });
 
@@ -2391,8 +2653,14 @@ renderer.domElement.addEventListener('pointerup', e => {
   const chip = document.getElementById('doorsleft');
   const hint = document.getElementById('draghint');
   const helpBtn = document.getElementById('helpbtn');
+  if (coarsePointer.matches) {                 // touch screens: no scroll wheel, no clicks
+    const text = hint.querySelector('div');
+    if (text) text.innerHTML = '<b>Drag</b> to look round · <b>Pinch</b> to zoom · Tap a glowing <b>?</b> door to answer';
+  }
   const HINT_FULL = hint.innerHTML;
-  const HINT_TIP = '<div>Click a door marked <b>?</b> — the glowing ones.</div>';
+  const HINT_TIP = coarsePointer.matches
+    ? '<div>Tap a door marked <b>?</b> — the glowing ones.</div>'
+    : '<div>Click a door marked <b>?</b> — the glowing ones.</div>';
 
   const stageUD = () => (groups[currentIndex] && groups[currentIndex].userData) || null;
   const isQuizStage = () => !!currentStage && currentStage.kind === 'quiz';
@@ -2459,8 +2727,7 @@ renderer.domElement.addEventListener('pointerup', e => {
       bannerHalo(ud);
     }
     chipSig = '';
-    tipAt = performance.now();
-    tipUsed = false;
+    tipAt = performance.now();                 // the idle tip fires once per run, not once per building
     firstRunHint();
   }
   function reconcile(now) {
@@ -2555,6 +2822,18 @@ renderer.domElement.addEventListener('pointerup', e => {
   });
   helpBtn.addEventListener('click', () => showHint(HINT_FULL, 6000));
 
+  /* touch screens: the glow is the tap target, so on screen it never shrinks
+     below HALO_MIN_PX however far the camera is (the plates are 1.7-2 units wide) */
+  const HALO_MIN_PX = 48, haloV = new THREE.Vector3();
+  function sizeHalo(bs) {
+    const pw = bs.plate.geometry.parameters.width;
+    const d = bs.plate.getWorldPosition(haloV).distanceTo(camera.position) || 1;
+    const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+    const px = pw * 1.16 / (2 * d * Math.tan(hfov / 2)) * innerWidth;   // the halo's natural width on screen
+    const k = Math.max(1, HALO_MIN_PX / Math.max(1, px));
+    bs.halo.scale.set(k, k, 1);
+  }
+
   /* ---- our own loop: pulse + reconcile (doc 02 owns tick()) ---- */
   (function pulse(now) {
     requestAnimationFrame(pulse);
@@ -2565,6 +2844,7 @@ renderer.domElement.addEventListener('pointerup', e => {
     const o = reduceMotion.matches
       ? 0.6
       : 0.35 + 0.3 * (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 2 * 0.9));
+    if (coarsePointer.matches) for (const s of ud.blankStates) if (s.halo) sizeHalo(s);
     for (const s of ud.blankStates) if (s.halo) s.halo.material.opacity = (s === hovered ? 0.9 : o);
     if (ud.buildingState && ud.buildingState.halo) ud.buildingState.halo.material.opacity = o;
   })(performance.now());
@@ -2585,10 +2865,11 @@ const CONFETTI_COLORS = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', 
 function fireConfetti(mode) {
   if (REDUCED()) return;                       // no big motion for reduced-motion users
   const colors = CONFETTI_COLORS;
-  if (mode === 'cannons') {                    // the finale: two cannons from the bottom corners
+  if (mode === 'cannons' || mode === 'part') { // two cannons from the bottom corners: the finale, or (smaller) a finished part
+    const n = mode === 'part' ? 60 : 120;
     for (const side of [0, 1]) {
       const dir = side === 0 ? 1 : -1;
-      for (let i = 0; i < 120; i++) {
+      for (let i = 0; i < n; i++) {
         confetti.push({
           x: side === 0 ? 0 : innerWidth,
           y: innerHeight * 0.8,
@@ -2603,10 +2884,20 @@ function fireConfetti(mode) {
     }
     return;
   }
-  for (let i = 0; i < 170; i++) {              // per-building burst
+  // per-building burst: from the plate just solved (where the eye is), kept out from under the sheet
+  let ox = innerWidth / 2, oy = innerHeight * 0.32;
+  const plate = activeBlank && activeBlank.plate;
+  if (plate) {
+    const v = plate.getWorldPosition(new THREE.Vector3()).project(camera);
+    if (v.z < 1) { ox = (v.x * 0.5 + 0.5) * innerWidth; oy = (-v.y * 0.5 + 0.5) * innerHeight; }
+  }
+  const band = bandRect();
+  oy = Math.min(Math.max(oy, band.top + 20), band.bottom - 20);
+  const count = coarsePointer.matches ? 90 : 170;   // phones: fewer pieces, they cover more of the screen
+  for (let i = 0; i < count; i++) {            // per-building burst
     confetti.push({
-      x: innerWidth / 2 + (Math.random() - 0.5) * 240,
-      y: innerHeight * 0.32,
+      x: ox + (Math.random() - 0.5) * 240,
+      y: oy,
       vx: (Math.random() - 0.5) * 10,
       vy: -7 - Math.random() * 9,
       g: 0.22 + Math.random() * 0.12,
@@ -2650,6 +2941,115 @@ function drawConfetti() {
     cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
     cctx.restore();
   }
+}
+
+/* ============================================================
+   chrome states on phones — what shows when. Listens to the document
+   events; nothing here edits the stage or quiz functions.
+   - worked examples keep every panel in place (the tutorial state)
+   - quiz buildings fold the prompt to its headline and the jump bar to
+     a progress strip; a tap opens each again, and the part buttons peek
+     for PEEK_MS when the last building of a part is finished
+   - the options sheet hides the hint, help and reset chips
+   - a building finished earlier says so instead of repeating its task
+   - confetti from the last building never falls over the next one
+   ============================================================ */
+{
+  const body = document.body;
+  const jump = document.getElementById('jumpbar');
+  const jbToggle = jump.querySelector('.jbtoggle');
+  const PEEK_MS = 3000;                        // the part buttons after a part is finished
+  const EXPAND_MS = 6000;                      // the part buttons after a tap on the strip
+  let peekT = 0, expandT = 0, peekPending = false, peekPart = 0;
+
+  const folded = () => isPhoneLayout() && body.classList.contains('stage-quiz');
+  const quizIsOpen = () => !ui.quiz.classList.contains('hidden');
+
+  function setJumpOpen(on) {
+    jump.classList.toggle('expanded', on);
+    jbToggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+    clearTimeout(expandT);
+    if (on) expandT = setTimeout(function again() {
+      if (jump.contains(document.activeElement)) { expandT = setTimeout(again, EXPAND_MS); return; }   // being used by keyboard
+      setJumpOpen(false);
+    }, EXPAND_MS);
+  }
+  jbToggle.addEventListener('click', e => { e.stopPropagation(); setJumpOpen(!jump.classList.contains('expanded')); });
+  jump.addEventListener('click', e => {        // the whole strip is the handle
+    if (!folded() || jump.classList.contains('expanded') || e.target.closest('button')) return;
+    setJumpOpen(true);
+  });
+  document.addEventListener('pointerdown', e => {
+    if (jump.classList.contains('expanded') && !jump.contains(e.target)) setJumpOpen(false);
+  });
+
+  function startPeek() {
+    peekPending = false;
+    jump.classList.add('peek');
+    const nb = jump.querySelector(`button.jbtn[data-part="${peekPart}"]`);
+    if (nb) nb.classList.add('pulse');          // the part that opens next
+    clearTimeout(peekT);
+    peekT = setTimeout(endPeek, PEEK_MS);
+  }
+  function endPeek() {
+    peekPending = false; clearTimeout(peekT);
+    jump.classList.remove('peek');
+    for (const b of jump.querySelectorAll('button.jbtn.pulse')) b.classList.remove('pulse');
+  }
+
+  document.addEventListener('stagechange', e => {
+    const st = e.detail.stage;
+    body.classList.toggle('stage-quiz', st.kind === 'quiz');
+    body.classList.toggle('stage-example', st.kind !== 'quiz');
+    setJumpOpen(false);
+    endPeek();
+    confetti = [];                             // nothing from the last building falls over this one
+    if (st.kind === 'quiz' && completed.has(e.detail.index)) setPrompt(promptDone(st));
+    requestAnimationFrame(() => applyViewOffset());
+  });
+  document.addEventListener('stagecomplete', e => {
+    const i = e.detail.index, st = STAGES[i], nx = STAGES[i + 1];
+    if (i !== currentIndex || st.kind !== 'quiz') return;
+    setPrompt(promptDone(st));
+    if (!folded() || (nx && nx.part === st.part)) return;   // a building, not a part: the strip's segment is the feedback
+    peekPart = st.part + 1; peekPending = true;
+    if (!quizIsOpen()) startPeek();            // else after the sheet closes, so the peek is actually seen
+  });
+  document.addEventListener('quizopen', e => {
+    body.classList.add('quiz-open');
+    const bs = e.detail && e.detail.bstate;
+    // once a door has been tapped the instruction has done its job: fold it (phones)
+    if (currentStage && currentStage.kind === 'quiz' && !ui.prompt.dataset.keep) ui.prompt.classList.add('brief');
+    ui.prompt.classList.remove('expanded');
+    // the plate's partial number repeats in the sheet, so a small plate need not be read off the wall
+    if (bs && !bs.header && typeof a11yMask === 'function') {
+      const mask = a11yMask(bs);
+      const small = ui.qhead.querySelector('small');
+      if (small && mask && mask !== '?') small.innerHTML = `The plate shows <b>${mask.replace(/_/g, '▢')}</b> — pick the full number`;
+    }
+    // touch: show which plate the tap opened
+    if (coarsePointer.matches && bs && bs.plate && bs.plate.material) {
+      bs.plate.material.color.set('#fff1c2');
+      setTimeout(() => { if (!bs.solved && bs.plate.material) bs.plate.material.color.set('#ffffff'); }, 700);
+    }
+    requestAnimationFrame(() => applyViewOffset());   // the sheet took the bottom: lift the picture (and hold it)
+  });
+  document.addEventListener('quizclose', () => {
+    body.classList.remove('quiz-open');
+    if (peekPending) startPeek();
+  });
+  document.addEventListener('coursereset', endPeek);
+
+  function promptDone(st) {
+    const n = st.label ?? st.building ?? st.number;
+    return { title: PROMPTS.done.title(n), body: PROMPTS.done.body };
+  }
+
+  // the folded prompt: a tap on the headline unfolds the instruction (and folds it again)
+  ui.prompt.addEventListener('click', () => {
+    if (!ui.prompt.classList.contains('brief') || !isPhoneLayout()) return;
+    ui.prompt.classList.toggle('expanded');
+  });
 }
 
 /* ============================================================
@@ -2936,8 +3336,10 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   applyViewportFov();
+  rerenderPromptIfLayoutChanged();
   // re-frame on orientation / window changes, unless a drag is under way
   if (currentStage && !dragging) { const { pos, tgt } = poseFor(currentStage); flyTo(pos, tgt, 0); }
+  applyViewOffset(0);
   sizeConfetti();
 });
 (function tick() {

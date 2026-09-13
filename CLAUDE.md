@@ -82,7 +82,8 @@ Structure top-to-bottom:
   `#app` (canvas mount), sr-only
   `#scene-desc` / `#doorlist`, `#prompt` (top banner), `#quiz` (options panel
   with `#qclose` / `#qkey`), `#viewbar` (Part 5 Front/Back/Left/Right),
-  `#minimap` (Part 5 top-down map), `#jumpbar` (parts 1-5 + `#progress`),
+  `#minimap` (Part 5 top-down map), `#jumpbar` (parts 1-5 + `#progress`, plus the
+  `.jbnow` caption and `.jbtoggle` caret of the phone progress strip),
   `#doorsleft` / `#draghint` / `#helpbtn`, `#bottombar` (Back / Next),
   `#resetview`.
 - **Import map + module** start: Three.js via CDN, then `OrbitControls`.
@@ -103,16 +104,30 @@ Structure top-to-bottom:
   curriculum; change them deliberately.**
 - **UI + state:** `ui`, mini-map drawing, jump-bar wiring, `ResizeObserver`
   publishing `--prompt-h`, the `PROMPTS` table + `setPrompt` (headline + body
-  + phone-short variant), `POSES` + `frameStage` / `flyTo` / `setSeqView` /
-  `resetView` / `orbitBy` (eased camera).
+  + phone-short variant; on phones a quiz instruction folds to its headline
+  (`#prompt.brief`) except on the first quiz building of a part, and "click"
+  reads "tap" on touch screens), `POSES` + `frameStage` / `flyTo` / `setSeqView` /
+  `resetView` / `orbitBy` (eased camera; a move that keeps its pivot swings round it
+  on an arc). Portrait phones frame each building type from its footprint
+  (`FOOTPRINT` / `portraitPos`, no fixed back-off) and shift the picture into the
+  free band of the screen with a view offset (`bandRect` / `applyViewOffset`).
 - **Quiz logic:** `openQuiz` / `chooseOption` (per-digit-place explanations
   on a wrong pick) / `closeQuiz`; door plates are clickable via raycasting,
-  with hover tint, pulsing halos and `pickBlank()` for precision.
+  with hover tint, pulsing halos and `pickBlank()` for precision; on touch
+  screens a tap that misses snaps to the nearest unsolved plate (`nearestBlank`)
+  and the halo never shrinks below 48 px on screen.
 - **Flow + reward:** `checkComplete` / `showNext` / `resetCourse` /
   `retryPart` (rebuilds one part for the report's "Try Part N again"),
   `popPlate`, `markSolved`, progress bar, `fireConfetti` (per building,
   cannons at the end), `fireFinale` (dispatches `coursecomplete`, then shows
   `#finale`; the report inside it is rendered by `report.js`).
+- **Chrome block (phones):** listens to the events below and sets `body.stage-quiz`
+  / `.stage-example` / `.quiz-open`; on quiz buildings the jump bar is a progress
+  strip (tap to expand; the part buttons peek for 3 s when a part is finished),
+  Home + Appearance are the one `⋯` button (`#lookbar .lk-menubtn`), a finished
+  building's prompt reads "Building N ✓", and confetti is cleared on a stage change.
+  Worked examples keep the full frame. The CSS for all of this is the last section
+  of `<style>`. Rationale: `docs/apartment-course-review/mobile-chrome/`.
 - **Accessibility block:** keyboard map (Tab / Enter / 1-4 / arrows / Home /
   F,B,L,R / Escape), live regions, per-stage scene description and door list.
 - **Events on `document`** connect the regions without shared function bodies:
