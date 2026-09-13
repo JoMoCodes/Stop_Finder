@@ -1913,6 +1913,11 @@ const SEQ_VIEWS = {
   front: [0, 9, 38], back: [0, 9, -38], left: [-40, 9, 0], right: [40, 9, 0],
 };
 const SEQ_VIEW_TARGET = [0, 4.5, 0];
+/* portrait phones: a walk-around view shows one face to read, so it fills more
+   of the screen than the stage's corner framing (FOOTPRINT.seq). This also keeps
+   the side views' camera in front of the neighbours the realistic looks stand
+   beyond the ends of the building, which the wider back-off parked it inside. */
+const SEQ_VIEW_FILL = 0.88;
 /* portrait phones: one fixed back-off (1.55x, tuned for the widest building)
    left the narrower buildings tiny and, in the Sunbelt look, parked the Part 4
    camera inside a neighbouring building. Each building type is framed from its
@@ -1924,8 +1929,9 @@ const PORTRAIT_MIN = 0.75;
 const FOOTPRINT = {                         // width (x), depth (z) and share of the screen width to fill
   tower: [TW, TD, 0.84], row: [RW, RD, 0.78], block: [BW, BD, 0.84], seq: [SQW + 4, SQD + 4, 0.75], plex: [W, D, 0.85],
 };
-function portraitPos(type, pos, tgt) {
-  const [w, d, fill] = FOOTPRINT[type] || FOOTPRINT.plex;
+function portraitPos(type, pos, tgt, fillOverride) {
+  const [w, d, fill0] = FOOTPRINT[type] || FOOTPRINT.plex;
+  const fill = fillOverride || fill0;
   const dir = pos.clone().sub(tgt);
   const len = dir.length();
   const flat = Math.hypot(dir.x, dir.z) || 1;
@@ -2094,7 +2100,7 @@ function setSeqView(view) {
   if (!v) return;
   const tgt = new THREE.Vector3(SEQ_VIEW_TARGET[0], SEQ_VIEW_TARGET[1], SEQ_VIEW_TARGET[2]);
   const pos = new THREE.Vector3(v[0], v[1], v[2]);
-  if (camera.aspect < 1) pos.copy(portraitPos('seq', pos, tgt));
+  if (camera.aspect < 1) pos.copy(portraitPos('seq', pos, tgt, SEQ_VIEW_FILL));
   markSeqViewButton(view);
   flyTo(pos, tgt, MOVE_MS);
 }
