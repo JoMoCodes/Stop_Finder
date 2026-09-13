@@ -1,0 +1,2735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Stop Finder — Houses</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  .hidden { display: none !important; }
+
+  /* ---- accessibility: same palette and contrast as the apartment course
+     (amber #ffd9a0, grey #9fb0c0, success #7ee0a0, error #ff9a8a on #14181e;
+     blank #c0392b on the white plate; text #08130c on green #57c97e) ---- */
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  button:focus-visible, canvas:focus-visible, [tabindex]:focus-visible { outline:3px solid #ffd54a; outline-offset:2px; box-shadow:0 0 0 6px rgba(20,24,30,.9); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    button.opt.wrong { animation:none !important; }
+  }
+
+  /* top prompt */
+  #prompt {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    width: min(680px, calc(100% - 32px));
+    background: rgba(20, 24, 30, 0.9); backdrop-filter: blur(6px);
+    color: #eef2f6; border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px; padding: 14px 20px 15px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.4); z-index: 10; text-align: left;
+  }
+  #prompt .ptitle { color: #ffd9a0; font-weight: 700; font-size: 17px; line-height: 1.3; margin-bottom: 4px; }
+  #prompt .pbody  { color: #dfe6ee; font-size: 15px; line-height: 1.5; }
+  #prompt .pbody b { color: #ffd9a0; font-weight: 600; }
+  #prompt .pbody i { font-style: normal; color: #eef2f6; text-decoration: underline dotted; }
+  #prompt .pbody .nb { white-space: nowrap; }
+  #prompt b { color: #ffd9a0; }
+
+  /* buttons */
+  button {
+    font: inherit; cursor: pointer; border: none; border-radius: 999px;
+    padding: 13px 30px; font-size: 16px; font-weight: 600; color: #08130c;
+    background: #57c97e; box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+    transition: transform .1s ease, background .12s ease;
+  }
+  button:hover { transform: translateY(-2px); background: #6fe096; }
+  button.ghost {
+    background: rgba(255,255,255,0.10); color: #eef2f6;
+    border: 1px solid rgba(255,255,255,0.20); font-weight: 500; padding: 11px 20px;
+  }
+  button.ghost:hover { background: rgba(255,255,255,0.18); }
+  button:disabled, button.ghost:disabled { opacity: .45; cursor: default; transform: none; }
+  #resetview { position: fixed; right: 22px; bottom: 80px; z-index: 11; padding: 9px 14px; font-size: 14px; }
+
+  /* bottom button bar (Back / Next between streets) */
+  #bottombar {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    z-index: 10; display: flex; align-items: center; gap: 10px;
+  }
+
+  /* per-street chip, first-run hint, help button */
+  #doorsleft {
+    position: fixed; top: 16px; right: 16px; z-index: 11; padding: 9px 14px; border-radius: 999px;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.14);
+    color: #eef2f6; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #doorsleft b { color: #ffd54a; }
+  #doorsleft.done { color: #7ee0a0; }
+
+  #draghint {
+    position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%);
+    width: min(470px, calc(100% - 32px)); display: flex; gap: 14px; align-items: center;
+    padding: 12px 16px; border-radius: 14px; background: rgba(20,24,30,0.92);
+    border: 1px solid rgba(255,213,74,0.45); color: #eef2f6; font-size: 14px; line-height: 1.45;
+    z-index: 12; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    opacity: 0; transition: opacity .3s ease; pointer-events: none;
+  }
+  #draghint.show { opacity: 1; }
+  #draghint b { color: #ffd9a0; }
+  #draghint svg { width: 64px; flex: none; }
+
+  #helpbtn {
+    position: fixed; right: 22px; bottom: 28px; width: 40px; height: 40px; padding: 0;
+    border-radius: 50%; font-size: 18px; z-index: 11;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* site bar: this course has one look, so the bar is just the Home button */
+  #lookbar {
+    position: fixed; right: 74px; bottom: 28px; z-index: 11;
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px; border-radius: 999px; font-size: 13px; color: #9fb0c0;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #lookbar a.lk-home {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px 0 10px;
+    border-radius: 999px; text-decoration: none; font-weight: 700; font-size: 13px;
+    color: #1a1400; background: #ffd54a; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    transition: transform .1s ease, background .12s ease;
+  }
+  #lookbar a.lk-home svg { width: 16px; height: 16px; flex: none; }
+  #lookbar a.lk-home:hover { background: #ffe07a; transform: translateY(-1px); }
+  #lookbar a.lk-home:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(20,24,30,.9); }
+
+  /* walk bar: turn left · walk to the next viewpoint · turn right */
+  #viewbar {
+    position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%);
+    z-index: 11; display: flex; align-items: center; gap: 6px;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 999px;
+    padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #viewbar button.vbtn { padding: 0 14px; min-height: 40px; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  #viewbar button.vbtn.turn { width: 40px; padding: 0; justify-content: center; font-size: 18px; }
+  #viewbar button.vbtn.walk { background: #57c97e; color: #08130c; border-color: transparent; font-weight: 600; }
+  #viewbar button.vbtn.walk:hover:not(:disabled) { background: #6fe096; }
+  #viewbar button.vbtn.walk:disabled { background: rgba(255,255,255,0.10); color: #eef2f6; }
+
+  /* digit-place palette: block · lot · side, shared by the quiz, prompt, report and 3D key */
+  :root { --c-block:#f28c6a; --c-lot:#eef2f6; --c-side:#7cc4ff; --c-path:#ffd54a; }
+  .pl-block{color:var(--c-block)} .pl-lot{color:var(--c-lot)} .pl-side{color:var(--c-side)}
+  .pl-building{color:var(--c-block)} .pl-floor{color:var(--c-side)} .pl-door{color:var(--c-lot)}
+
+  /* street map (Street View style): viewpoints you can tap, "you are here" */
+  #minimap{position:fixed;left:22px;bottom:28px;z-index:11;width:236px;padding:8px 8px 6px;border-radius:14px;background:rgba(20,24,30,.9);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  #minimap svg{display:block;width:100%;height:auto}
+  #minimap .mmnote{color:#9fb0c0;font-size:10px;text-align:center;margin-top:4px}
+  #minimap circle.node{cursor:pointer}
+
+  /* top-left "jump to part" menu */
+  #jumpbar {
+    position: fixed; top: 16px; left: 16px; z-index: 11;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #jumpbar .jbtitle { color: #9fb0c0; font-size: 12px; text-align: center; margin-bottom: 8px; }
+  #jumpbar .jbtns { display: flex; gap: 8px; }
+  #jumpbar button.jbtn {
+    width: 40px; height: 40px; padding: 0; font-size: 15px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #jumpbar button.jbtn.active { background: #57c97e; color: #08130c; border-color: transparent; }
+
+  /* course progress: one segment per street */
+  #progress { display: flex; gap: 3px; margin-top: 8px; height: 6px; }
+  #progress .seg { flex: 1; border-radius: 3px; background: rgba(255,255,255,0.18); }
+  #progress .seg.done { background: #57c97e; }
+  #progress .seg.now { background: #ffd9a0; }
+  #progress .seg.part { margin-left: 6px; }
+
+  /* end-of-run report: the dialog shell; contents come from report.js */
+  #finale {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(580px, calc(100% - 32px)); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    padding: 20px 24px 24px; border-radius: 18px;
+    background: rgba(20,24,30,0.94); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.16); color: #eef2f6; z-index: 40;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    animation: finale-in .2s ease-out;
+  }
+  #finale:focus { outline: none; }
+  @keyframes finale-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } }
+  #finale .factions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* right-side quiz panel */
+  #quiz {
+    position: fixed; top: 50%; right: 22px; transform: translateY(-50%);
+    width: 248px; z-index: 11;
+    background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 38px 16px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #quiz .qhead { color: #eef2f6; font-weight: 600; margin-bottom: 12px; text-align: center; }
+  #quiz .qhead small { display: block; color: #9fb0c0; font-weight: 400; font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  #qclose {
+    position: absolute; top: 5px; right: 6px; width: 32px; height: 32px; padding: 0;
+    border-radius: 50%; font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #qkey {
+    display: flex; gap: 10px; justify-content: center; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .06em; color: #9fb0c0; margin: -6px 0 10px;
+  }
+  #qopts { display: flex; flex-direction: column; gap: 8px; }
+  button.opt {
+    background: rgba(255,255,255,0.08); color: #eef2f6;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+    display: flex; align-items: center; gap: 10px; min-height: 48px;
+    padding: 10px 14px; font-size: 16px; font-weight: 600; text-align: left;
+    line-height: 1.5; box-shadow: none;
+    transition: background .12s, transform .12s, border-color .12s;
+  }
+  button.opt:hover { transform: none; }
+  button.opt:hover:not(:disabled) {
+    background: rgba(255,255,255,0.16); transform: translateX(3px);
+    border-color: rgba(255,217,160,0.6);
+  }
+  button.opt .ltr { width: 22px; color: #9fb0c0; font-weight: 500; }
+  button.opt .num {
+    font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum"; letter-spacing: .02em;
+  }
+  .pl + .pl { margin-left: .14em; }
+  button.opt.wrong { background: rgba(229,57,53,0.32); border-color: rgba(229,57,53,0.75); animation: shake .42s; }
+  button.opt.right { background: rgba(87,201,126,0.28); border-color: rgba(87,201,126,0.7); }
+  button.opt:disabled { cursor: default; opacity: 1; }
+  #qmsg { margin-top: 12px; text-align: center; font-size: 14px; min-height: 20px; line-height: 1.4; }
+  #qmsg.ok { color: #7ee0a0; }
+  #qmsg.bad { color: #ff9a8a; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+  /* ============================================================
+     RESPONSIVE / MOBILE LAYOUT — overrides only, all in media queries
+     ============================================================ */
+  @media (pointer: coarse) {
+    button { min-height: 44px; }
+    #jumpbar button.jbtn { width: 44px; height: 44px; }
+    button.opt { min-height: 52px; }
+    #lookbar a.lk-home { min-height: 44px; }
+    #qclose { width: 44px; height: 44px; }
+    #viewbar button.vbtn { min-height: 44px; }
+    #viewbar button.vbtn.turn { width: 44px; }
+  }
+
+  /* --- tablets 641-1024px --- */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    #quiz { right: 12px; width: 248px; }
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); }
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); }
+  }
+
+  /* --- phones, portrait --- */
+  @media (max-width: 640px) {
+    #prompt { top: 8px; left: 8px; right: 8px; width: auto; transform: none; padding: 10px 12px 11px;
+      max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; }
+    #prompt .ptitle { font-size: 16px; }
+    #prompt .pbody { font-size: 15px; }
+
+    #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+    #jumpbar .jbtns { gap: 8px; }
+    #progress { margin-top: 6px; }
+
+    #lookbar { top: auto; bottom: 70px; left: 8px; right: auto; padding: 4px; }
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px); right: 8px; left: auto; }
+
+    #bottombar { bottom: 12px; gap: 8px; width: calc(100% - 16px); justify-content: center; }
+    #bottombar button { padding: 12px 18px; font-size: 15px; min-height: 46px; }
+
+    /* walk bar sits above Back / Next, between Home (left) and the map (right) */
+    #viewbar { bottom: 68px; left: 50%; transform: translateX(-50%); gap: 4px; padding: 4px; }
+    #viewbar button.vbtn { padding: 0 10px; font-size: 14px; }
+    #viewbar button.vbtn .vlabel { display: none; }
+    #viewbar button.vbtn.walk { width: 44px; padding: 0; justify-content: center; font-size: 18px; }
+
+    #helpbtn   { right: 8px; bottom: auto; top: calc(var(--prompt-h, 140px) + 16px + 74px + 50px); left: auto; width: 44px; height: 44px; }
+    #resetview { right: 8px; bottom: 122px; left: auto; padding: 0; width: 44px; height: 44px; }
+    #resetview .rv-label { display: none; }
+    #minimap   { right: 8px; bottom: 172px; left: auto; top: auto; width: 128px; padding: 5px 5px 3px; }
+    #minimap .mmnote { display: none; }
+    #draghint  { left: 8px; right: 8px; width: auto; top: 46%; bottom: auto; transform: none; }
+
+    #quiz { top: auto; bottom: 0; left: 0; right: 0; width: auto; transform: none; z-index: 30;
+      border-radius: 16px 16px 0 0; border-bottom: none; max-height: 60vh; overflow-y: auto;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); }
+    #qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button.opt { min-height: 56px; display: flex; align-items: center; justify-content: center; }
+    button.opt .ltr { display: none; }
+    button.opt .num { font-size: 24px; }
+    #qclose { width: 44px; height: 44px; top: 4px; right: 4px; }
+    #finale { inset: 0; transform: none; width: auto; max-height: none; border-radius: 0;
+      padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); animation: none; }
+  }
+
+  @media (max-width: 360px) {
+    #minimap { width: 104px; bottom: 160px; }
+  }
+
+  /* --- phones, landscape --- */
+  @media (max-height: 520px) and (orientation: landscape) {
+    #prompt { top: 8px; left: 8px; right: auto; transform: none; width: min(52vw, 460px);
+      max-height: 44vh; overflow-y: auto; padding: 8px 12px; }
+    #prompt .ptitle { font-size: 14px; }
+    #prompt .pbody { font-size: 13px; }
+
+    #jumpbar { top: auto; bottom: 8px; left: 8px; padding: 6px; }
+    #jumpbar .jbtitle { display: none; }
+
+    #bottombar { bottom: 8px; left: auto; right: 8px; transform: none; }
+    #bottombar button { padding: 9px 16px; font-size: 14px; }
+
+    #viewbar { top: auto; bottom: 8px; left: 284px; transform: none; padding: 4px; gap: 4px; }
+    #viewbar button.vbtn { padding: 0 10px; font-size: 13px; }
+    #viewbar button.vbtn .vlabel { display: none; }
+    #viewbar button.vbtn.walk { width: 44px; padding: 0; justify-content: center; font-size: 18px; }
+
+    #quiz { top: 8px; bottom: 8px; right: 8px; left: auto; width: 236px;
+      max-height: none; transform: none; border-radius: 14px; overflow-y: auto; }
+    #qopts { display: flex; flex-direction: column; }
+
+    #minimap { right: 252px; top: 8px; bottom: auto; left: auto; width: 150px; padding: 5px 5px 3px; }
+    #minimap .mmnote { display: none; }
+    #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); left: 8px; right: auto; }
+    #draghint { left: 8px; right: auto; width: min(52vw, 460px); top: calc(var(--prompt-h, 140px) + 60px); bottom: auto; transform: none; }
+    #helpbtn { display: none; }
+    #resetview { right: 8px; bottom: 112px; left: auto; padding: 0; width: 44px; height: 44px; }
+    #resetview .rv-label { display: none; }
+
+    #lookbar { top: 8px; right: 8px; bottom: auto; left: auto; z-index: 10; }
+
+    #finale { inset: 8px; transform: none; width: auto; max-height: none; border-radius: 14px;
+      padding: 12px 16px 16px; animation: none; }
+  }
+</style>
+</head>
+<body>
+<!-- end-of-run report (shown after the last street) -->
+<div id="finale" class="hidden" role="dialog" aria-modal="true" aria-labelledby="ftitle" aria-describedby="fsum" tabindex="-1">
+  <div id="report"></div>
+  <div class="factions"><button id="fagain">Start over ▸</button><button id="fclose" class="ghost">Keep looking around</button></div>
+</div>
+
+<div id="app"></div>
+
+<!-- screen-reader text for the 3D scene, where you are standing, and a keyboard route to every blank house -->
+<p id="scene-desc" class="sr-only"></p>
+<p id="walkstatus" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+<div id="doorlist" class="sr-only" role="group" aria-label="Houses to fill in"></div>
+
+<div id="prompt" aria-live="polite" aria-atomic="true"></div>
+
+<!-- right-side multiple-choice panel -->
+<div id="quiz" class="hidden" role="dialog" aria-labelledby="qhead">
+  <button id="qclose" class="ghost" aria-label="Close">×</button>
+  <div class="qhead" id="qhead">Which house is this?<small>Pick the number that fits the pattern</small></div>
+  <div id="qkey" class="hidden"><span class="pl pl-block">block</span><span class="pl pl-lot">lot</span></div>
+  <div id="qopts"></div>
+  <div id="qmsg" aria-live="assertive" aria-atomic="true"></div>
+</div>
+
+<!-- walk bar: turn, step to the next viewpoint, turn -->
+<div id="viewbar" role="group" aria-label="Walk along the street">
+  <button class="ghost vbtn turn" data-view="turn-left" aria-label="Turn left">◀</button>
+  <button class="ghost vbtn walk" data-view="walk" aria-label="Walk to the next viewpoint ahead"><span aria-hidden="true">▲</span><span class="vlabel">Walk</span></button>
+  <button class="ghost vbtn turn" data-view="turn-right" aria-label="Turn right">▶</button>
+</div>
+
+<!-- street map: viewpoints, houses, blocks, "you are here" -->
+<div id="minimap" aria-hidden="true"><svg viewBox="0 0 220 110"></svg><div class="mmnote">Tap a dot to walk there</div></div>
+
+<!-- jump menu: skip to the example street of any part -->
+<div id="jumpbar" role="navigation" aria-label="Jump to part">
+  <div class="jbtitle">Jump to part</div>
+  <div class="jbtns">
+    <button class="ghost jbtn" data-part="1" aria-label="Part 1: odd numbers on one side, even on the other">1</button>
+    <button class="ghost jbtn" data-part="2" aria-label="Part 2: numbers rise away from the start of the street">2</button>
+    <button class="ghost jbtn" data-part="3" aria-label="Part 3: each block is a new hundred">3</button>
+    <button class="ghost jbtn" data-part="4" aria-label="Part 4: gaps in the numbers are normal">4</button>
+    <button class="ghost jbtn" data-part="5" aria-label="Part 5: numbers round a court">5</button>
+  </div>
+  <div id="progress" aria-hidden="true"></div>
+</div>
+
+<div id="doorsleft" class="hidden" aria-live="polite"></div>
+
+<div id="draghint" class="hidden" role="status">
+  <svg viewBox="0 0 64 40" aria-hidden="true" fill="none" stroke="#ffd54a" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <path d="M27 37v-6.5l-4.6-5.1a2.6 2.6 0 0 1 3.7-3.7l1.9 1.9V10.5a2.4 2.4 0 0 1 4.8 0v8.2" />
+    <path d="M32.8 19.6a2.4 2.4 0 0 1 4.8 0v1.8" />
+    <path d="M37.6 21.4a2.4 2.4 0 0 1 4.8 0v8.3a7 7 0 0 1-2 4.9V37" />
+    <path d="M15 16.5 9.5 22l5.5 5.5" /><path d="M9.5 22h8.5" />
+    <path d="M49 16.5 54.5 22 49 27.5" /><path d="M54.5 22H46" />
+  </svg>
+  <div><b>Drag</b> to look around · Click the <b>arrows on the road</b> to walk · <b>Scroll / pinch</b> to zoom · Click a house marked <b>?</b> to answer</div>
+</div>
+
+<button id="helpbtn" class="ghost" aria-label="How to use the controls">?</button>
+
+<!-- site bar: Home (this course has a single look, so no Appearance menu) -->
+<nav id="lookbar" aria-label="Home">
+  <a class="lk-home" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Home: back to the Stop Finder menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v10h13V10" /><path d="M10 20v-6h4v6" />
+    </svg>
+    <span>Home</span>
+  </a>
+</nav>
+
+<div id="bottombar" role="group" aria-label="Course navigation">
+  <button id="back" class="ghost hidden">◀ Back</button>
+  <button id="continue" class="hidden">Next ▸</button>
+  <button id="next" class="hidden">Next ▸</button>
+</div>
+
+<button id="resetview" class="ghost hidden" aria-label="Face down the street again">↺ <span class="rv-label">Reset view</span></button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import './track.js';                       // course run tracking (see track.js / docs/tracking.md)
+import { configure as configureReport } from './report.js';   // end-of-run report (see report.js / docs/report.md)
+
+/* ============================================================
+   HOUSES — a Street View style course on house numbering.
+
+   The learner stands at eye height on the road at one of a chain of
+   viewpoints ("nodes"), drags to look round, and walks by clicking the
+   arrows on the road, tapping the map, or with the keyboard. Each stage
+   is one street scene: a straight street of one or more blocks (Parts
+   1-4) or a court with a bulb at the end (Part 5). Houses carry their
+   number on a plate beside the door and on the mailbox at the kerb; a
+   blank house shows "?" or a partial number and opens the quiz.
+
+   Curriculum (STAGES, further down):
+     1  odd numbers on one side, even on the other
+     2  numbers rise away from the start of the street
+     3  each block is a new hundred: leading digits = block
+     4  gaps are normal: numbers measure distance, not houses
+     5  round a court: the two sides meet at the far end (and one court
+        that counts round in a single run)
+   ============================================================ */
+
+/* ---- layout constants (metres) ---- */
+const HALF_ROAD = 3.5;                 // road is 7 wide
+const WALK_W = 2.0;                    // sidewalk, from the kerb outward
+const YARD_D = 5.0;                    // front yard
+const FRONT_Z = HALF_ROAD + WALK_W + YARD_D;   // 10.5: house fronts sit here
+const LOT_W = 14;                      // a regular lot
+const HOUSE_D = 8;                     // house depth (front to back)
+const CROSS_W = 8;                     // a cross street (road only)
+const EYE = 1.65;                      // camera height
+const NODE_STEP = 14;                  // viewpoints along a block
+
+/* court (Part 5) */
+const CT = { entryLots: [[-21, -33], [-33, -45]], bulbZ: -62, bulbR: 10, ringR: 5.5,
+             houseR: 17, leftPhi: [62, 105, 148], mainLots: [[-33.5, -19.5], [-19.5, -5.5], [5.5, 19.5], [19.5, 33.5]] };
+
+const COLOR = {
+  ground: 0x7f9a5c, lawn: [0x86a465, 0x7c9a5b, 0x8fab6a], road: 0x6d7379, roadEdge: 0x5f656b,
+  walk: 0xc9c3b8, kerb: 0xb9b3a8, drive: 0xb0aba3,
+  siding: [0xe8dcc4, 0xc9d3d9, 0xb8c4a8, 0xd9c3a3, 0xa9b7c6, 0xe3c9b0, 0xc7b8a0, 0xd7d2c4, 0xb5a48a, 0x9fb3a2, 0xd4b5a0, 0xbfc9bf],
+  trim: 0xf4f1ea, roof: [0x4a3b30, 0x5b5551, 0x6b4a3a, 0x3f4a52, 0x7a6a5a, 0x554b45],
+  door: [0x8b2f2f, 0x2f4f6b, 0x3b5f3b, 0x5a3d2b, 0x1f1f24, 0xb35a2a],
+  glass: 0x3f5266, garage: 0xe9e4d8, post: 0x3a3a3a, mailbox: 0x2b2f34, trunk: 0x6b4e35,
+  leaf: [0x4f7a3a, 0x5c8a42, 0x3f6d33, 0x6f8f3e], car: [0xc94c4c, 0x3a4c6b, 0xd8d8d8, 0x2b2b2b, 0x7a8f9e, 0xb89a4a],
+  sky: 0xbfd9ec, sign: 0x1f6b3d, arrow: 0xffd54a, chevron: 0xffffff,
+};
+
+/* ---- one colour per number place: block (leading digits), lot (last two),
+   and the side of the street the last digit's parity puts you on ---- */
+const PLACE_COLORS = { block: '#f28c6a', lot: '#eef2f6', side: '#7cc4ff', path: '#ffd54a' };
+
+/* split a house number into its places. Parts 1-2 and the running-count
+   court show a plain number; from Part 3 the leading digits are the block. */
+function splitPlaces(str, type) {
+  const s = String(str), n = s.length;
+  if ((type === 'block' || type === 'court') && n >= 3)
+    return [{ text: s.slice(0, n - 2), place: 'block' }, { text: s.slice(n - 2), place: 'lot' }];
+  return [{ text: s, place: 'lot' }];
+}
+const isEven = v => v % 2 === 0;
+const parityWord = v => (isEven(v) ? 'even' : 'odd');
+
+/* ---- ordinals for the cross streets: 1st Ave, 2nd Ave, 11th Ave ... ---- */
+function ordinal(n) {
+  const r = n % 100;
+  const sfx = (r >= 11 && r <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+  return n + sfx;
+}
+/* the cross street at the low end of block h is the (h-1)th Ave; Main St before block 1 */
+function crossName(h) { return h <= 0 ? 'Main St' : `${ordinal(h)} Ave`; }
+
+/* seeded random so a street looks the same every time it is rebuilt */
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function hashStr(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+/* ============================================================
+   scene
+   ============================================================ */
+const app = document.getElementById('app');
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 1400);
+camera.rotation.order = 'YXZ';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+app.appendChild(renderer.domElement);
+
+const hemi = new THREE.HemisphereLight(0xfff5e6, 0x6f7a5a, 0.62);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1dc, 1.45);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
+sun.shadow.camera.left = -48; sun.shadow.camera.right = 48;
+sun.shadow.camera.top = 48;   sun.shadow.camera.bottom = -48;
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+scene.add(new THREE.AmbientLight(0xffffff, 0.16));
+const SUN_OFFSET = new THREE.Vector3(26, 42, 30);
+/* the shadow box follows the viewer: a 200 m street would otherwise need a huge map */
+function aimSun(x, z) {
+  sun.target.position.set(x, 0, z);
+  sun.position.set(x + SUN_OFFSET.x, SUN_OFFSET.y, z + SUN_OFFSET.z);
+}
+aimSun(0, 0);
+
+/* sky dome + fog */
+const skyGeo = new THREE.SphereGeometry(1000, 32, 16);
+{
+  const col = [], top = new THREE.Color(0x6aa0d8), hor = new THREE.Color(0xe2ebf1), c = new THREE.Color();
+  const pos = skyGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const t = THREE.MathUtils.clamp(pos.getY(i) / 1000, 0, 1);
+    c.copy(hor).lerp(top, Math.pow(t, 0.55)); col.push(c.r, c.g, c.b);
+  }
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+}
+scene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false })));
+scene.fog = new THREE.Fog(0xe2ebf1, 150, 520);
+
+/* ---- helpers ---- */
+function mat(color, opts = {}) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...opts });
+}
+function box(parent, w, h, d, color, x, y, z, opts = {}) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, opts));
+  m.castShadow = true; m.receiveShadow = true;
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+/* a flat rectangle lying on the ground (y up) */
+function slab(parent, w, d, color, x, y, z, opts = {}) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat(color, { roughness: 1, ...opts }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, y, z);
+  m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+
+/* ---- plate / sign typography (same system as the apartment course) ----
+   numerals that fill their plate, and a blank style that reads without
+   colour: dashed frame + hollow boxes where digits are missing. */
+const PLATE_FONT = '"Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif';
+const PLATE_FG = '#16202b', PLATE_BG = 'rgba(255,255,255,0.96)';
+const BLANK_FG = '#c0392b';
+const BLANK_ON_DARK = '#ffd9a0';
+const BLANK_DASH = { width: 14, dash: [40, 26], inset: 22 };
+
+function isDarkBg(css) {
+  if (!css) return false;
+  let r = 255, g = 255, b = 255;
+  const m = /rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(css);
+  if (m) { r = +m[1]; g = +m[2]; b = +m[3]; }
+  else if (css[0] === '#') {
+    const hx = css.slice(1), t = hx.length === 3 ? hx.replace(/./g, c => c + c) : hx;
+    r = parseInt(t.slice(0, 2), 16); g = parseInt(t.slice(2, 4), 16); b = parseInt(t.slice(4, 6), 16);
+  }
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
+}
+function drawDigitBox(ctx, x, baselineY, adv, cap, color) {
+  const bw = adv * 0.84, bh = cap * 0.78, r = Math.min(bw, bh) * 0.18;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, cap * 0.09);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x + (adv - bw) / 2, baselineY - bh, bw, bh, r);
+  else ctx.rect(x + (adv - bw) / 2, baselineY - bh, bw, bh);
+  ctx.stroke();
+  ctx.restore();
+}
+function makeTextTexture(text, opts = {}) {
+  const s = String(text);
+  const isBlank = /[?_]/.test(s);
+  const wide = s.length > 3;
+  const { w = wide ? 768 : 512, h = wide ? 384 : 256,
+    bg = PLATE_BG, fg = PLATE_FG, font = 'bold 170px sans-serif', pad: extraPad = 0 } = opts;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
+  const fm = /^\s*(.*?)(\d+(?:\.\d+)?)px\s/.exec(font);
+  const weight = fm ? fm[1].trim() : 'bold';
+  const base = fm ? parseFloat(fm[2]) : 170;
+  const fontAt = px => `${weight} ${px}px ${PLATE_FONT}`.trim();
+  const k = w / 1024, dashLw = BLANK_DASH.width * k, dashInset = BLANK_DASH.inset * k + dashLw / 2;
+  const pad = (isBlank ? dashInset + dashLw : 0) + extraPad * k;
+  const availW = w - 2 * pad, availH = h - 2 * pad;
+  const probe = s.replace(/_/g, '0');
+  ctx.font = fontAt(100);
+  const pm = ctx.measureText(probe);
+  const wPer = (pm.width || 50) / 100;
+  const ascPer = (pm.actualBoundingBoxAscent || 72) / 100;
+  const descPer = (pm.actualBoundingBoxDescent || 0) / 100;
+  const px = Math.max(8, Math.min(0.86 * availW / wPer, 0.72 * availH / ascPer,
+    0.88 * availH / (ascPer + descPer), 1.35 * base * (h / 256)));
+  ctx.font = fontAt(px);
+  const dm = ctx.measureText('0');
+  const cap = dm.actualBoundingBoxAscent || px * 0.72;
+  const asc = ascPer * px, desc = descPer * px;
+  const baselineY = (h - (asc + desc)) / 2 + asc;
+  const blankFg = isDarkBg(bg) ? BLANK_ON_DARK : BLANK_FG;
+  if (isBlank) {
+    ctx.save();
+    ctx.strokeStyle = blankFg; ctx.lineWidth = dashLw;
+    ctx.setLineDash(BLANK_DASH.dash.map(d => d * k));
+    ctx.strokeRect(dashInset, dashInset, w - 2 * dashInset, h - 2 * dashInset);
+    ctx.restore();
+  }
+  ctx.textBaseline = 'alphabetic';
+  if (isBlank) {
+    ctx.textAlign = 'left';
+    const adv = ch => ctx.measureText(ch === '_' ? '0' : ch).width;
+    const chars = Array.from(s);
+    let x = (w - chars.reduce((t, ch) => t + adv(ch), 0)) / 2;
+    for (const ch of chars) {
+      const a = adv(ch);
+      if (ch === '_') drawDigitBox(ctx, x, baselineY, a, cap, blankFg);
+      else { ctx.fillStyle = ch === '?' ? blankFg : fg; ctx.fillText(ch, x, baselineY); }
+      x += a;
+    }
+  } else {
+    ctx.textAlign = 'center'; ctx.fillStyle = fg;
+    ctx.fillText(s, w / 2, baselineY);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+function label(parent, text, pw, ph, texOpts = {}, matOpts = {}) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
+    new THREE.MeshBasicMaterial({ map: makeTextTexture(text, texOpts), transparent: true, ...matOpts }));
+  parent.add(m); return m;
+}
+/* text that reads correctly from both sides: two planes back to back */
+function labelTwoSided(parent, text, pw, ph, texOpts = {}) {
+  const g = new THREE.Group();
+  const tex = makeTextTexture(text, texOpts);
+  for (const s of [1, -1]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    m.rotation.y = s > 0 ? 0 : Math.PI; m.position.z = s * 0.006;
+    g.add(m);
+  }
+  parent.add(g); return g;
+}
+function setPlateText(plate, text, texOpts = {}) {
+  plate.material.map.dispose();
+  plate.material.map = makeTextTexture(text, texOpts);
+  plate.material.color.set('#ffffff');
+  plate.material.needsUpdate = true;
+}
+/* a dark caption board (multi-line, centred) on a canvas, for the guides */
+function boardTexture(lines, opts = {}) {
+  const { w = 1024, h = 320, bg = 'rgba(20,24,30,0.92)', fg = '#ffe4c2', size = 92, accent = '#ffd54a' } = opts;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  const r = 28;
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(w - r, 0); ctx.quadraticCurveTo(w, 0, w, r);
+  ctx.lineTo(w, h - r); ctx.quadraticCurveTo(w, h, w - r, h);
+  ctx.lineTo(r, h); ctx.quadraticCurveTo(0, h, 0, h - r);
+  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath(); ctx.fill();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const n = lines.length, lh = size * 1.25;
+  lines.forEach((ln, i) => {
+    const big = typeof ln === 'object' ? ln : { text: ln };
+    ctx.fillStyle = big.color || (i === 0 ? accent : fg);
+    ctx.font = `${big.weight || (i === 0 ? 'bold' : '600')} ${big.size || size}px ${PLATE_FONT}`;
+    ctx.fillText(big.text, w / 2, h / 2 + (i - (n - 1) / 2) * lh);
+  });
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8; tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function board(parent, lines, pw, ph, x, y, z, yaw, opts = {}) {
+  const g = new THREE.Group();
+  const tex = boardTexture(lines, opts);
+  for (const s of [1, -1]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    m.rotation.y = s > 0 ? 0 : Math.PI; m.position.z = s * 0.006;
+    g.add(m);
+  }
+  g.position.set(x, y, z); g.rotation.y = yaw;
+  parent.add(g);
+  return g;
+}
+
+/* ---- a bright 3D arrow from -> to ---- */
+function arrow(parent, from, to, color, radius = 0.1) {
+  const dir = to.clone().sub(from);
+  const len = dir.length();
+  const shaftLen = Math.max(0.05, len - 0.7);
+  const grp = new THREE.Group();
+  const m = new THREE.MeshBasicMaterial({ color });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, shaftLen, 12), m);
+  shaft.position.y = shaftLen / 2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.7, 16), m);
+  head.position.y = shaftLen + 0.35;
+  grp.add(shaft, head);
+  grp.position.copy(from);
+  grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  parent.add(grp);
+  return grp;
+}
+
+/* ---- ground (shared) ---- */
+function makeGroundNoise() {
+  const S = 256, CELL = 8;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  for (let y = 0; y < S; y += CELL) for (let x = 0; x < S; x += CELL) {
+    const v = Math.round(255 * (1 - 0.05 * Math.random()));
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(x, y, CELL, CELL);
+  }
+  ctx.filter = 'blur(6px)'; ctx.drawImage(c, 0, 0); ctx.filter = 'none';
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(80, 80);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200),
+  new THREE.MeshStandardMaterial({ color: COLOR.ground, roughness: 1, map: makeGroundNoise() }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02;
+ground.receiveShadow = true; scene.add(ground);
+
+/* asphalt with a faint speckle so long roads don't read as one flat swatch */
+function makeAsphalt() {
+  const S = 128;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 900; i++) {
+    const v = 225 + Math.floor(Math.random() * 30);
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(Math.random() * S, Math.random() * S, 1.5, 1.5);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const ASPHALT = makeAsphalt();
+function roadMat() {
+  const t = ASPHALT.clone(); t.needsUpdate = true;
+  return new THREE.MeshStandardMaterial({ color: COLOR.road, roughness: 1, map: t });
+}
+
+/* ============================================================
+   street furniture builders
+   ============================================================ */
+
+/* a straight stretch of road along x from x0 to x1 (centre line z = 0),
+   with kerbs and sidewalks either side, a dashed centre line, and lawn
+   strips out to the lots */
+function buildRoad(g, x0, x1, { centreLine = true } = {}) {
+  const len = x1 - x0, cx = (x0 + x1) / 2;
+  const road = slab(g, len, HALF_ROAD * 2, COLOR.road, cx, 0.0, 0);
+  road.material = roadMat(); road.material.map.repeat.set(len / 6, 2);
+  if (centreLine) {
+    const n = Math.floor(len / 6);
+    for (let i = 0; i < n; i++) slab(g, 3, 0.16, 0xe6d27a, x0 + 3 + i * 6, 0.012, 0);
+  }
+}
+/* a cross street running along z through the main road, between x0 and x1 */
+function buildCrossStreet(g, x0, x1, depth = 60) {
+  const cx = (x0 + x1) / 2, w = x1 - x0;
+  const r = slab(g, w, depth * 2, COLOR.road, cx, 0.001, 0);
+  r.material = roadMat(); r.material.map.repeat.set(2, depth / 3);
+  for (const s of [-1, 1]) {                          // kerbs along the cross street, clear of the junction
+    const zc = s * (HALF_ROAD + WALK_W + (depth - HALF_ROAD - WALK_W) / 2);
+    const zl = depth - HALF_ROAD - WALK_W;
+    for (const e of [-1, 1]) {
+      box(g, 0.32, 0.14, zl, COLOR.kerb, cx + e * (w / 2 + 0.16), 0.07, zc);
+      slab(g, WALK_W - 0.32, zl, COLOR.walk, cx + e * (w / 2 + 0.32 + (WALK_W - 0.32) / 2), 0.13, zc);
+    }
+  }
+  // a stop line at each side of the junction
+  for (const s of [-1, 1]) slab(g, w - 1, 0.4, 0xf2f2f2, cx, 0.012, s * (HALF_ROAD + 0.6));
+}
+
+const SIGN_OPTS = { bg: '#1f6b3d', fg: '#ffffff', font: 'bold 130px sans-serif', w: 1024, h: 200, pad: 40 };
+/* a street sign pole at (x, z) with two blades: `along` names the main
+   street (blade parallel to x, block number appended) and `across` the
+   cross street (blade parallel to z). Blades read from both sides. */
+function buildSignPole(g, x, z, along, across, block) {
+  box(g, 0.1, 3.2, 0.1, COLOR.post, x, 1.6, z);
+  const a = labelTwoSided(g, block != null ? `${along.toUpperCase()}  ${block}` : along.toUpperCase(), 2.2, 0.42, SIGN_OPTS);
+  a.position.set(x, 3.05, z); a.rotation.y = 0;
+  const b = labelTwoSided(g, across.toUpperCase(), 2.0, 0.42, SIGN_OPTS);
+  b.position.set(x, 2.58, z); b.rotation.y = Math.PI / 2;
+  return [a, b];
+}
+
+/* a tree: trunk + a rounded canopy (two spheres) */
+function buildTree(g, x, z, r) {
+  const h = 2.2 + r() * 1.4, cr = 1.4 + r() * 1.1;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, h, 8), mat(COLOR.trunk));
+  trunk.position.set(x, h / 2, z); trunk.castShadow = true; g.add(trunk);
+  const leaf = mat(COLOR.leaf[Math.floor(r() * COLOR.leaf.length)], { roughness: 0.95 });
+  const c1 = new THREE.Mesh(new THREE.SphereGeometry(cr, 12, 10), leaf);
+  c1.position.set(x, h + cr * 0.6, z); c1.castShadow = true; g.add(c1);
+  const c2 = new THREE.Mesh(new THREE.SphereGeometry(cr * 0.7, 10, 8), leaf);
+  c2.position.set(x + cr * 0.4, h + cr * 1.1, z - cr * 0.3); c2.castShadow = true; g.add(c2);
+}
+/* a low hedge / shrub row */
+function buildShrubs(g, x0, x1, z, r) {
+  const n = Math.max(1, Math.round((x1 - x0) / 1.3));
+  const leaf = mat(COLOR.leaf[Math.floor(r() * COLOR.leaf.length)]);
+  for (let i = 0; i < n; i++) {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.5 + r() * 0.2, 8, 6), leaf);
+    s.position.set(x0 + (i + 0.5) * (x1 - x0) / n, 0.45, z); s.scale.y = 0.75; s.castShadow = true; g.add(s);
+  }
+}
+/* a parked car: body + cabin + wheels, pointing along its local x */
+function buildCar(g, x, z, yaw, color) {
+  const car = new THREE.Group();
+  box(car, 4.3, 0.7, 1.8, color, 0, 0.6, 0, { roughness: 0.5, metalness: 0.25 });
+  box(car, 2.3, 0.6, 1.6, color, -0.1, 1.25, 0, { roughness: 0.5, metalness: 0.25 });
+  box(car, 2.0, 0.5, 1.62, COLOR.glass, -0.1, 1.28, 0, { roughness: 0.25, metalness: 0.2 });
+  for (const wx of [-1.4, 1.4]) for (const wz of [-0.85, 0.85]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 14), mat(0x1c1c1c));
+    w.rotation.x = Math.PI / 2; w.position.set(wx, 0.34, wz); w.castShadow = true; car.add(w);
+  }
+  car.position.set(x, 0, z); car.rotation.y = yaw;
+  g.add(car);
+}
+
+/* ---- house styles: siding, roof colour, storeys, gable direction, garage ---- */
+const PLATE_W = 1.15, PLATE_H = 0.52;        // beside the door
+const MB_PLATE_W = 0.56, MB_PLATE_H = 0.26;  // on the mailbox
+
+/* a house group: the front wall's centre is at (px, 0, pz) and local +z is
+   the direction it faces (toward the road). `curb` is the distance from
+   the front wall to the kerb, `lotW` the frontage. Returns { group, plates }. */
+function buildHouse(parent, spec) {
+  const { px, pz, facing, lotW, curb, seed, value, mask, styleHint = {} } = spec;
+  const r = rng(seed);
+  const g = new THREE.Group();
+  g.position.set(px, 0, pz);
+  g.rotation.y = Math.atan2(facing.x, facing.z);
+  parent.add(g);
+
+  const storeys = styleHint.storeys ?? (r() < 0.45 ? 2 : 1);
+  const bodyH = storeys === 2 ? 5.9 : 3.3;
+  const garage = styleHint.garage ?? (lotW >= 13.5 && r() < 0.6);
+  const gW = garage ? 3.6 : 0;
+  const w = Math.min(10, lotW - 3.6 - gW);
+  const gableX = r() < 0.5;                 // ridge along the street (side gable) or toward it
+  const siding = COLOR.siding[Math.floor(r() * COLOR.siding.length)];
+  const roofC = COLOR.roof[Math.floor(r() * COLOR.roof.length)];
+  const doorC = COLOR.door[Math.floor(r() * COLOR.door.length)];
+  const doorSide = r() < 0.5 ? -1 : 1;      // door left or right of centre
+  const bodyX = garage ? -gW / 2 * (doorSide) * 0 : 0;
+
+  // lawn for the whole lot, a shade per lot so the frontage reads
+  if (styleHint.lawn !== false) {
+    const lawn = slab(g, lotW - 0.4, curb - 0.2 + HOUSE_D + 6, COLOR.lawn[seed % 3], 0, 0.005, (curb - 0.2 - HOUSE_D - 6) / 2);
+    lawn.userData.lawn = true;
+  }
+
+  // walls
+  box(g, w, bodyH, HOUSE_D, siding, bodyX, bodyH / 2, -HOUSE_D / 2);
+  // foundation line
+  box(g, w + 0.1, 0.35, HOUSE_D + 0.1, 0x8f8a80, bodyX, 0.17, -HOUSE_D / 2);
+
+  // roof
+  const ov = 0.55, roofH = gableX ? 2.2 : 2.6;
+  const roofM = mat(roofC, { roughness: 0.8 });
+  let roof;
+  if (gableX) {                                  // ridge along local x (parallel to the street)
+    const sh = new THREE.Shape();
+    sh.moveTo(-HOUSE_D / 2 - ov, 0); sh.lineTo(HOUSE_D / 2 + ov, 0); sh.lineTo(0, roofH); sh.closePath();
+    roof = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: w + 2 * ov, bevelEnabled: false }), roofM);
+    roof.rotation.y = -Math.PI / 2;
+    roof.position.set(bodyX + w / 2 + ov, bodyH, -HOUSE_D / 2);
+  } else {                                       // ridge toward the street: the gable faces the road
+    const sh = new THREE.Shape();
+    sh.moveTo(-w / 2 - ov, 0); sh.lineTo(w / 2 + ov, 0); sh.lineTo(0, roofH); sh.closePath();
+    roof = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: HOUSE_D + 2 * ov, bevelEnabled: false }), roofM);
+    roof.position.set(bodyX, bodyH, -HOUSE_D - ov);
+    // gable wall in siding colour so the triangle isn't roof-coloured
+    const tri = new THREE.Shape();
+    tri.moveTo(-w / 2, 0); tri.lineTo(w / 2, 0); tri.lineTo(0, roofH * (w / (w + 2 * ov)));
+    const gable = new THREE.Mesh(new THREE.ShapeGeometry(tri), mat(siding));
+    gable.position.set(bodyX, bodyH, 0.01); g.add(gable);
+  }
+  roof.castShadow = true; roof.receiveShadow = true; g.add(roof);
+
+  // door + frame + step, on the door side of the front
+  const dx = bodyX + doorSide * (w / 2 - 1.6);
+  box(g, 1.3, 2.3, 0.08, COLOR.trim, dx, 1.15, 0.04);
+  box(g, 1.02, 2.1, 0.1, doorC, dx, 1.05, 0.07, { roughness: 0.6 });
+  box(g, 1.7, 0.16, 0.9, 0xb9b3a8, dx, 0.08, 0.5);
+  if (r() < 0.55) {                              // small porch roof on posts, above the number plate
+    box(g, 2.6, 0.14, 1.3, roofC, dx, 3.05, 0.65);
+    for (const e of [-1, 1]) box(g, 0.12, 3.0, 0.12, COLOR.trim, dx + e * 1.2, 1.5, 1.2);
+  }
+  // windows: one beside the door, more on the other half, and upstairs
+  const win = (wx, wy, ww = 1.3, wh = 1.4) => {
+    box(g, ww + 0.2, wh + 0.2, 0.06, COLOR.trim, wx, wy, 0.03);
+    box(g, ww, wh, 0.05, COLOR.glass, wx, wy, 0.06, { roughness: 0.25, metalness: 0.15 });
+  };
+  const farX = bodyX - doorSide * (w / 2 - 2.0);
+  win(farX, 1.55, 1.6, 1.4);
+  if (w >= 8.5) win(bodyX - doorSide * 0.4, 1.55, 1.2, 1.3);
+  if (storeys === 2) { win(farX, 4.45); win(dx, 4.45); if (w >= 8.5) win(bodyX - doorSide * 0.4, 4.45, 1.2, 1.3); }
+
+  // garage beside the house (on the side away from the door), with a driveway to the kerb
+  if (garage) {
+    const gx = bodyX - doorSide * (w / 2 + gW / 2);
+    box(g, gW, 2.9, HOUSE_D - 1.5, siding, gx, 1.45, -(HOUSE_D - 1.5) / 2 - 0.4);
+    box(g, gW + 0.3, 0.3, HOUSE_D - 1.2, roofC, gx, 3.0, -(HOUSE_D - 1.2) / 2 - 0.4, { roughness: 0.8 });
+    box(g, gW - 0.6, 2.3, 0.08, COLOR.garage, gx, 1.2, -0.36, { roughness: 0.7 });
+    slab(g, 3.2, curb - 0.3, COLOR.drive, gx, 0.02, (curb - 0.3) / 2 - 0.2);
+  } else {
+    // a path from the door to the sidewalk
+    slab(g, 1.2, curb - WALK_W - 0.4, COLOR.walk, dx, 0.02, (curb - WALK_W - 0.4) / 2 + 0.6);
+  }
+
+  // the number: a plate over the door, and on the mailbox at the kerb
+  const shown = mask === null ? String(value) : mask;
+  const plateOpts = mask === null ? {} : { fg: BLANK_FG };
+  const plate = label(g, shown, PLATE_W, PLATE_H, plateOpts);
+  plate.position.set(dx, 2.64, 0.1);
+  const mbx = dx + doorSide * 2.2;
+  box(g, 0.1, 1.05, 0.1, COLOR.post, mbx, 0.52, curb - 0.45);
+  box(g, 0.34, 0.3, 0.58, COLOR.mailbox, mbx, 1.2, curb - 0.45, { roughness: 0.55, metalness: 0.3 });
+  const mbPlate = label(g, shown, MB_PLATE_W, MB_PLATE_H, plateOpts);
+  mbPlate.position.set(mbx, 1.2, curb - 0.45 + 0.3);
+
+  // greenery
+  if (r() < 0.7) buildTree(g, bodyX - doorSide * (w / 2 + (garage ? gW : 0) + 1.2), curb - 2.6 - r() * 2, r);
+  if (r() < 0.5) buildShrubs(g, farX - 1.4, farX + 1.4, 0.75, r);
+
+  return { group: g, plates: [plate, mbPlate] };
+}
+
+/* ---- walking chevrons: a flat arrow on the road that takes you to the
+   next viewpoint (Street View's arrows). A bigger invisible disc catches
+   the tap. Pooled: repositioned whenever the viewer moves. ---- */
+function chevronShape() {
+  const s = new THREE.Shape();
+  s.moveTo(0, 1.1); s.lineTo(0.95, -0.35); s.lineTo(0.42, -0.35); s.lineTo(0.42, -1.1);
+  s.lineTo(-0.42, -1.1); s.lineTo(-0.42, -0.35); s.lineTo(-0.95, -0.35); s.closePath();
+  return s;
+}
+const CHEV_GEO = new THREE.ShapeGeometry(chevronShape());
+const CHEV_HIT = new THREE.CircleGeometry(1.7, 20);
+function makeChevron(parent) {
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(CHEV_GEO, new THREE.MeshBasicMaterial({ color: COLOR.chevron, transparent: true, opacity: 0.82, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.05; m.renderOrder = 2;
+  const halo = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.5, 28), new THREE.MeshBasicMaterial({ color: COLOR.chevron, transparent: true, opacity: 0.3, depthWrite: false, fog: false }));
+  halo.rotation.x = -Math.PI / 2; halo.position.y = 0.04; halo.renderOrder = 1;
+  const hit = new THREE.Mesh(CHEV_HIT, new THREE.MeshBasicMaterial({ visible: false }));
+  hit.rotation.x = -Math.PI / 2; hit.position.y = 0.06;
+  g.add(m, halo, hit);
+  g.userData = { arrow: m, halo, hit };
+  hit.userData.chevron = g;
+  parent.add(g);
+  return g;
+}
+
+/* ============================================================
+   layouts: where the houses, roads and viewpoints go
+   ============================================================ */
+/* a yaw (camera.rotation.y) that looks along the world direction (dx, dz) */
+const yawTo = (dx, dz) => Math.atan2(-dx, -dz);
+const YAW_EAST = yawTo(1, 0), YAW_NORTH = yawTo(0, -1);
+
+/* numbers for one side of a block: explicit lists (Part 4) or 2i+1 / 2i+2 */
+function numbersFor(b, side, oddSide) {
+  if (b.left && b.right) return side < 0 ? b.left : b.right;
+  const odd = side === oddSide;
+  return Array.from({ length: b.n }, (_, i) => b.hundred * 100 + (odd ? 2 * i + 1 : 2 * i + 2));
+}
+const maskOf = (st, v) => (st.blanks && st.blanks[v] !== undefined ? st.blanks[v] : null);
+
+/* a straight street along x: cross street, block, cross street, block ...
+   Houses on the left (z < 0) face +z; on the right they face -z. Lot widths
+   follow the number steps, so a bigger jump in the numbers is a wider lot. */
+function layoutStreet(st) {
+  const houses = [], nodes = [], blocks = [], crossings = [];
+  const oddSide = st.odd === 'right' ? 1 : -1;
+  let x = 0;
+  st.blocks.forEach((b, bi) => {
+    const lowName = crossName(b.hundred - 1);
+    crossings.push({ x0: x, x1: x + CROSS_W, name: lowName, blockAhead: b.hundred * 100,
+      blockBehind: bi > 0 ? st.blocks[bi - 1].hundred * 100 : null, index: bi });
+    nodes.push({ x: x + CROSS_W / 2, z: 0, kind: 'cross', at: lowName, heading: YAW_EAST });
+    const x0 = x + CROSS_W;
+    const nums = { [-1]: numbersFor(b, -1, oddSide), [1]: numbersFor(b, 1, oddSide) };
+    const n = Math.max(nums[-1].length, nums[1].length);
+    const L = n * LOT_W;
+    for (const s of [-1, 1]) {
+      const list = nums[s];
+      const steps = list.map((v, i) => i < list.length - 1 ? list[i + 1] - v : (list.length > 1 ? list[i] - list[i - 1] : 2));
+      const tot = steps.reduce((a, c) => a + c, 0);
+      let lx = x0;
+      list.forEach((v, i) => {
+        const w = L * steps[i] / tot;
+        houses.push({
+          value: v, mask: maskOf(st, v), side: s, x0: lx, x1: lx + w, hundred: b.hundred, block: bi, index: i,
+          px: lx + w / 2, pz: s * FRONT_Z, facing: { x: 0, z: -s }, lotW: w, curb: FRONT_Z - HALF_ROAD,
+          desc: `${ordinal(i + 1)} house on the ${s < 0 ? 'left' : 'right'}` +
+                (st.blocks.length > 1 ? ` in the ${b.hundred * 100} block` : ''),
+        });
+        lx += w;
+      });
+    }
+    const nN = Math.max(1, Math.round(L / NODE_STEP));
+    for (let k = 0; k < nN; k++) {
+      const nx = x0 + (k + 0.5) * L / nN;
+      nodes.push({ x: nx, z: 0, kind: 'block', hundred: b.hundred, heading: YAW_EAST });
+    }
+    blocks.push({ x0, x1: x0 + L, hundred: b.hundred, index: bi });
+    x = x0 + L;
+  });
+  const last = st.blocks[st.blocks.length - 1];
+  const highName = crossName(last.hundred);
+  crossings.push({ x0: x, x1: x + CROSS_W, name: highName, blockAhead: null, blockBehind: last.hundred * 100, index: st.blocks.length });
+  nodes.push({ x: x + CROSS_W / 2, z: 0, kind: 'cross', at: highName, heading: YAW_EAST });
+  nodes.forEach((nd, i) => {
+    nd.links = [];
+    if (i > 0) nd.links.push(i - 1);
+    if (i < nodes.length - 1) nd.links.push(i + 1);
+  });
+  // where each viewpoint stands, for the spoken status: "between 204 and 206"
+  for (const nd of nodes) nd.near = nearestHouses(nd, houses);
+  const start = st.startNode === 'far' ? nodes.length - 1 : st.startNode === 'mid' ? Math.floor(nodes.length / 2) : 0;
+  if (st.startNode === 'far') nodes[start].startHeading = yawTo(-1, 0);
+  return { kind: 'street', houses, nodes, blocks, crossings, oddSide, start,
+    xMin: 0, xMax: x + CROSS_W, bounds: { x0: -8, x1: x + CROSS_W + 8, z0: -26, z1: 26 } };
+}
+
+/* the two houses (one per side) nearest a viewpoint */
+function nearestHouses(nd, houses) {
+  const out = [];
+  for (const s of [-1, 1]) {
+    let best = null, bd = Infinity;
+    for (const h of houses) {
+      if ((h.side || 0) !== s) continue;
+      const d = Math.hypot(h.px - nd.x, h.pz - nd.z);
+      if (d < bd) { bd = d; best = h; }
+    }
+    if (best && bd < 16) out.push(best);
+  }
+  return out;
+}
+
+/* a court: a short stretch of the main street with the court opening off
+   its north side, two lots either side of the entrance, then a bulb with
+   three houses on each half. `left` / `right` list each side's numbers in
+   walking-in order (entrance first, then round the bulb). */
+function layoutCourt(st) {
+  const houses = [], nodes = [];
+  const m = st.main;
+  CT.mainLots.forEach(([x0, x1], i) => {
+    for (const [s, list] of [[-1, m.north], [1, m.south]]) {
+      houses.push({ value: list[i], mask: null, main: true, side: s, x0, x1,
+        px: (x0 + x1) / 2, pz: s * FRONT_Z, facing: { x: 0, z: -s }, lotW: x1 - x0, curb: FRONT_Z - HALF_ROAD,
+        desc: `on ${m.name}` });
+    }
+  });
+  for (const [key, sx] of [['left', -1], ['right', 1]]) {
+    const list = st[key];
+    CT.entryLots.forEach(([z0, z1], i) => {
+      const v = list[i];
+      houses.push({ value: v, mask: maskOf(st, v), courtSide: key, order: i, side: sx,
+        px: sx * FRONT_Z, pz: (z0 + z1) / 2, facing: { x: -sx, z: 0 }, lotW: z0 - z1, curb: FRONT_Z - HALF_ROAD,
+        desc: `${ordinal(i + 1)} house on the ${key} going in` });
+    });
+    CT.leftPhi.forEach((deg, i) => {
+      const phi = (sx < 0 ? deg : 360 - deg) * Math.PI / 180;
+      const v = list[CT.entryLots.length + i];
+      const px = -CT.houseR * Math.sin(phi), pz = CT.bulbZ + CT.houseR * Math.cos(phi);
+      const fx = -px, fz = CT.bulbZ - pz, fl = Math.hypot(fx, fz);
+      houses.push({ value: v, mask: maskOf(st, v), courtSide: key, order: CT.entryLots.length + i, side: sx, bulb: true,
+        px, pz, facing: { x: fx / fl, z: fz / fl }, lotW: 12.5, curb: CT.houseR - CT.bulbR, noLawn: true,
+        desc: `${ordinal(i + 1)} house round the bulb on the ${key}` });
+    });
+  }
+  const mainX = [-28, -14, 0, 14, 28];
+  mainX.forEach(x => nodes.push({ x, z: 0, kind: 'main', heading: YAW_EAST }));
+  const MOUTH = 2;
+  nodes[MOUTH].heading = YAW_NORTH;
+  const entryZ = [-14, -27, -40];
+  const E0 = nodes.length;
+  entryZ.forEach(z => nodes.push({ x: 0, z, kind: 'entry', heading: YAW_NORTH }));
+  const R0 = nodes.length;
+  const ringDeg = [0, 60, 120, 180, 240, 300];
+  ringDeg.forEach(deg => {
+    const phi = deg * Math.PI / 180;
+    nodes.push({ x: -CT.ringR * Math.sin(phi), z: CT.bulbZ + CT.ringR * Math.cos(phi), kind: 'ring', deg });
+  });
+  nodes.forEach(nd => nd.links = []);
+  const link = (a, b) => { nodes[a].links.push(b); nodes[b].links.push(a); };
+  for (let i = 0; i < mainX.length - 1; i++) link(i, i + 1);
+  link(MOUTH, E0);
+  for (let i = 0; i < entryZ.length - 1; i++) link(E0 + i, E0 + i + 1);
+  link(E0 + entryZ.length - 1, R0);
+  for (let i = 0; i < ringDeg.length; i++) link(R0 + i, R0 + (i + 1) % ringDeg.length);
+  // ring viewpoints face the way the left side counts: round via the west
+  for (let i = 0; i < ringDeg.length; i++) {
+    const a = nodes[R0 + i], b = nodes[R0 + (i + 1) % ringDeg.length];
+    a.heading = yawTo(b.x - a.x, b.z - a.z);
+  }
+  for (const nd of nodes) nd.near = nd.kind === 'main' ? nearestHouses(nd, houses.filter(h => h.main))
+    : houses.filter(h => !h.main && Math.hypot(h.px - nd.x, h.pz - nd.z) < 15).slice(0, 2);
+  return { kind: 'court', houses, nodes, start: MOUTH, mouth: MOUTH, ring0: R0,
+    bounds: { x0: -36, x1: 36, z0: -84, z1: 22 } };
+}
+
+/* ============================================================
+   course stages — the curriculum. Each stage is one street.
+   blanks: value -> the partial number the plate shows ('?' = nothing).
+   ============================================================ */
+const STAGES = [
+  // ---- PART 1 — odd numbers on one side of the street, even on the other ----
+  { part: 1, type: 'street', kind: 'example', label: 'Maple St', odd: 'left', blocks: [{ hundred: 1, n: 5 }] },
+  { part: 1, type: 'street', kind: 'quiz', label: 'Elm St', odd: 'left', blocks: [{ hundred: 2, n: 5 }],
+    blanks: { 205: '?', 204: '?', 210: '?' } },
+  { part: 1, type: 'street', kind: 'quiz', label: 'Birch St', odd: 'right', blocks: [{ hundred: 3, n: 5 }],
+    blanks: { 306: '?', 310: '?', 301: '?', 307: '?' } },
+
+  // ---- PART 2 — numbers rise away from the start of the street ----
+  { part: 2, type: 'street', kind: 'example', label: 'Oak St', odd: 'left', blocks: [{ hundred: 1, n: 6 }] },
+  { part: 2, type: 'street', kind: 'quiz', label: 'Pine St', odd: 'left', blocks: [{ hundred: 2, n: 6 }], startNode: 'far',
+    blanks: { 211: '?', 202: '?', 208: '?' } },
+  { part: 2, type: 'street', kind: 'quiz', label: 'Cedar St', odd: 'right', blocks: [{ hundred: 4, n: 7 }], startNode: 'mid',
+    blanks: { 401: '?', 414: '?', 405: '?', 410: '?', 408: '?' } },
+
+  // ---- PART 3 — cross a street and the numbers jump to the next hundred ----
+  { part: 3, type: 'block', kind: 'example', label: 'Ash St', odd: 'left',
+    blocks: [{ hundred: 1, n: 4 }, { hundred: 2, n: 4 }, { hundred: 3, n: 4 }] },
+  { part: 3, type: 'block', kind: 'quiz', label: 'Hickory St', odd: 'left',
+    blocks: [{ hundred: 11, n: 5 }, { hundred: 12, n: 5 }],
+    blanks: { 1103: '11_3', 1108: '1_08', 1201: '__01', 1206: '120_', 1209: '12__' } },
+  { part: 3, type: 'block', kind: 'quiz', label: 'Poplar St', odd: 'right',
+    blocks: [{ hundred: 23, n: 4 }, { hundred: 24, n: 4 }, { hundred: 25, n: 4 }],
+    blanks: { 2302: '2_02', 2307: '__07', 2404: '24__', 2405: '2_05', 2408: '?', 2503: '25__', 2506: '__06' } },
+
+  // ---- PART 4 — gaps: numbers measure distance along the street, not houses ----
+  { part: 4, type: 'block', kind: 'example', label: 'Sycamore Dr', odd: 'left', gaps: true,
+    blocks: [{ hundred: 14, left: [1401, 1407, 1413, 1421], right: [1402, 1410, 1416, 1420] },
+             { hundred: 15, left: [1501, 1505, 1513, 1519], right: [1504, 1508, 1512, 1522] }] },
+  { part: 4, type: 'block', kind: 'quiz', label: 'Juniper Dr', odd: 'left', gaps: true,
+    blocks: [{ hundred: 16, left: [1601, 1609, 1615, 1621], right: [1604, 1608, 1616, 1624] },
+             { hundred: 17, left: [1703, 1707, 1715, 1723], right: [1702, 1710, 1714, 1720] }],
+    blanks: { 1609: '16_9', 1616: '161_', 1621: '?', 1702: '1_02', 1715: '17__', 1720: '__20' } },
+  { part: 4, type: 'block', kind: 'quiz', label: 'Laurel Dr', odd: 'right', gaps: true,
+    blocks: [{ hundred: 31, left: [3102, 3106, 3114, 3118, 3126], right: [3101, 3105, 3111, 3117, 3123] },
+             { hundred: 32, left: [3204, 3208, 3216, 3222, 3228], right: [3203, 3207, 3211, 3219, 3225] }],
+    blanks: { 3106: '?', 3117: '31__', 3126: '3_26', 3204: '__04', 3211: '32__', 3219: '3_19', 3228: '?' } },
+
+  // ---- PART 5 — round a court: the two sides meet at the far end ----
+  { part: 5, type: 'court', kind: 'example', label: 'Willow Ct', odd: 'left',
+    main: { name: 'Ash St', north: [810, 812, 814, 816], south: [809, 811, 813, 815] },
+    left: [1601, 1603, 1605, 1607, 1609], right: [1602, 1604, 1606, 1608, 1610] },
+  { part: 5, type: 'court', kind: 'quiz', label: 'Hazel Ct', odd: 'right',
+    main: { name: 'Elm St', north: [504, 506, 508, 510], south: [503, 505, 507, 509] },
+    left: [2102, 2104, 2106, 2108, 2110], right: [2101, 2103, 2105, 2107, 2109],
+    blanks: { 2104: '21__', 2108: '2_08', 2110: '?', 2103: '210_', 2109: '?' } },
+  // one court that counts round in a single run: 1, 2, 3 ... up one side, back down the other
+  { part: 5, type: 'loop', kind: 'quiz', label: 'Fern Ct',
+    main: { name: 'Pine St', north: [2202, 2204, 2206, 2208], south: [2201, 2203, 2205, 2207] },
+    left: [1, 2, 3, 4, 5], right: [10, 9, 8, 7, 6],
+    blanks: { 3: '?', 5: '?', 7: '?', 8: '?', 10: '?' } },
+];
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* the nearest numbers shown from the start on the same side of the same
+   block, below and above this house (null when there is none) */
+function shownNeighbours(house, layout) {
+  let lo = null, hi = null;
+  for (const h of layout.houses) {
+    if (h === house || h.mask !== null || h.main) continue;
+    const sameRun = layout.kind === 'court' ? h.courtSide === house.courtSide
+      : (h.side === house.side && h.block === house.block);
+    if (!sameRun) continue;
+    if (h.value < house.value && (lo === null || h.value > lo)) lo = h.value;
+    if (h.value > house.value && (hi === null || h.value < hi)) hi = h.value;
+  }
+  return { lo, hi };
+}
+
+/* three wrong answers that each break exactly one rule the part teaches:
+   the other side (parity), the wrong hundred, the wrong spot along the block.
+   For the gap streets the "wrong spot" lies outside the visible neighbours,
+   since any same-parity number between them would fit the pattern. */
+function makeOptionsFor(house, st, layout) {
+  const v = house.value, out = [];
+  const pick = cands => {
+    const c = shuffle(cands.filter(n => Number.isFinite(n) && n > 0 && n !== v && !out.includes(n)));
+    if (c.length) { out.push(c[0]); return true; }
+    return false;
+  };
+  if (st.type === 'loop') {
+    const N = st.left.length + st.right.length;
+    const ok = n => n >= 1 && n <= N;
+    pick([v - 2, v + 2].filter(ok));
+    pick([v - 3, v + 3].filter(ok));
+    pick([v - 4, v + 4, v - 5, v + 5].filter(ok));
+    let k = 1;
+    while (out.length < 3 && k <= N) pick([k++]);
+  } else if (st.type === 'street') {
+    pick([v - 1, v + 1]);
+    pick([v - 2, v + 2]);
+    pick([v - 4, v + 4, v - 10, v + 10, v - 6, v + 6]);
+  } else if (st.gaps) {
+    pick([v - 1, v + 1]);
+    pick([v - 100, v + 100]);
+    const { lo, hi } = shownNeighbours(house, layout);
+    const inBlock = n => Math.floor(n / 100) === Math.floor(v / 100) && n % 100 > 0;
+    const cands = [];
+    if (lo !== null) cands.push(lo - 2, lo - 4); else cands.push(v - 12, v - 20);
+    if (hi !== null) cands.push(hi + 2, hi + 4); else cands.push(v + 12, v + 20);
+    pick(cands.filter(inBlock));
+    if (out.length < 3) pick([v - 20, v + 20, v + 30, v - 30].filter(inBlock));
+  } else {                                           // block, court
+    pick([v - 1, v + 1]);
+    pick([v - 100, v + 100].filter(n => n >= 100));
+    pick([v - 2, v + 2, v - 4, v + 4, v - 20, v + 20]);
+  }
+  while (out.length < 3) pick([v + 3, v - 3, v + 5, v - 5, v + 7, v + 9]);
+  return shuffle([v, ...out.slice(0, 3)]);
+}
+
+/* ============================================================
+   building a stage
+   ============================================================ */
+/* kerb + sidewalk strips along x on both sides (or one) of the main road */
+function buildWalks(g, x0, x1, sides = [-1, 1]) {
+  const len = x1 - x0, cx = (x0 + x1) / 2;
+  for (const s of sides) {
+    box(g, len, 0.14, 0.32, COLOR.kerb, cx, 0.07, s * (HALF_ROAD + 0.16));
+    slab(g, len, WALK_W - 0.32, COLOR.walk, cx, 0.13, s * (HALF_ROAD + 0.32 + (WALK_W - 0.32) / 2));
+  }
+}
+/* a road along z (the court entrance): x centred on 0 */
+function buildRoadZ(g, z0, z1, { walks = true } = {}) {
+  const len = Math.abs(z1 - z0), cz = (z0 + z1) / 2;
+  const r = slab(g, HALF_ROAD * 2, len, COLOR.road, 0, 0.0, cz);
+  r.material = roadMat(); r.material.map.repeat.set(2, len / 6);
+  if (!walks) return;
+  for (const s of [-1, 1]) {
+    box(g, 0.32, 0.14, len, COLOR.kerb, s * (HALF_ROAD + 0.16), 0.07, cz);
+    slab(g, WALK_W - 0.32, len, COLOR.walk, s * (HALF_ROAD + 0.32 + (WALK_W - 0.32) / 2), 0.13, cz);
+  }
+}
+
+/* the coloured "12 · 05  BLOCK · LOT" key, drawn on its own canvas */
+function placeKeyTexture(segments) {
+  const CW = 1024, CH = 300;
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+  const r = 28;
+  ctx.fillStyle = 'rgba(20,24,30,0.92)';
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(CW - r, 0); ctx.quadraticCurveTo(CW, 0, CW, r);
+  ctx.lineTo(CW, CH - r); ctx.quadraticCurveTo(CW, CH, CW - r, CH);
+  ctx.lineTo(r, CH); ctx.quadraticCurveTo(0, CH, 0, CH - r);
+  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath(); ctx.fill();
+  const digitFont = `bold 170px ${PLATE_FONT}`, capFont = `bold 50px ${PLATE_FONT}`;
+  const gap = 46;
+  const cols = segments.map(([text, place]) => {
+    ctx.font = digitFont; const dw = ctx.measureText(text).width;
+    ctx.font = capFont; const cw = ctx.measureText(place.toUpperCase()).width;
+    return { text, place, w: Math.max(dw, cw) };
+  });
+  let total = 0;
+  cols.forEach((col, i) => { total += col.w + (i ? gap : 0); });
+  let cx = (CW - total) / 2;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  cols.forEach((col, i) => {
+    const mid = cx + col.w / 2;
+    ctx.fillStyle = PLACE_COLORS[col.place] || PLACE_COLORS.lot;
+    ctx.font = digitFont; ctx.fillText(col.text, mid, 112);
+    ctx.font = capFont; ctx.fillText(col.place.toUpperCase(), mid, 228);
+    if (i) { ctx.fillStyle = '#9fb0c0'; ctx.font = digitFont; ctx.fillText('·', cx - gap / 2, 108); }
+    cx += col.w + gap;
+  });
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8; tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+/* a sign on a post; the plane faces local +z, yaw turns it */
+function addPost(g, x, z, h) { box(g, 0.12, h, 0.12, COLOR.post, x, h / 2, z); }
+function addPlaceKey(g, segments, x, y, z, yaw) {
+  const grp = new THREE.Group();
+  const tex = placeKeyTexture(segments);
+  for (const s of [1, -1]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.3), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    m.rotation.y = s > 0 ? 0 : Math.PI; m.position.z = s * 0.006;
+    grp.add(m);
+  }
+  grp.position.set(x, y, z); grp.rotation.y = yaw;
+  g.add(grp);
+  addPost(g, x, z, y - 0.65);
+  return grp;
+}
+function addBoard(g, lines, x, y, z, yaw, pw = 4.4, ph = 1.4, opts = {}) {
+  addPost(g, x, z, y - ph / 2);
+  return board(g, lines, pw, ph, x, y, z, yaw, opts);
+}
+
+/* the straight-street scene: roads, walks, signs, cars, and the guides on an example */
+function buildStreetScene(g, st, L, seed) {
+  const r = rng(seed ^ 0x9e3779b9);
+  for (const b of L.blocks) { buildRoad(g, b.x0, b.x1); buildWalks(g, b.x0, b.x1); }
+  for (const c of L.crossings) buildCrossStreet(g, c.x0, c.x1);
+  buildRoad(g, L.xMin - 60, L.xMin); buildWalks(g, L.xMin - 60, L.xMin);
+  buildRoad(g, L.xMax, L.xMax + 60); buildWalks(g, L.xMax, L.xMax + 60);
+  for (const c of L.crossings) {
+    buildSignPole(g, c.x1 + 0.9, -(HALF_ROAD + 0.9), st.label, c.name, c.blockAhead);
+    buildSignPole(g, c.x0 - 0.9, HALF_ROAD + 0.9, st.label, c.name, c.blockBehind);
+  }
+  // a few parked cars at the kerb, never in front of a blank house's mailbox view
+  for (const b of L.blocks) {
+    const n = Math.round((b.x1 - b.x0) / 30);
+    for (let i = 0; i < n; i++) {
+      const x = b.x0 + 6 + r() * (b.x1 - b.x0 - 12), s = r() < 0.5 ? -1 : 1;
+      const blocked = L.houses.some(h => h.mask !== null && h.side === s && Math.abs(h.px - x) < 9);
+      if (blocked) continue;
+      buildCar(g, x, s * 2.5, s < 0 ? 0 : Math.PI, COLOR.car[Math.floor(r() * COLOR.car.length)]);
+    }
+  }
+  // trees along the stubs beyond the course so the street doesn't end abruptly
+  for (const x of [L.xMin - 14, L.xMin - 30, L.xMin - 48, L.xMax + 14, L.xMax + 30, L.xMax + 48])
+    for (const s of [-1, 1]) buildTree(g, x + r() * 4, s * (7 + r() * 8), r);
+
+  if (st.kind !== 'example') return;
+  const b0 = L.blocks[0], mid = (b0.x0 + b0.x1) / 2;
+  if (st.part === 1) {
+    for (const s of [-1, 1]) {
+      const odd = s === L.oddSide;
+      const nums = L.houses.filter(h => h.side === s).map(h => h.value);
+      addBoard(g, [odd ? 'ODD SIDE' : 'EVEN SIDE', nums.slice(0, 3).join(' · ') + ' …'],
+        mid, 3.4, s * (HALF_ROAD + WALK_W + 0.9), s < 0 ? 0 : Math.PI, 4.0, 1.2,
+        { accent: PLACE_COLORS.side });
+    }
+  }
+  if (st.part === 2) {
+    addBoard(g, ['MAIN ST', 'numbers start here'], b0.x0 + 0.6, 3.1, -(HALF_ROAD + WALK_W + 0.9), -Math.PI / 2, 4.4, 1.4);
+    for (const s of [-1, 1]) {
+      const z = s * (HALF_ROAD + WALK_W + 0.6);
+      for (let k = 0; k < 3; k++) {
+        const x = b0.x0 + 10 + k * 24;
+        arrow(g, new THREE.Vector3(x, 0.6, z), new THREE.Vector3(x + 7, 0.6, z), COLOR.arrow, 0.11);
+      }
+    }
+    addBoard(g, ['NUMBERS RISE', 'away from Main St →'], mid, 3.3, -(HALF_ROAD + WALK_W + 0.9), 0, 4.6, 1.4);
+  }
+  if (st.part === 3) {
+    addPlaceKey(g, [['2', 'block'], ['05', 'lot']], L.blocks[1].x0 + 0.6, 3.0, -(HALF_ROAD + WALK_W + 0.9), -Math.PI / 2);
+    for (const c of L.crossings.slice(1, -1))
+      addBoard(g, ['+100', `the ${c.blockAhead} block`], (c.x0 + c.x1) / 2, 4.8, -(HALF_ROAD - 0.6), -Math.PI / 2, 3.4, 1.2);
+  }
+  if (st.part === 4) {
+    addPlaceKey(g, [['14', 'block'], ['02', 'lot']], b0.x0 + 0.6, 3.0, -(HALF_ROAD + WALK_W + 0.9), -Math.PI / 2);
+    const rightNums = L.houses.filter(h => h.side === 1 && h.block === 0).map(h => h.value);
+    addBoard(g, ['GAPS ARE NORMAL', rightNums.join(' · ')], mid, 3.3, HALF_ROAD + WALK_W + 0.9, Math.PI, 5.2, 1.4);
+    addBoard(g, ['A WIDER LOT', 'a bigger jump'], mid + 6, 3.3, -(HALF_ROAD + WALK_W + 0.9), 0, 4.2, 1.3);
+  }
+}
+
+/* the court scene */
+function buildCourtScene(g, st, L, seed) {
+  const r = rng(seed ^ 0x51ed27);
+  buildRoad(g, -60, 60);
+  buildWalks(g, -60, -(HALF_ROAD + WALK_W), [-1]);
+  buildWalks(g, HALF_ROAD + WALK_W, 60, [-1]);
+  buildWalks(g, -60, 60, [1]);
+  const zEnd = CT.bulbZ + Math.sqrt(CT.bulbR * CT.bulbR - HALF_ROAD * HALF_ROAD);
+  buildRoadZ(g, -HALF_ROAD, zEnd, { walks: false });
+  // entrance walks, from the corner of the main street's sidewalk to the bulb ring
+  const zTan = CT.bulbZ + Math.sqrt(Math.pow(CT.bulbR + WALK_W, 2) - Math.pow(HALF_ROAD + WALK_W, 2));
+  for (const s of [-1, 1]) {
+    const z0 = -(HALF_ROAD + WALK_W), len = z0 - zTan;
+    box(g, 0.32, 0.14, len, COLOR.kerb, s * (HALF_ROAD + 0.16), 0.07, z0 - len / 2);
+    slab(g, WALK_W - 0.32, len, COLOR.walk, s * (HALF_ROAD + 0.32 + (WALK_W - 0.32) / 2), 0.13, z0 - len / 2);
+  }
+  // the bulb: asphalt disc, kerb ring, sidewalk ring, and lawn all round
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(CT.bulbR, 48), roadMat());
+  disc.rotation.x = -Math.PI / 2; disc.position.set(0, 0.006, CT.bulbZ); disc.receiveShadow = true; g.add(disc);
+  const ring = (r0, r1, y, color) => {
+    const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 56), mat(color, { roughness: 1 }));
+    m.rotation.x = -Math.PI / 2; m.position.set(0, y, CT.bulbZ); m.receiveShadow = true; g.add(m); return m;
+  };
+  ring(CT.bulbR, CT.bulbR + 0.32, 0.14, COLOR.kerb);
+  ring(CT.bulbR + 0.32, CT.bulbR + WALK_W, 0.13, COLOR.walk);
+  ring(CT.bulbR + WALK_W, CT.bulbR + WALK_W + 24, 0.008, COLOR.lawn[1]);
+  // lawns for the entrance lots, one slab per side
+  for (const s of [-1, 1]) {
+    const z0 = CT.entryLots[0][0], z1 = CT.entryLots[CT.entryLots.length - 1][1];
+    slab(g, 16, z0 - z1 + 4, COLOR.lawn[0], s * (HALF_ROAD + WALK_W + 8), 0.006, (z0 + z1) / 2 - 2);
+  }
+  // signs at the mouth: the court's name reads from the main street
+  buildSignPole(g, HALF_ROAD + WALK_W + 0.9, -(HALF_ROAD + 0.9), st.main.name, st.label, null);
+  buildSignPole(g, -(HALF_ROAD + WALK_W + 0.9), -(HALF_ROAD + 0.9), st.main.name, st.label, null);
+  addBoard(g, ['NO OUTLET'], HALF_ROAD + WALK_W + 1.0, 2.1, -(HALF_ROAD + WALK_W + 2.2), 0, 2.0, 0.9,
+    { bg: '#f2c230', fg: '#1a1400', accent: '#1a1400', size: 110 });
+  // a couple of parked cars on the main street
+  buildCar(g, -22, 2.5, Math.PI, COLOR.car[0]);
+  buildCar(g, 24, -2.5, 0, COLOR.car[2]);
+  buildCar(g, 6.4, -30, Math.PI / 2, COLOR.car[4]);
+  for (const x of [-44, -52, 44, 52]) for (const s of [-1, 1]) buildTree(g, x + r() * 4, s * (7 + r() * 8), r);
+  buildTree(g, 0, CT.bulbZ - CT.houseR - 12, r);   // behind the houses at the top of the bulb
+  if (st.kind !== 'example') return;
+  addBoard(g, ['ROUND THE COURT', 'odd left · even right', 'the sides meet at the far end'],
+    -(HALF_ROAD + WALK_W + 1.2), 3.6, -17, Math.PI / 2, 5.0, 1.75, { size: 84 });
+  // arrows along both sidewalks going in, and round the bulb
+  for (const s of [-1, 1]) {
+    const x = s * (HALF_ROAD + WALK_W + 0.6);
+    for (const z of [-12, -30]) arrow(g, new THREE.Vector3(x, 0.6, z), new THREE.Vector3(x, 0.6, z - 7), COLOR.arrow, 0.11);
+    for (const deg of [35, 85, 135]) {
+      const a0 = (s < 0 ? deg : 360 - deg) * Math.PI / 180, a1 = a0 + (s < 0 ? 1 : -1) * 0.34;
+      const rr = CT.bulbR + WALK_W + 0.6;
+      arrow(g, new THREE.Vector3(-rr * Math.sin(a0), 0.6, CT.bulbZ + rr * Math.cos(a0)),
+               new THREE.Vector3(-rr * Math.sin(a1), 0.6, CT.bulbZ + rr * Math.cos(a1)), COLOR.arrow, 0.11);
+    }
+  }
+}
+
+function buildStageGroup(i) {
+  const st = STAGES[i];
+  const g = new THREE.Group();
+  scene.add(g);
+  const layout = (st.type === 'court' || st.type === 'loop') ? layoutCourt(st) : layoutStreet(st);
+  const seed = hashStr(st.label);
+  if (layout.kind === 'street') buildStreetScene(g, st, layout, seed);
+  else buildCourtScene(g, st, layout, seed);
+
+  const raycastList = [], blankStates = [];
+  layout.houses.forEach((h, k) => {
+    const built = buildHouse(g, {
+      px: h.px, pz: h.pz, facing: h.facing, lotW: h.lotW, curb: h.curb,
+      seed: (seed + k * 7919 + h.value * 31) >>> 0, value: h.value, mask: h.mask,
+      styleHint: h.noLawn ? { lawn: false } : {},
+    });
+    h.plates = built.plates; h.group = built.group;
+    if (h.mask === null) return;
+    const bstate = { value: h.value, solved: false, plate: built.plates[0], plates: built.plates,
+      options: makeOptionsFor(h, st, layout), house: h };
+    built.group.traverse(o => {
+      if (!o.isMesh || o.userData.lawn) return;
+      o.userData.bstate = bstate;
+      raycastList.push(o);
+    });
+    blankStates.push(bstate);
+  });
+  const chevrons = [0, 1, 2, 3].map(() => makeChevron(g));
+  g.userData = { raycastList, blankStates, layout, chevrons, st, node: layout.start };
+  return g;
+}
+
+/* ============================================================
+   UI + state
+   ============================================================ */
+const ui = {
+  prompt: document.getElementById('prompt'),
+  quiz: document.getElementById('quiz'),
+  qhead: document.getElementById('qhead'),
+  qopts: document.getElementById('qopts'),
+  qmsg: document.getElementById('qmsg'),
+  back: document.getElementById('back'),
+  continueBtn: document.getElementById('continue'),
+  next: document.getElementById('next'),
+  viewbar: document.getElementById('viewbar'),
+  walkBtn: document.querySelector('#viewbar button[data-view="walk"]'),
+};
+
+const groups = {};
+const celebrated = new Set();
+let currentIndex = -1, currentStage = null;
+let blanks = [];          // raycast targets for the active street
+let activeBlank = null;   // blank whose options are open
+const curUD = () => (groups[currentIndex] && groups[currentIndex].userData) || null;
+const curNode = () => { const ud = curUD(); return ud ? ud.layout.nodes[ud.node] : null; };
+
+const reduceMotionMQ = matchMedia('(prefers-reduced-motion: reduce)');
+const prefersReducedMotion = () => reduceMotionMQ.matches;
+
+/* ---- the report: what this course calls its parts, places and questions ---- */
+configureReport({
+  site: 'House numbers',
+  scope: `all ${STAGES.length} streets`,
+  unit: 'house',
+  partTitles: { 1: 'Odd side, even side', 2: 'Rising away from the start', 3: 'Each block is a hundred', 4: 'Gaps are normal', 5: 'Round the court' },
+  placeOrder: ['block', 'side', 'lot'],
+  stageName: st => (st && st.label) || '',
+  maskFor: (st, v) => (st && st.blanks && st.blanks[v]) || '?',
+  splitPlaces: (val, type) => splitPlaces(String(val), type),
+  headlinePerfect: 'Every house, first try.',
+  perfectTry: 'Nothing to fix. Go find some houses.',
+  missLine: (part, place) => {
+    if (place === 'side') return `In Part ${part}, check which side is odd and which is even — most misses were the <span class="pl-side">side</span>.`;
+    if (place === 'block') return `In Part ${part}, read the <span class="pl-block">block</span> off the street sign — most misses were the hundred.`;
+    if (part === 2) return 'In Part 2, check which way the numbers climb before you count on.';
+    if (part === 4) return 'In Part 4, bracket the house between its neighbours — the gap size does not matter.';
+    if (part === 5) return 'In Part 5, follow one side round the bulb — the two sides meet at the far end.';
+    return `In Part ${part}, count on from the house next door — most misses were the <span class="pl-lot">lot</span>.`;
+  },
+  readyLine: (misses, place) => place ? `Only ${misses}, mostly the <span class="pl-${place}">${place}</span>. Worth a glance next time.` : `Only ${misses} in all.`,
+});
+
+/* ============================================================
+   the Street View camera: stand at a viewpoint, drag to look round,
+   scroll / pinch to zoom, walk to the next viewpoint
+   ============================================================ */
+const look = { yaw: YAW_EAST, pitch: 0, fov: 62, vyaw: 0, vpitch: 0 };
+const FOV_MIN = 22, FOV_MAX = 80;
+const PITCH_MIN = -0.62, PITCH_MAX = 0.85;
+const fovDefault = () => (camera.aspect < 1 ? 74 : 62);
+const TAU = Math.PI * 2;
+const wrapAngle = a => ((a + Math.PI) % TAU + TAU) % TAU - Math.PI;
+function applyLook() {
+  look.pitch = THREE.MathUtils.clamp(look.pitch, PITCH_MIN, PITCH_MAX);
+  look.fov = THREE.MathUtils.clamp(look.fov, FOV_MIN, FOV_MAX);
+  camera.rotation.set(look.pitch, look.yaw, 0);
+  if (camera.fov !== look.fov) { camera.fov = look.fov; camera.updateProjectionMatrix(); }
+}
+const forwardXZ = () => ({ x: -Math.sin(look.yaw), z: -Math.cos(look.yaw) });
+
+/* eased turns and zooms on their own loop; a drag cancels them */
+let lookRAF = 0, lookSeq = 0;
+function easeLook(target, ms) {
+  lookSeq++; const seq = lookSeq;
+  if (lookRAF) { cancelAnimationFrame(lookRAF); lookRAF = 0; }
+  look.vyaw = look.vpitch = 0;
+  const from = { yaw: look.yaw, pitch: look.pitch, fov: look.fov };
+  const to = { yaw: target.yaw ?? look.yaw, pitch: target.pitch ?? look.pitch, fov: target.fov ?? look.fov };
+  const dyaw = wrapAngle(to.yaw - from.yaw);
+  if (prefersReducedMotion()) ms = 0;
+  const land = () => { look.yaw = wrapAngle(from.yaw + dyaw); look.pitch = to.pitch; look.fov = to.fov; lookRAF = 0; applyLook(); updateResetChip(); mmSync(); };
+  if (ms <= 0) { land(); return; }
+  const t0 = performance.now();
+  const step = now => {
+    if (seq !== lookSeq) return;
+    const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    look.yaw = from.yaw + dyaw * e; look.pitch = from.pitch + (to.pitch - from.pitch) * e; look.fov = from.fov + (to.fov - from.fov) * e;
+    applyLook();
+    if (k < 1) lookRAF = requestAnimationFrame(step); else land();
+  };
+  lookRAF = requestAnimationFrame(step);
+}
+function turnBy(deg, ms = 320) { easeLook({ yaw: look.yaw + THREE.MathUtils.degToRad(deg) }, ms); }
+
+/* ---- walking between viewpoints ---- */
+let walking = false, walkRAF = 0, walkSeq = 0;
+function walkTo(idx, via = 'ui', ms = 640) {
+  const ud = curUD();
+  if (!ud) return;
+  const nd = ud.layout.nodes[idx];
+  if (!nd || idx === ud.node) return;
+  walkSeq++; const seq = walkSeq;
+  if (walkRAF) { cancelAnimationFrame(walkRAF); walkRAF = 0; }
+  if (prefersReducedMotion()) ms = 0;
+  ud.node = idx;
+  for (const c of ud.chevrons) c.visible = false;
+  const p0 = camera.position.clone(), p1 = new THREE.Vector3(nd.x, EYE, nd.z);
+  const land = () => { walking = false; walkRAF = 0; camera.position.copy(p1); afterMove(via); };
+  if (ms <= 0) { land(); return; }
+  walking = true;
+  const t0 = performance.now();
+  const step = now => {
+    if (seq !== walkSeq) return;
+    const k = Math.min(1, (now - t0) / ms);
+    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // ease in-out: a step, not a glide
+    camera.position.lerpVectors(p0, p1, e);
+    if (k < 1) walkRAF = requestAnimationFrame(step); else land();
+  };
+  walkRAF = requestAnimationFrame(step);
+}
+function afterMove(via) {
+  const ud = curUD();
+  if (!ud) return;
+  const nd = ud.layout.nodes[ud.node];
+  aimSun(nd.x, nd.z);
+  placeChevrons();
+  syncWalkButton();
+  mmSync(true);
+  a11yWalkStatus();
+  updateResetChip();
+  document.dispatchEvent(new CustomEvent('walk', { detail: { index: currentIndex, node: ud.node, via } }));
+}
+/* one chevron per neighbouring viewpoint, 3.4 m out on the road */
+function placeChevrons() {
+  const ud = curUD();
+  if (!ud) return;
+  const nd = ud.layout.nodes[ud.node];
+  ud.chevrons.forEach((c, i) => {
+    const li = nd.links[i];
+    if (li === undefined) { c.visible = false; c.userData.link = -1; return; }
+    const to = ud.layout.nodes[li];
+    const dx = to.x - nd.x, dz = to.z - nd.z, d = Math.hypot(dx, dz) || 1;
+    c.position.set(nd.x + dx / d * 4.2, 0, nd.z + dz / d * 4.2);
+    c.rotation.y = yawTo(dx / d, dz / d);
+    c.visible = true;
+    c.userData.link = li;
+    c.userData.arrow.material.opacity = 0.82; c.scale.setScalar(0.78);
+  });
+}
+/* the neighbouring viewpoint most nearly ahead (or behind) of where you face */
+function linkTowards(sign) {
+  const ud = curUD();
+  if (!ud) return -1;
+  const nd = ud.layout.nodes[ud.node], f = forwardXZ();
+  let best = -1, bc = 0.3;
+  for (const li of nd.links) {
+    const to = ud.layout.nodes[li];
+    const dx = to.x - nd.x, dz = to.z - nd.z, d = Math.hypot(dx, dz) || 1;
+    const c = (dx * f.x + dz * f.z) / d * sign;
+    if (c > bc) { bc = c; best = li; }
+  }
+  return best;
+}
+function walkAhead(via) { const li = linkTowards(1); if (li >= 0) walkTo(li, via); else turnBy(180, 520); }
+function walkBack(via) { const li = linkTowards(-1); if (li >= 0) walkTo(li, via); }
+function syncWalkButton() {
+  if (!ui.walkBtn) return;
+  const ahead = linkTowards(1) >= 0;
+  ui.walkBtn.setAttribute('aria-label', ahead ? 'Walk to the next viewpoint ahead' : 'Dead end ahead — turn round');
+  ui.walkBtn.title = ahead ? 'Walk ahead' : 'Turn round';
+  ui.walkBtn.querySelector('span[aria-hidden]').textContent = ahead ? '▲' : '↻';
+  ui.walkBtn.querySelector('.vlabel').textContent = ahead ? 'Walk' : 'Turn';
+}
+for (const btn of ui.viewbar.querySelectorAll('button[data-view]')) {
+  btn.onclick = () => {
+    const v = btn.dataset.view;
+    if (v === 'turn-left') turnBy(45); else if (v === 'turn-right') turnBy(-45); else walkAhead('button');
+  };
+}
+
+/* ---- the default view at a viewpoint, and the Reset view chip ---- */
+function nodePose(nd) { return { yaw: nd.startHeading ?? nd.heading ?? YAW_EAST, pitch: 0, fov: fovDefault() }; }
+function driftedFromPose() {
+  const nd = curNode();
+  if (!nd) return false;
+  const p = nodePose(nd);
+  return Math.abs(look.fov - p.fov) > 4 || Math.abs(look.pitch) > 0.36 || Math.abs(wrapAngle(look.yaw - p.yaw)) > 2.1;
+}
+const resetChip = document.getElementById('resetview');
+let introRunning = false;
+function updateResetChip() {
+  syncWalkButton();                            // the facing direction changed: is there still a viewpoint ahead?
+  if (!resetChip || introRunning) return;
+  resetChip.classList.toggle('hidden', !driftedFromPose());
+}
+function resetView() {
+  const nd = curNode();
+  if (!nd) return;
+  easeLook(nodePose(nd), 450);
+}
+if (resetChip) resetChip.onclick = resetView;
+
+/* one-time swing on the very first framing: start 22 degrees off and glide
+   in, so "you can look round" is shown, not told */
+let firstFrame = true;
+function frameStage(st) {
+  const ud = curUD();
+  const nd = ud.layout.nodes[ud.node];
+  camera.position.set(nd.x, EYE, nd.z);
+  const pose = nodePose(nd);
+  lookSeq++; if (lookRAF) { cancelAnimationFrame(lookRAF); lookRAF = 0; }
+  look.vyaw = look.vpitch = 0;
+  if (firstFrame && !prefersReducedMotion()) {
+    firstFrame = false;
+    introRunning = true;
+    look.yaw = pose.yaw + THREE.MathUtils.degToRad(22); look.pitch = 0; look.fov = pose.fov;
+    applyLook();
+    setTimeout(() => { easeLook(pose, 1400); setTimeout(() => { introRunning = false; updateResetChip(); }, 1460); }, 300);
+  } else {
+    firstFrame = false;
+    look.yaw = pose.yaw; look.pitch = pose.pitch; look.fov = pose.fov;
+    applyLook();
+  }
+  afterMove('stage');
+}
+
+/* ---- pointer: drag to look, click to pick, pinch / wheel to zoom ---- */
+const canvas = renderer.domElement;
+const pointers = new Map();
+let dragStart = null, dragged = false, pinch0 = null, lastMove = null;
+let dragging = false;
+canvas.style.cursor = 'grab';
+canvas.addEventListener('pointerdown', e => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  canvas.setPointerCapture(e.pointerId);
+  if (pointers.size === 1) {
+    dragStart = { x: e.clientX, y: e.clientY }; dragged = false; lastMove = { x: e.clientX, y: e.clientY, t: performance.now() };
+    lookSeq++; if (lookRAF) { cancelAnimationFrame(lookRAF); lookRAF = 0; }   // a touch abandons a pending intro swing
+    look.vyaw = look.vpitch = 0;
+  } else if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y), fov: look.fov };
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) { hoverPt = { x: e.clientX, y: e.clientY }; hoverDirty = true; return; }
+  const prev = pointers.get(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2 && pinch0) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    look.fov = THREE.MathUtils.clamp(pinch0.fov * pinch0.d / d, FOV_MIN, FOV_MAX);
+    applyLook(); updateResetChip();
+    return;
+  }
+  if (pointers.size !== 1) return;
+  const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+  if (!dragged && dragStart && Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) > 5) {
+    dragged = true; dragging = true; canvas.style.cursor = 'grabbing';
+    if (hintOnDrag) hintOnDrag();
+  }
+  if (!dragged) return;
+  const k = THREE.MathUtils.degToRad(look.fov) / canvas.clientHeight;   // a full-height drag turns one field of view
+  look.yaw += dx * k; look.pitch += dy * k;
+  const now = performance.now(), dt = Math.max(1, now - (lastMove ? lastMove.t : now));
+  look.vyaw = dx * k / dt * 16; look.vpitch = dy * k / dt * 16;          // per-frame velocity for the glide
+  lastMove = { x: e.clientX, y: e.clientY, t: now };
+  applyLook(); updateResetChip(); mmSync();
+});
+function endPointer(e) {
+  const had = pointers.has(e.pointerId);
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch0 = null;
+  if (!had) return;
+  if (pointers.size === 0) {
+    const wasDrag = dragged;
+    dragging = false; canvas.style.cursor = hovered ? 'pointer' : 'grab';
+    if (!wasDrag && e.type === 'pointerup' && dragStart) handleClick(e.clientX, e.clientY);
+    else if (wasDrag && performance.now() - (lastMove ? lastMove.t : 0) > 80) { look.vyaw = look.vpitch = 0; }
+    dragStart = null; dragged = false;
+  }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('pointerleave', e => { if (!pointers.has(e.pointerId)) { hoverPt = null; hoverDirty = true; } });
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  look.fov = THREE.MathUtils.clamp(look.fov * Math.exp(e.deltaY * 0.0012), FOV_MIN, FOV_MAX);
+  applyLook(); updateResetChip();
+}, { passive: false });
+canvas.addEventListener('dblclick', e => {           // Street View habit: double-click the road to go there
+  const hit = pickAt(e.clientX, e.clientY);
+  if (hit && hit.node !== undefined) walkTo(hit.node, 'road');
+});
+
+/* what is under a screen point: a walking arrow, a blank house (its plates
+   win over its walls), or a spot on the road near a viewpoint */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const hitPt = new THREE.Vector3();
+function pickAt(clientX, clientY) {
+  const ud = curUD();
+  if (!ud) return null;
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const discs = ud.chevrons.filter(c => c.visible).map(c => c.userData.hit);
+  const ch = raycaster.intersectObjects(discs, false)[0];
+  if (ch) return { chevron: ch.object.userData.chevron };
+  if (currentStage.kind === 'quiz' && blanks.length) {
+    let body = null;
+    for (const h of raycaster.intersectObjects(blanks, false)) {
+      const bs = h.object.userData.bstate;
+      if (!bs || bs.solved) continue;
+      if (bs.plates.includes(h.object)) return { bstate: bs };
+      if (!body && h.distance < 40) body = bs;
+    }
+    if (body) return { bstate: body };
+  }
+  if (raycaster.ray.intersectPlane(groundPlane, hitPt)) {
+    let best = -1, bd = 6.5;
+    ud.layout.nodes.forEach((nd, i) => {
+      const d = Math.hypot(nd.x - hitPt.x, nd.z - hitPt.z);
+      if (d < bd && i !== ud.node) { bd = d; best = i; }
+    });
+    if (best >= 0) return { node: best };
+  }
+  return null;
+}
+function handleClick(x, y) {
+  const hit = pickAt(x, y);
+  if (!hit) return;
+  if (hit.chevron) { const li = hit.chevron.userData.link; if (li >= 0) walkTo(li, 'chevron'); return; }
+  if (hit.bstate) { openQuiz(hit.bstate); return; }
+  if (hit.node !== undefined) walkTo(hit.node, 'road');
+}
+
+/* ============================================================
+   street map (top-down): the road, the blocks, every house, the
+   viewpoints you can tap, and where you stand and face
+   ============================================================ */
+const mmBox = document.getElementById('minimap');
+const mmSvg = mmBox && mmBox.querySelector('svg');
+const MM_NS = 'http://www.w3.org/2000/svg';
+const MM_W = 220, MM_H = 110, MM_PAD = 7;
+let mmMap = null;      // world -> svg mapping for the current stage
+function mmNode(tag, attrs, parent = mmSvg) {
+  const n = document.createElementNS(MM_NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  parent.appendChild(n);
+  return n;
+}
+function mmFit(layout) {
+  const b = layout.bounds, court = layout.kind === 'court';
+  // the court is drawn with the entrance running left to right
+  const u0 = court ? -b.z1 : b.x0, u1 = court ? -b.z0 : b.x1;
+  const v0 = court ? b.x0 : b.z0, v1 = court ? b.x1 : b.z1;
+  const s = Math.min((MM_W - 2 * MM_PAD) / (u1 - u0), (MM_H - 2 * MM_PAD) / (v1 - v0));
+  const ox = (MM_W - (u1 - u0) * s) / 2, oy = (MM_H - (v1 - v0) * s) / 2;
+  return { s, court, toU: (x, z) => ox + ((court ? -z : x) - u0) * s, toV: (x, z) => oy + ((court ? x : z) - v0) * s };
+}
+function mmDraw(st, ud) {
+  while (mmSvg.firstChild) mmSvg.removeChild(mmSvg.firstChild);
+  const L = ud.layout;
+  const M = mmMap = mmFit(L);
+  const road = '#5f656b', walk = '#8d949b';
+  if (L.kind === 'street') {
+    mmNode('line', { x1: M.toU(L.xMin - 60, 0), y1: M.toV(0, 0), x2: M.toU(L.xMax + 60, 0), y2: M.toV(0, 0), stroke: road, 'stroke-width': Math.max(4, 7 * M.s) });
+    for (const c of L.crossings) {
+      const u = M.toU((c.x0 + c.x1) / 2, 0);
+      mmNode('line', { x1: u, y1: M.toV(0, -40), x2: u, y2: M.toV(0, 40), stroke: road, 'stroke-width': Math.max(4, CROSS_W * M.s) });
+      mmNode('text', { x: u, y: M.toV(0, 26) - 1, 'text-anchor': 'middle', fill: walk, 'font-size': 7, 'font-family': 'system-ui, sans-serif' }).textContent = c.name;
+    }
+    if (st.type === 'block' || st.blocks.length > 1)
+      for (const b of L.blocks)
+        mmNode('text', { x: M.toU((b.x0 + b.x1) / 2, 0), y: M.toV(0, 0) + 3, 'text-anchor': 'middle', fill: '#eef2f6', 'font-size': 8, 'font-weight': 700, 'font-family': 'system-ui, sans-serif' }).textContent = b.hundred * 100;
+    // numbers rise this way
+    const u0 = M.toU(L.blocks[0].x0 + 2, 0), v = M.toV(0, HALF_ROAD + 2.2), c = 'var(--c-path, #ffd54a)';
+    mmNode('line', { x1: u0, y1: v, x2: u0 + 16, y2: v, stroke: c, 'stroke-width': 1.6 });
+    mmNode('polygon', { fill: c, points: `${u0 + 20},${v} ${u0 + 15},${v - 3} ${u0 + 15},${v + 3}` });
+  } else {
+    const uM = M.toU(0, 0), vM0 = M.toV(-60, 0), vM1 = M.toV(60, 0);
+    mmNode('line', { x1: uM, y1: vM0, x2: uM, y2: vM1, stroke: road, 'stroke-width': Math.max(4, 7 * M.s) });
+    mmNode('line', { x1: uM, y1: M.toV(0, 0), x2: M.toU(0, CT.bulbZ), y2: M.toV(0, CT.bulbZ), stroke: road, 'stroke-width': Math.max(4, 7 * M.s) });
+    mmNode('circle', { cx: M.toU(0, CT.bulbZ), cy: M.toV(0, CT.bulbZ), r: CT.bulbR * M.s, fill: road });
+    mmNode('text', { x: uM + 4, y: M.toV(-28, 0), fill: walk, 'font-size': 7, 'font-family': 'system-ui, sans-serif', transform: `rotate(-90 ${uM + 4} ${M.toV(-28, 0)})` }).textContent = st.main.name;
+    mmNode('text', { x: M.toU(0, -9), y: M.toV(-6, 0), fill: walk, 'font-size': 7, 'font-family': 'system-ui, sans-serif' }).textContent = st.label;
+  }
+  // houses: a dot per house; blanks amber, solved green
+  const solved = new Set();
+  for (const b of ud.blankStates) if (b.solved) solved.add(b.value);
+  const hs = Math.max(3.4, Math.min(6, 5 * M.s));
+  for (const h of L.houses) {
+    const u = M.toU(h.px, h.pz), v = M.toV(h.px, h.pz);
+    const blank = h.mask !== null;
+    mmNode('rect', { x: u - hs / 2, y: v - hs / 2, width: hs, height: hs, rx: 1,
+      fill: blank ? (solved.has(h.value) ? '#57c97e' : '#ffd54a') : 'none',
+      stroke: blank ? 'none' : '#9fb0c0', 'stroke-width': 1 });
+  }
+  // viewpoints
+  L.nodes.forEach((nd, i) => {
+    const c = mmNode('circle', { class: 'node', cx: M.toU(nd.x, nd.z), cy: M.toV(nd.x, nd.z), r: 3.2, fill: '#eef2f6', 'fill-opacity': 0.5 });
+    c.addEventListener('click', () => walkTo(i, 'map'));
+  });
+  mmDrawYou(ud);
+}
+let mmYou = null;
+function mmDrawYou(ud) {
+  if (mmYou) { mmYou.remove(); mmYou = null; }
+  const M = mmMap; if (!M) return;
+  const nd = ud.layout.nodes[ud.node];
+  const f = forwardXZ();
+  const u = M.toU(nd.x, nd.z), v = M.toV(nd.x, nd.z);
+  const fu = M.court ? -f.z : f.x, fv = M.court ? f.x : f.z;
+  const g = mmNode('g', {});
+  mmNode('circle', { cx: u, cy: v, r: 4.2, fill: '#ffd9a0' }, g);
+  const nx = -fv, ny = fu;
+  mmNode('polygon', { fill: '#ffd9a0', points: `${u + fu * 11},${v + fv * 11} ${u + nx * 4.5},${v + ny * 4.5} ${u - nx * 4.5},${v - ny * 4.5}` }, g);
+  mmYou = g;
+}
+let mmSig = null;
+function mmSync(force) {
+  if (!mmSvg) return;
+  const ud = curUD();
+  if (!ud) return;
+  let n = 0;
+  for (const b of ud.blankStates) if (b.solved) n++;
+  const full = currentIndex + '|' + n;
+  const sig = full + '|' + ud.node + '|' + Math.round(look.yaw * 24);
+  if (!force && sig === mmSig) return;
+  const redraw = force || !mmSig || mmSig.split('|').slice(0, 2).join('|') !== full;
+  mmSig = sig;
+  if (redraw) mmDraw(currentStage, ud); else mmDrawYou(ud);
+}
+document.addEventListener('blanksolved', () => mmSync(true));
+
+// jump-to-part menu
+const partStart = {};
+STAGES.forEach((s, idx) => { if (!(s.part in partStart)) partStart[s.part] = idx; });
+const jumpBtns = [...document.querySelectorAll('#jumpbar button[data-part]')];
+for (const btn of jumpBtns) btn.onclick = () => showStage(partStart[Number(btn.dataset.part)]);
+
+new ResizeObserver(([e]) => document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px'))
+  .observe(document.getElementById('prompt'));
+
+/* ---- prompt copy: one amber headline + a short plain-language body ---- */
+const plSpan = (cls, txt) => `<span class="pl pl-${cls}">${txt}</span>`;
+const PROMPTS = {
+  p1example: {
+    title: 'Part 1 · Odd side, even side',
+    body: 'One side of the street has the <b>odd</b> numbers, the other the <b>even</b>: 101, 103, 105 on the left; 102, 104, 106 on the right. ' +
+          'Houses facing each other are one apart. <b>Drag</b> to look round, click the <b>arrows on the road</b> to walk.',
+    short: 'Odd numbers on one side, even on the other; facing houses are one apart. Drag to look, tap the road arrows to walk.',
+  },
+  p1quiz: {
+    title: n => `${n} · Which side is which?`,
+    body: 'Click a house marked <b>?</b> and pick its number. Check a neighbour on the <b>same side</b> — along one side the numbers go up by two.',
+    short: 'Click a <b>?</b> house. Same side, same odd or even, counting by two.',
+  },
+  p2example: {
+    title: 'Part 2 · Numbers rise away from the start',
+    body: 'Oak St starts at Main St. Walk away from Main St and the numbers climb on both sides — the <b>yellow arrows</b> show the way. ' +
+          'Need a lower number? Turn round.',
+    short: 'Numbers climb as you walk away from Main St. Need a lower number? Turn round.',
+  },
+  p2quiz: {
+    title: n => `${n} · Which way do they climb?`,
+    body: 'Read two numbers to see which way they rise, then count on to the houses marked <b>?</b> — some are at the ends of the street.',
+    short: 'Read two numbers to find the direction, then count on to the <b>?</b> houses.',
+  },
+  p3example: {
+    title: 'Part 3 · Each block is a hundred',
+    body: 'Cross a street and the numbers jump to the next hundred: the 100 block, the 200 block, the 300 block. ' +
+          'The leading digits are the ' + plSpan('block', 'block') + ', the last two count along it: ' +
+          plSpan('block', '2') + '·' + plSpan('lot', '05') + '. The street signs show the block.',
+    short: 'Each cross street adds a hundred. ' + plSpan('block', 'Block') + ' · ' + plSpan('lot', 'lot') + ': ' +
+           plSpan('block', '2') + '·' + plSpan('lot', '05') + '. The street signs show the block.',
+  },
+  p3quiz: {
+    title: n => `${n} · Read the block`,
+    body: 'Click a house with a <b>partial number</b> (like 12▢3) and pick the full one. The street sign at the corner tells you the block.',
+    short: 'Click a <b>partial number</b> (like 12▢3). The corner sign gives the block.',
+  },
+  p4example: {
+    title: 'Part 4 · Gaps are normal',
+    body: 'Numbers are handed out by <b>distance</b> along the street, not one per house, so they skip: 1402, 1410, 1416. ' +
+          'A missing number is not a missing house. The side, the direction and the block still hold.',
+    short: 'Numbers measure distance, so they skip: 1402, 1410, 1416. A missing number is not a missing house.',
+  },
+  p4quiz: {
+    title: n => `${n} · Mind the gaps`,
+    body: 'Pick the number that fits <b>between its neighbours</b>: right side, right block, rising the right way. The size of the gap does not matter.',
+    short: 'Pick what fits <b>between the neighbours</b>: right side, right block, right direction.',
+  },
+  p5example: {
+    title: 'Part 5 · Round the court',
+    body: 'A court is a dead end with a loop. The numbers rise as you go in — odd on one side, even on the other — right round the bulb, ' +
+          'until the two sides <b>meet at the far end</b>. The corner houses face the main street, so their numbers belong to it.',
+    short: 'Numbers rise going in, odd one side, even the other, round the bulb until the sides <b>meet at the far end</b>.',
+  },
+  p5quiz: {
+    title: n => `${n} · Round the bulb`,
+    body: 'Walk in and round. Click a house marked <b>?</b> and pick its number — the two sides meet at the far end.',
+    short: 'Walk in and round. Click a <b>?</b> house — the sides meet at the far end.',
+  },
+  p5loop: {
+    title: n => `${n} · One run round the loop`,
+    body: 'Some courts count round in <b>one run</b>: 1, 2, 3 … up one side and back down the other. Two neighbours one apart tell you so. ' +
+          'Click a house marked <b>?</b>.',
+    short: 'This court counts round in <b>one run</b>: up one side, back down the other. Click a <b>?</b> house.',
+  },
+};
+function promptFor(st) {
+  const key = `p${st.part}${st.kind === 'example' ? 'example' : (st.type === 'loop' ? 'loop' : 'quiz')}`;
+  const row = PROMPTS[key] || PROMPTS.p1quiz;
+  const val = v => (typeof v === 'function' ? v(st.label) : v);
+  return { title: val(row.title), body: val(row.body), short: val(row.short) };
+}
+function setPrompt({ title, body, short }) {
+  const useShort = short && matchMedia('(max-width: 640px)').matches;
+  ui.prompt.innerHTML = `<div class="ptitle">${title}</div><div class="pbody">${useShort ? short : body}</div>`;
+}
+
+/* ============================================================
+   stages
+   ============================================================ */
+function allSolved() {
+  const ud = curUD();
+  return !!ud && ud.blankStates.length > 0 && ud.blankStates.every(s => s.solved);
+}
+function showStage(i) {
+  currentIndex = i;
+  currentStage = STAGES[i];
+  for (const b of jumpBtns) b.classList.toggle('active', Number(b.dataset.part) === currentStage.part);
+  if (!groups[i]) groups[i] = buildStageGroup(i);
+  for (const k in groups) groups[k].visible = (Number(k) === i);
+  blanks = groups[i].userData.raycastList;
+
+  closeQuiz();
+  ui.next.classList.add('hidden');
+  ui.continueBtn.classList.add('hidden');
+  ui.back.classList.add('hidden');
+
+  setPrompt(promptFor(currentStage));
+  if (currentStage.kind === 'example') {
+    ui.continueBtn.textContent = 'Next ▸';
+    ui.continueBtn.classList.remove('hidden');
+    if (currentIndex > 0) ui.back.classList.remove('hidden');
+  } else {
+    ui.back.classList.remove('hidden');
+  }
+  ui.prompt.classList.remove('hidden');
+
+  frameStage(currentStage);
+  if (currentStage.kind === 'quiz' && allSolved()) showNext();   // revisiting a finished street
+  document.dispatchEvent(new CustomEvent('stagechange', { detail: { index: i, stage: currentStage } }));
+}
+
+/* ============================================================
+   quiz
+   ============================================================ */
+const RULE_BY_PART = {
+  1: 'Odd on one side, even on the other.',
+  2: 'Numbers rise away from the start of the street.',
+  3: 'Cross a street and the hundred goes up.',
+  4: 'Keep the side, the block and the direction — the gap size does not matter.',
+  5: 'Round the court the two sides meet at the far end.',
+};
+const quizType = () => (currentStage ? currentStage.type : 'street');
+const quizPlaces = (val, type) => splitPlaces(String(val), type);
+
+function optionHTML(idx, val, type) {
+  const segs = quizPlaces(val, type);
+  return `<span class="ltr">${'abcd'[idx]}</span><span class="num">` +
+    segs.map(sg => `<span class="pl pl-${sg.place}">${sg.text}</span>`).join('') + '</span>';
+}
+function renderQuizKey(type) {
+  const key = document.getElementById('qkey');
+  if (!key) return;
+  key.classList.toggle('hidden', !(type === 'block' || type === 'court'));
+}
+/* which rule a wrong pick broke: the hundred, the side of the street, or the spot along it */
+function placeOf(chosen, correct, st) {
+  if ((st.type === 'block' || st.type === 'court') && Math.floor(chosen / 100) !== Math.floor(correct / 100)) return 'block';
+  if (st.type !== 'loop' && isEven(chosen) !== isEven(correct)) return 'side';
+  return 'lot';
+}
+/* why the pick was wrong, in a short line — never reveals the answer */
+function explainWrong(chosen, correct, st) {
+  const pl = placeOf(chosen, correct, st);
+  if (pl === 'block') return 'Right spot, wrong hundred — the street sign gives the block.';
+  if (pl === 'side') return `${chosen} is ${parityWord(chosen)} — that’s the other side of the street.`;
+  if (st.type === 'loop') return 'One run round the loop — count on by one from the house next door.';
+  if (st.gaps) return 'Right side and block — but it must sit between its neighbours.';
+  if (st.part === 2) return 'Right side — check which way the numbers climb, then count on by two.';
+  if (st.type === 'court') return 'Right side — follow that side round the bulb, counting by two.';
+  if (st.type === 'block') return 'Right side and block — count on by two from the house next door.';
+  return 'Right side — count on by two from the house next door.';
+}
+
+let quizCloseTimer = null;
+function cancelAutoClose() {
+  if (quizCloseTimer !== null) { clearTimeout(quizCloseTimer); quizCloseTimer = null; }
+}
+function armAutoClose(bstate) {
+  cancelAutoClose();
+  quizCloseTimer = setTimeout(() => {
+    quizCloseTimer = null;
+    if (activeBlank && activeBlank !== bstate) return;
+    const reading = ui.quiz.matches(':hover') || ui.quiz.contains(document.activeElement);
+    if (reading) return;
+    closeQuiz();
+  }, 1100);
+}
+document.getElementById('qclose').onclick = () => closeQuiz();
+
+function openQuiz(bstate) {
+  if (bstate.solved) return;
+  cancelAutoClose();
+  activeBlank = bstate;
+  const type = quizType();
+  ui.qhead.innerHTML = 'Which house is this?<small>Pick the number that fits the pattern</small>';
+  renderQuizKey(type);
+  ui.qopts.innerHTML = '';
+  bstate.options.forEach((val, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.innerHTML = optionHTML(idx, val, type);
+    btn.onclick = ev => chooseOption(bstate, val, btn, ev);
+    ui.qopts.appendChild(btn);
+  });
+  ui.qmsg.textContent = '';
+  ui.qmsg.className = '';
+  ui.quiz.classList.remove('hidden');
+  document.dispatchEvent(new CustomEvent('quizopen', { detail: { bstate, type } }));
+}
+function chooseOption(bstate, val, btn, ev) {
+  if (bstate !== activeBlank || bstate.solved) return;
+  const type = quizType();
+  if (val === bstate.value) {
+    bstate.solved = true;
+    for (const p of bstate.plates) setPlateText(p, String(val));
+    btn.classList.add('right');
+    document.dispatchEvent(new CustomEvent('answer', { detail: {
+      bstate, picked: val, correct: true, attempt: (bstate.wrongCount || 0) + 1, type,
+    } }));
+    [...ui.qopts.children].forEach(b => b.disabled = true);
+    ui.qmsg.textContent = `✓ Correct — ${val}`;
+    ui.qmsg.className = 'ok';
+    if (ev && ev.detail > 0 && document.activeElement === btn) btn.blur();
+    checkComplete(bstate);
+    if (activeBlank === bstate) armAutoClose(bstate);
+  } else {
+    btn.disabled = true;
+    btn.classList.add('wrong');
+    bstate.wrongCount = (bstate.wrongCount || 0) + 1;
+    const place = placeOf(val, bstate.value, currentStage);
+    document.dispatchEvent(new CustomEvent('answer', { detail: {
+      bstate, picked: val, correct: false, attempt: bstate.wrongCount, type, place,
+      chosen: quizPlaces(val, type), expected: quizPlaces(bstate.value, type),
+    } }));
+    let msg = explainWrong(val, bstate.value, currentStage);
+    const rule = currentStage && (currentStage.type === 'loop' ? 'One run round the loop, by one.' : RULE_BY_PART[currentStage.part]);
+    if (bstate.wrongCount >= 2 && rule) msg += ' ' + rule;
+    ui.qmsg.textContent = msg;
+    ui.qmsg.className = 'bad';
+  }
+}
+function closeQuiz() {
+  cancelAutoClose();
+  activeBlank = null;
+  ui.quiz.classList.add('hidden');
+  document.dispatchEvent(new CustomEvent('quizclose', { detail: {} }));
+}
+
+function checkComplete(bstate) {
+  if (bstate) {
+    popPlate(bstate);
+    markSolved(bstate);
+    document.dispatchEvent(new CustomEvent('blanksolved', { detail: { bstate, index: currentIndex } }));
+  }
+  if (!allSolved()) return;
+  markStageComplete(currentIndex);
+  if (!celebrated.has(currentIndex)) {
+    celebrated.add(currentIndex);
+    if (completed.size === STAGES.length) fireFinale();
+    else fireConfetti('');
+  }
+  showNext();
+}
+function showNext() {
+  const isLast = currentIndex === STAGES.length - 1;
+  const nextStage = STAGES[currentIndex + 1];
+  if (isLast) {
+    const fi = firstIncomplete();
+    ui.next.textContent = fi === -1 ? 'Start over ▸' : `Finish Part ${STAGES[fi].part} ▸`;
+  }
+  else if (nextStage && nextStage.kind === 'example') ui.next.textContent = `Next: Part ${nextStage.part} ▸`;
+  else ui.next.textContent = 'Next ▸';
+  ui.next.classList.remove('hidden');
+}
+
+/* ============================================================
+   reward + progress
+   ============================================================ */
+const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function popPlate(bstate) {
+  if (!bstate) return;
+  const reduced = REDUCED();
+  const white = new THREE.Color(0xffffff), tint = new THREE.Color(0xc8ffd8);
+  const outBack = x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+  requestAnimationFrame(() => {
+    const t0 = performance.now();
+    (function step(t) {
+      const e = t - t0;
+      for (const p of bstate.plates) {
+        if (!reduced) {
+          const k = Math.min(1, e / 320);
+          const bump = k < 0.5 ? outBack(k / 0.5) : 1 - (k - 0.5) / 0.5;
+          const sc = 1 + 0.18 * bump;
+          p.scale.set(sc, sc, 1);
+        }
+        if (p.material && p.material.color) p.material.color.copy(white).lerp(tint, Math.sin(Math.PI * Math.min(1, e / 500)));
+      }
+      if (e < 500) requestAnimationFrame(step);
+      else for (const p of bstate.plates) { p.scale.set(1, 1, 1); if (p.material && p.material.color) p.material.color.copy(white); }
+    })(performance.now());
+  });
+  if (!reduced) plateBurst(bstate.plate);
+}
+function markSolved(bstate) {
+  for (const p of (bstate ? bstate.plates : [])) {
+    if (!p || p.userData.solvedDot) continue;
+    const par = p.geometry && p.geometry.parameters;
+    if (!par) continue;
+    const pw = par.width, ph = par.height;
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(ph * 0.14, 20),
+      new THREE.MeshBasicMaterial({ color: 0x57c97e, fog: false }));
+    dot.position.set(pw / 2 - ph * 0.18, ph / 2 - ph * 0.18, 0.004);
+    p.add(dot);
+    p.userData.solvedDot = dot;
+  }
+}
+
+const completed = new Set();
+const progressEl = document.getElementById('progress');
+const jbTitleEl = document.querySelector('#jumpbar .jbtitle');
+const progSegs = STAGES.map((st, i) => {
+  const seg = document.createElement('span');
+  seg.className = 'seg' + (i > 0 && st.part !== STAGES[i - 1].part ? ' part' : '');
+  if (progressEl) progressEl.appendChild(seg);
+  return seg;
+});
+function updateProgress() {
+  for (let i = 0; i < progSegs.length; i++) {
+    const done = completed.has(i);
+    progSegs[i].classList.toggle('done', done);
+    progSegs[i].classList.toggle('now', !done && i === currentIndex);
+  }
+  if (jbTitleEl && currentIndex >= 0)
+    jbTitleEl.textContent = `Part ${STAGES[currentIndex].part} · Street ${currentIndex + 1} of ${STAGES.length}`;
+}
+function markStageComplete(i) {
+  completed.add(i); updateProgress();
+  document.dispatchEvent(new CustomEvent('stagecomplete', { detail: { index: i, stage: STAGES[i] } }));
+}
+document.addEventListener('stagechange', updateProgress);
+function firstIncomplete() {
+  for (let i = 0; i < STAGES.length; i++) if (!completed.has(i)) return i;
+  return -1;
+}
+
+/* ---- end of the run ---- */
+const finaleEl = document.getElementById('finale');
+let finaleShown = false;
+function fireFinale() {
+  if (finaleShown) return;
+  finaleShown = true;
+  document.dispatchEvent(new CustomEvent('coursecomplete', { detail: {} }));
+  fireConfetti('cannons');
+  showFinale();
+}
+function showFinale() {
+  if (!finaleEl) return;
+  const open = () => finaleEl.classList.remove('hidden');
+  if (REDUCED()) open(); else setTimeout(open, 900);
+}
+function hideFinale() { if (finaleEl) finaleEl.classList.add('hidden'); }
+const fcloseBtn = document.getElementById('fclose');
+if (fcloseBtn) fcloseBtn.onclick = hideFinale;
+const fagainBtn = document.getElementById('fagain');
+if (fagainBtn) fagainBtn.onclick = () => { hideFinale(); resetCourse(); showStage(0); };
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && finaleEl && !finaleEl.classList.contains('hidden')) hideFinale();
+});
+
+function disposeGroup(g) {
+  scene.remove(g);
+  g.traverse(o => {
+    if (o.geometry && o.geometry !== CHEV_GEO && o.geometry !== CHEV_HIT) o.geometry.dispose();
+    if (o.material) { if (o.material.map && o.material.map !== ASPHALT) o.material.map.dispose(); o.material.dispose(); }
+  });
+}
+/* "Try Part N again" from the report: rebuild only that part's streets */
+function retryPart(p) {
+  hideFinale();
+  const stagesReset = [];
+  for (let i = 0; i < STAGES.length; i++) {
+    if (STAGES[i].part !== p) continue;
+    stagesReset.push(i);
+    if (groups[i]) { disposeGroup(groups[i]); delete groups[i]; }
+    completed.delete(i);
+    celebrated.delete(i);
+  }
+  if (!stagesReset.length) return;
+  finaleShown = false;
+  updateProgress();
+  document.dispatchEvent(new CustomEvent('partreset', { detail: { part: p, stages: stagesReset } }));
+  showStage(stagesReset[0]);
+}
+document.addEventListener('retrypart', e => {
+  const p = Number(e.detail && e.detail.part);
+  if (p >= 1 && p <= 5) retryPart(p);
+});
+function resetCourse() {
+  for (const k of Object.keys(groups)) { disposeGroup(groups[k]); delete groups[k]; }
+  celebrated.clear();
+  completed.clear();
+  finaleShown = false;
+  hideFinale();
+  document.dispatchEvent(new CustomEvent('coursereset', { detail: {} }));
+}
+ui.continueBtn.onclick = () => {
+  markStageComplete(currentIndex);
+  if (completed.size === STAGES.length) fireFinale();
+  showStage(currentIndex + 1);
+};
+ui.back.onclick = () => showStage(Math.max(0, currentIndex - 1));
+ui.next.onclick = () => {
+  if (currentIndex < STAGES.length - 1) showStage(currentIndex + 1);
+  else {
+    const fi = firstIncomplete();
+    if (fi === -1) { hideFinale(); resetCourse(); showStage(0); }
+    else showStage(fi);
+  }
+};
+
+/* ============================================================
+   discoverability: halos behind unsolved plates, hover tint, cursor,
+   the "N houses left" chip, the first-run hint and the ? button
+   ============================================================ */
+let hovered = null, hoverPt = null, hoverDirty = false, hoveredChevron = null;
+let hintOnDrag = null;
+{
+  const chip = document.getElementById('doorsleft');
+  const hint = document.getElementById('draghint');
+  const helpBtn = document.getElementById('helpbtn');
+  const HINT_FULL = hint.innerHTML;
+  const HINT_TIP = '<div>Click a house marked <b>?</b> — the glowing ones. Walk closer with the road arrows.</div>';
+  const isQuizStage = () => !!currentStage && currentStage.kind === 'quiz';
+  const quizIsOpen = () => !ui.quiz.classList.contains('hidden');
+
+  function addHalo(bs) {
+    if (!bs || bs.solved) return;
+    bs.halos = bs.halos || [];
+    for (const p of bs.plates) {
+      if (p.userData.halo || !p.geometry.parameters) continue;
+      const { width: pw, height: ph } = p.geometry.parameters;
+      const halo = new THREE.Mesh(new THREE.PlaneGeometry(pw * 1.16, ph * 1.4),
+        new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, opacity: 0.55, depthWrite: false, fog: false }));
+      halo.position.z = -0.006;
+      halo.renderOrder = -1;
+      p.add(halo);
+      p.userData.halo = halo;
+      bs.halos.push(halo);
+    }
+  }
+  function clearBlank(bs) {
+    if (!bs) return;
+    for (const p of bs.plates) {
+      if (p.userData.halo) { p.remove(p.userData.halo); p.userData.halo.geometry.dispose(); p.userData.halo.material.dispose(); p.userData.halo = null; }
+      if (p.material) { p.material.color.set('#ffffff'); p.scale.set(1, 1, 1); }
+    }
+    bs.halos = [];
+    if (hovered === bs) hovered = null;
+  }
+  function updateChip(ud) {
+    if (!ud || !isQuizStage()) { chip.className = 'hidden'; return; }
+    const left = ud.blankStates.filter(s => !s.solved).length;
+    if (left > 0) { chip.className = ''; chip.innerHTML = `<b>${left}</b> house${left === 1 ? '' : 's'} left`; }
+    else { chip.className = 'done'; chip.textContent = 'Done ✓'; }
+  }
+  let stageIndex = -1, chipSig = '';
+  function onStage() {
+    const ud = curUD();
+    if (!ud) return;
+    stageIndex = currentIndex;
+    if (isQuizStage()) for (const s of ud.blankStates) if (!s.solved) addHalo(s);
+    chipSig = '';
+    tipAt = performance.now();
+    tipUsed = false;
+    firstRunHint();
+  }
+  function reconcile(now) {
+    const ud = curUD();
+    if (!ud) return;
+    if (currentIndex !== stageIndex) onStage();
+    for (const s of ud.blankStates) if (s.solved && ((s.halos && s.halos.length) || s === hovered)) clearBlank(s);
+    const sig = currentIndex + ':' + ud.blankStates.reduce((n, s) => n + (s.solved ? 1 : 0), 0) + ':' + (isQuizStage() ? 'q' : 'e');
+    if (sig !== chipSig) { chipSig = sig; updateChip(ud); }
+    tipCheck(now, ud);
+  }
+  document.addEventListener('stagechange', () => onStage());
+  document.addEventListener('blanksolved', e => clearBlank(e.detail && e.detail.bstate));
+
+  function updateHover() {
+    hoverDirty = false;
+    const hit = (hoverPt && !dragging) ? pickAt(hoverPt.x, hoverPt.y) : null;
+    const bs = hit && hit.bstate ? hit.bstate : null;
+    const ch = hit && hit.chevron ? hit.chevron : null;
+    if (bs !== hovered) {
+      if (hovered) for (const p of hovered.plates) { p.material.color.set('#ffffff'); p.scale.set(1, 1, 1); }
+      hovered = bs;
+      if (hovered) for (const p of hovered.plates) { p.material.color.set('#fff1c2'); p.scale.set(1.06, 1.06, 1); }
+    }
+    if (ch !== hoveredChevron) {
+      if (hoveredChevron) { hoveredChevron.userData.arrow.material.opacity = 0.82; hoveredChevron.scale.setScalar(0.78); }
+      hoveredChevron = ch;
+      if (hoveredChevron) { hoveredChevron.userData.arrow.material.opacity = 1; hoveredChevron.scale.setScalar(0.9); }
+    }
+    if (!dragging) canvas.style.cursor = (hovered || hoveredChevron || (hit && hit.node !== undefined)) ? 'pointer' : 'grab';
+  }
+
+  let hintTimer = 0, hideTimer = 0, firstStage = true, awaitingDrag = false;
+  let tipAt = 0, tipUsed = false;
+  const seen = {
+    get() { try { return localStorage.getItem('sf.houses.hintSeen') === '1'; } catch (e) { return false; } },
+    set() { try { localStorage.setItem('sf.houses.hintSeen', '1'); } catch (e) { /* private mode */ } },
+  };
+  function showHint(html, ms) {
+    clearTimeout(hintTimer); clearTimeout(hideTimer);
+    hint.innerHTML = html;
+    hint.classList.remove('hidden');
+    requestAnimationFrame(() => hint.classList.add('show'));
+    hintTimer = setTimeout(hideHint, ms);
+  }
+  function hideHint() {
+    clearTimeout(hintTimer);
+    if (awaitingDrag) { awaitingDrag = false; seen.set(); }
+    hint.classList.remove('show');
+    hideTimer = setTimeout(() => { if (!hint.classList.contains('show')) hint.classList.add('hidden'); }, 340);
+  }
+  function firstRunHint() {
+    if (!firstStage) return;
+    firstStage = false;
+    if (seen.get()) return;
+    awaitingDrag = true;
+    showHint(HINT_FULL, 8000);
+  }
+  function tipCheck(now, ud) {
+    if (tipUsed || !isQuizStage()) return;
+    if (quizIsOpen() || hint.classList.contains('show') || ud.blankStates.some(s => s.solved)) { tipAt = now; return; }
+    if (now - tipAt > 12000) { tipUsed = true; showHint(HINT_TIP, 5000); }
+  }
+  hintOnDrag = () => { if (hint.classList.contains('show')) hideHint(); };
+  helpBtn.addEventListener('click', () => showHint(HINT_FULL, 6000));
+
+  (function pulse(now) {
+    requestAnimationFrame(pulse);
+    reconcile(now);
+    if (hoverDirty) updateHover();
+    const ud = curUD();
+    if (!ud) return;
+    const o = reduceMotionMQ.matches ? 0.6 : 0.35 + 0.3 * (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 2 * 0.9));
+    for (const s of ud.blankStates) if (s.halos) for (const h of s.halos) h.material.opacity = (s === hovered ? 0.9 : o);
+  })(performance.now());
+}
+
+/* ============================================================
+   confetti (2D canvas overlay)
+   ============================================================ */
+const cc = document.createElement('canvas');
+cc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:39';
+document.body.appendChild(cc);
+const cctx = cc.getContext('2d');
+function sizeConfetti() { cc.width = innerWidth; cc.height = innerHeight; }
+sizeConfetti();
+let confetti = [];
+const CONFETTI_COLORS = ['#ff5252', '#ffd54a', '#57c97e', '#42a5f5', '#ab47bc', '#ff9800'];
+function fireConfetti(mode) {
+  if (REDUCED()) return;
+  const colors = CONFETTI_COLORS;
+  if (mode === 'cannons') {
+    for (const side of [0, 1]) {
+      const dir = side === 0 ? 1 : -1;
+      for (let i = 0; i < 120; i++) confetti.push({
+        x: side === 0 ? 0 : innerWidth, y: innerHeight * 0.8,
+        vx: dir * (6 + Math.random() * 8), vy: -12 - Math.random() * 6, g: 0.22 + Math.random() * 0.12,
+        rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45, w: 6 + Math.random() * 7, h: 8 + Math.random() * 9,
+        color: colors[i % colors.length],
+      });
+    }
+    return;
+  }
+  for (let i = 0; i < 170; i++) confetti.push({
+    x: innerWidth / 2 + (Math.random() - 0.5) * 240, y: innerHeight * 0.32,
+    vx: (Math.random() - 0.5) * 10, vy: -7 - Math.random() * 9, g: 0.22 + Math.random() * 0.12,
+    rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.45, w: 6 + Math.random() * 7, h: 8 + Math.random() * 9,
+    color: colors[i % colors.length],
+  });
+}
+function plateBurst(plate) {
+  if (REDUCED() || !plate) return;
+  const v = plate.getWorldPosition(new THREE.Vector3()).project(camera);
+  if (v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2) return;
+  const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight;
+  const colors = ['#57c97e', '#7ee0a0', '#ffd54a'];
+  for (let i = 0; i < 14; i++) confetti.push({
+    x: x + (Math.random() - 0.5) * 26, y: y + (Math.random() - 0.5) * 16,
+    vx: (Math.random() - 0.5) * 4, vy: -4 - Math.random() * 3, g: 0.16 + Math.random() * 0.08,
+    rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.5, w: 4 + Math.random() * 2, h: 4 + Math.random() * 2,
+    color: colors[i % colors.length],
+  });
+}
+function drawConfetti() {
+  cctx.clearRect(0, 0, cc.width, cc.height);
+  if (!confetti.length) return;
+  confetti = confetti.filter(p => p.y < innerHeight + 40);
+  for (const p of confetti) {
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+    cctx.save();
+    cctx.translate(p.x, p.y); cctx.rotate(p.rot);
+    cctx.fillStyle = p.color;
+    cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    cctx.restore();
+  }
+}
+
+/* ============================================================
+   accessibility — keyboard, focus, ARIA, scene text
+   ============================================================ */
+const sceneDescEl = document.getElementById('scene-desc');
+const doorListEl = document.getElementById('doorlist');
+const walkStatusEl = document.getElementById('walkstatus');
+for (const id of ['minimap', 'viewbar', 'jumpbar']) {
+  const el = document.getElementById(id);
+  if (el) document.body.insertBefore(el, app);
+}
+canvas.tabIndex = 0;
+canvas.setAttribute('role', 'img');
+canvas.setAttribute('aria-label', '3D street view. Arrow keys look round and walk; Home faces down the street again.');
+canvas.setAttribute('aria-describedby', 'scene-desc');
+
+function a11yMarkCurrentPart() {
+  if (!currentStage) return;
+  for (const b of jumpBtns) {
+    if (Number(b.dataset.part) === currentStage.part) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  }
+}
+const spokenMask = mask => (mask === '?' ? 'no number yet' : mask.replace(/_+/g, ' blank ').replace(/\s+/g, ' ').trim());
+
+/* the street in a sentence, then each side's numbers in walking order */
+function a11yStageText() {
+  const st = currentStage, ud = curUD();
+  if (!st || !ud) return '';
+  const L = ud.layout;
+  const solved = new Set(); for (const b of ud.blankStates) if (b.solved) solved.add(b.value);
+  const say = h => (h.mask !== null && !solved.has(h.value) ? `blank (${spokenMask(h.mask)})` : String(h.value));
+  let text;
+  if (L.kind === 'street') {
+    const nb = st.blocks.length;
+    text = `${st.label}: ${nb === 1 ? 'one block' : nb + ' blocks'} with ${st.blocks[0].n || st.blocks[0].left.length} houses a side` +
+           (nb > 1 ? `, the ${st.blocks.map(b => b.hundred * 100).join(', ')} blocks, a cross street between each` : '') + '. ';
+    for (const s of [-1, 1]) {
+      const hs = L.houses.filter(h => h.side === s);
+      text += `${s < 0 ? 'Left' : 'Right'} side from the start: ${hs.map(say).join(', ')}. `;
+    }
+  } else {
+    text = `${st.label}, a court off ${st.main.name} with a bulb at the end. `;
+    for (const key of ['left', 'right']) {
+      const hs = L.houses.filter(h => h.courtSide === key);
+      text += `${key === 'left' ? 'Left' : 'Right'} side going in, then round the bulb: ${hs.map(say).join(', ')}. `;
+    }
+  }
+  if (st.kind === 'example') return text + 'This is a worked example — every house already shows its number.';
+  const left = ud.blankStates.filter(b => !b.solved).length;
+  if (left) return `${text}${left} house${left === 1 ? ' is' : 's are'} blank — use the house list to fill ${left === 1 ? 'it' : 'them'} in.`;
+  return `${text}Every house is filled in.`;
+}
+function a11yDescribeStage() {
+  if (!sceneDescEl) return;
+  const text = a11yStageText();
+  if (sceneDescEl.textContent !== text) sceneDescEl.textContent = text;
+}
+function a11yRebuildDoorList() {
+  if (!doorListEl) return;
+  doorListEl.innerHTML = '';
+  const ud = curUD();
+  if (!ud || !currentStage || currentStage.kind !== 'quiz') return;
+  for (const b of ud.blankStates) {
+    if (b.solved) continue;
+    const h = b.house;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `House showing ${h.mask.replace(/_/g, '▢')}, ${h.desc} — open its options`;
+    btn.setAttribute('aria-label', `House showing ${spokenMask(h.mask)}, ${h.desc} — open its options`);
+    btn.onclick = () => openQuiz(b);
+    doorListEl.appendChild(btn);
+  }
+}
+/* "Standing by 204 and 205, facing up the street" */
+function a11yFacing() {
+  const f = forwardXZ();
+  const court = curUD() && curUD().layout.kind === 'court';
+  if (Math.abs(f.x) >= Math.abs(f.z)) return f.x > 0 ? (court ? 'east along the main street' : 'up the street, numbers rising')
+                                                   : (court ? 'west along the main street' : 'back toward the start');
+  return f.z < 0 ? (court ? 'into the court' : 'the left side') : (court ? 'back to the main street' : 'the right side');
+}
+let walkStatusTimer = 0;
+function a11yWalkStatus() {
+  if (!walkStatusEl) return;
+  const nd = curNode();
+  if (!nd) return;
+  const ud = curUD();
+  const shown = h => { const b = ud && ud.blankStates.find(x => x.house === h); return (h.mask !== null && b && !b.solved) ? 'a blank house' : h.value; };
+  const near = nd.near && nd.near.length ? `by ${nd.near.map(shown).join(' and ')}` : (nd.at ? `at ${nd.at}` : 'on the road');
+  clearTimeout(walkStatusTimer);
+  walkStatusTimer = setTimeout(() => { walkStatusEl.textContent = `Standing ${near}, facing ${a11yFacing()}.`; }, 250);
+}
+
+let a11yReturnFocus = null;
+function a11yOnQuizOpen() {
+  const prev = document.activeElement;
+  if (prev && prev !== document.body && !ui.quiz.contains(prev)) a11yReturnFocus = prev;
+  setTimeout(() => { const first = ui.qopts.querySelector('button.opt:not([disabled])'); if (first) first.focus(); }, 0);
+}
+function a11yOnQuizClose() {
+  const back = a11yReturnFocus;
+  a11yReturnFocus = null;
+  setTimeout(() => { if (back && back.isConnected) back.focus(); else canvas.focus(); }, 0);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  const quizOpen = !!activeBlank && !ui.quiz.classList.contains('hidden');
+  if (quizOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeQuiz(); return; }
+    const opts = [...ui.qopts.querySelectorAll('button.opt:not([disabled])')];
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && opts.length) {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      const at = opts.indexOf(document.activeElement);
+      const to = at < 0 ? (step > 0 ? 0 : opts.length - 1) : (at + step + opts.length) % opts.length;
+      opts[to].focus();
+      return;
+    }
+    const k = e.key.toLowerCase();
+    const idx = '1234'.indexOf(k) >= 0 ? '1234'.indexOf(k) : 'abcd'.indexOf(k);
+    if (idx >= 0) {
+      const btn = [...ui.qopts.querySelectorAll('button.opt')][idx];
+      if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+      return;
+    }
+    return;
+  }
+  if (e.key === 'Home') { e.preventDefault(); resetView(); return; }
+  if (t && t !== document.body && t !== canvas && typeof t.closest === 'function' && t.closest('button, a[href], [tabindex]:not(canvas)')) return;
+  switch (e.key.toLowerCase()) {
+    case 'arrowleft': case 'a': e.preventDefault(); turnBy(20, 220); break;
+    case 'arrowright': case 'd': e.preventDefault(); turnBy(-20, 220); break;
+    case 'arrowup': case 'w': e.preventDefault(); walkAhead('key'); break;
+    case 'arrowdown': case 's': e.preventDefault(); walkBack('key'); break;
+    case 'pageup': e.preventDefault(); easeLook({ pitch: look.pitch + 0.18 }, 200); break;
+    case 'pagedown': e.preventDefault(); easeLook({ pitch: look.pitch - 0.18 }, 200); break;
+    default: return;
+  }
+  a11yWalkStatus();
+});
+
+let a11ySig = null, a11yQuizWasOpen = false;
+function a11ySync() {
+  const ud = curUD();
+  const sig = currentIndex + '|' + (ud ? ud.blankStates.filter(b => b.solved).length + '/' + ud.blankStates.length : '-');
+  if (sig !== a11ySig) {
+    a11ySig = sig;
+    a11yMarkCurrentPart();
+    a11yDescribeStage();
+    a11yRebuildDoorList();
+  }
+  const open = !!activeBlank && !ui.quiz.classList.contains('hidden');
+  if (open !== a11yQuizWasOpen) {
+    a11yQuizWasOpen = open;
+    if (open) a11yOnQuizOpen(); else a11yOnQuizClose();
+  }
+}
+for (const ev of ['stagechange', 'blanksolved', 'quizopen', 'quizclose']) document.addEventListener(ev, a11ySync);
+setInterval(a11ySync, 200);
+
+/* ============================================================
+   loop + resize
+   ============================================================ */
+addEventListener('resize', () => {
+  const wasDefault = Math.abs(look.fov - fovDefault()) < 0.5;
+  camera.aspect = innerWidth / innerHeight;
+  if (wasDefault) look.fov = fovDefault();
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  applyLook();
+  sizeConfetti();
+});
+(function tick() {
+  // glide after a flick, then settle
+  if (!dragging && (Math.abs(look.vyaw) > 1e-4 || Math.abs(look.vpitch) > 1e-4)) {
+    look.yaw += look.vyaw; look.pitch += look.vpitch;
+    look.vyaw *= 0.9; look.vpitch *= 0.9;
+    if (Math.abs(look.vyaw) <= 1e-4) look.vyaw = 0;
+    if (Math.abs(look.vpitch) <= 1e-4) look.vpitch = 0;
+    applyLook(); mmSync(); if (!look.vyaw && !look.vpitch) updateResetChip();
+  }
+  renderer.render(scene, camera);
+  drawConfetti();
+  requestAnimationFrame(tick);
+})();
+
+showStage(0);
+
+/* console handle for checking the scene without a mouse:
+   sfHouses.go(i) shows stage i, .walk(n) steps to viewpoint n, .face(deg) turns,
+   .solve() answers every open house on the current street */
+window.sfHouses = {
+  stages: STAGES, go: showStage, walk: i => walkTo(i, 'console'), turn: turnBy, reset: resetView, look,
+  face(yawDeg, pitchDeg = 0, fov) { look.yaw = THREE.MathUtils.degToRad(yawDeg); look.pitch = THREE.MathUtils.degToRad(pitchDeg); if (fov) look.fov = fov; applyLook(); mmSync(); },
+  ud: curUD, open: k => { const ud = curUD(); const b = ud && ud.blankStates.filter(s => !s.solved)[k || 0]; if (b) openQuiz(b); return b ? b.value : null; },
+  solve() { const ud = curUD(); if (!ud) return; for (const b of ud.blankStates) if (!b.solved) { openQuiz(b); const btn = [...ui.qopts.children][b.options.indexOf(b.value)]; btn.click(); } },
+  node: () => curUD() && curUD().node,
+};
+</script>
+</body>
+</html>
