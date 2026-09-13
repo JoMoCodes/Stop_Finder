@@ -67,7 +67,9 @@
     color: #eef2f6; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
   #doorsleft b { color: #ffd54a; }
-  #doorsleft.done { color: #7ee0a0; }
+  #doorsleft .dl-go { color: #ffd9a0; margin-left: 2px; }
+  #doorsleft:hover { transform: translateY(-1px); background: rgba(255,255,255,0.14); }
+  #doorsleft.done { color: #7ee0a0; cursor: default; pointer-events: none; }
 
   #draghint {
     position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%);
@@ -87,11 +89,16 @@
     display: flex; align-items: center; justify-content: center;
   }
 
-  /* site bar: this course has one look, so the bar is just the Home button */
+  /* site bar: a prominent Home button plus a compact Appearance menu. The four
+     looks drop out of the Appearance button on hover (mouse), tap / click, or
+     Enter (keyboard). Desktop: bottom right, left of the ? button, menu opens
+     upward. Phones: see the media queries at the end (portrait is a stacked
+     list at the bottom left, menu opens upward; landscape sits top right, menu
+     opens downward). */
   #lookbar {
     position: fixed; right: 74px; bottom: 28px; z-index: 11;
     display: flex; align-items: center; gap: 4px;
-    padding: 4px; border-radius: 999px; font-size: 13px; color: #9fb0c0;
+    padding: 4px 6px 4px 4px; border-radius: 999px; font-size: 13px; color: #9fb0c0;
     background: rgba(20,24,30,0.90); backdrop-filter: blur(6px);
     border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
@@ -104,6 +111,48 @@
   #lookbar a.lk-home svg { width: 16px; height: 16px; flex: none; }
   #lookbar a.lk-home:hover { background: #ffe07a; transform: translateY(-1px); }
   #lookbar a.lk-home:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(20,24,30,.9); }
+  #lookbar button.lk-toggle {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px 0 12px;
+    border-radius: 999px; background: transparent; box-shadow: none; border: none;
+    font-size: 13px; font-weight: 500; color: #9fb0c0; transition: background .12s ease;
+  }
+  #lookbar button.lk-toggle:hover { transform: none; background: rgba(255,255,255,0.12); }
+  #lookbar button.lk-toggle .lk-current { color: #eef2f6; font-weight: 600; }
+  #lookbar button.lk-toggle .lk-caret { font-size: 10px; color: #9fb0c0; transition: transform .15s ease; }
+  #lookbar.open button.lk-toggle { background: rgba(255,255,255,0.12); color: #eef2f6; }
+  #lookbar.open button.lk-toggle .lk-caret { transform: rotate(180deg); }
+  /* the drop-out menu: .lk-menu is a transparent hover bridge, .lk-list is the panel */
+  #lookbar .lk-menu {
+    position: absolute; right: 0; bottom: 100%; padding-bottom: 8px;
+    opacity: 0; visibility: hidden; transform: translateY(6px); pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease, visibility 0s linear .15s;
+  }
+  #lookbar .lk-list {
+    display: flex; flex-direction: column; gap: 2px; min-width: 200px; padding: 6px;
+    border-radius: 14px; background: rgba(20,24,30,0.96); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  #lookbar .lk-list a {
+    display: flex; align-items: baseline; gap: 8px; min-height: 32px; padding: 6px 12px;
+    border-radius: 10px; text-decoration: none; white-space: nowrap;
+    color: #eef2f6; font-size: 14px; font-weight: 600;
+  }
+  #lookbar .lk-list a small { color: #9fb0c0; font-size: 12px; font-weight: 400; }
+  #lookbar .lk-list a:hover { background: rgba(255,255,255,0.12); }
+  #lookbar .lk-list a[aria-current="page"] { background: #57c97e; color: #08130c; }
+  #lookbar .lk-list a[aria-current="page"] small { color: rgba(8,19,12,0.72); }
+  #lookbar .lk-list a:focus-visible { outline: 2px solid #ffd54a; outline-offset: 1px; }
+  #lookbar.open .lk-menu {
+    opacity: 1; visibility: visible; transform: none; pointer-events: auto;
+    transition: opacity .15s ease, transform .15s ease, visibility 0s;
+  }
+  @media (hover: hover) {
+    #lookbar:hover .lk-menu {
+      opacity: 1; visibility: visible; transform: none; pointer-events: auto;
+      transition: opacity .15s ease, transform .15s ease, visibility 0s;
+    }
+    #lookbar:hover button.lk-toggle .lk-caret { transform: rotate(180deg); }
+  }
 
   /* walk bar: turn left · walk to the next viewpoint · turn right */
   #viewbar {
@@ -221,7 +270,7 @@
     button { min-height: 44px; }
     #jumpbar button.jbtn { width: 44px; height: 44px; }
     button.opt { min-height: 52px; }
-    #lookbar a.lk-home { min-height: 44px; }
+    #lookbar a.lk-home, #lookbar button.lk-toggle, #lookbar .lk-list a { min-height: 44px; }
     #qclose { width: 44px; height: 44px; }
     #viewbar button.vbtn { min-height: 44px; }
     #viewbar button.vbtn.turn { width: 44px; }
@@ -232,6 +281,10 @@
     #quiz { right: 12px; width: 248px; }
     #jumpbar { top: calc(var(--prompt-h, 140px) + 16px); }
     #doorsleft { top: calc(var(--prompt-h, 140px) + 16px); }
+    /* Home + Appearance above the ? button, clear of the Back / Next row */
+    #lookbar { right: 12px; bottom: 80px; }
+    #lookbar button.lk-toggle .lk-current { display: none; }
+    #resetview { bottom: 132px; }
   }
 
   /* --- phones, portrait --- */
@@ -246,14 +299,24 @@
     #jumpbar .jbtns { gap: 8px; }
     #progress { margin-top: 6px; }
 
-    #lookbar { top: auto; bottom: 70px; left: 8px; right: auto; padding: 4px; }
+    /* Home + Appearance bar: bottom left, stacked as a two-row list above the
+       Back / Next row; the Appearance menu opens upward from it */
+    #lookbar { top: auto; bottom: 70px; left: 8px; right: auto;
+      flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; border-radius: 16px; }
+    #lookbar a.lk-home, #lookbar button.lk-toggle { justify-content: flex-start; padding: 0 14px 0 12px; border-radius: 12px; }
+    #lookbar button.lk-toggle .lk-current { display: none; }
+    #lookbar button.lk-toggle .lk-caret { margin-left: auto; }
+    #lookbar .lk-menu { left: 0; right: auto; }
+
+    /* stacked under the jump bar so the two never collide on narrow phones */
     #doorsleft { top: calc(var(--prompt-h, 140px) + 16px + 74px); right: 8px; left: auto; }
 
     #bottombar { bottom: 12px; gap: 8px; width: calc(100% - 16px); justify-content: center; }
     #bottombar button { padding: 12px 18px; font-size: 15px; min-height: 46px; }
 
-    /* walk bar sits above Back / Next, between Home (left) and the map (right) */
-    #viewbar { bottom: 68px; left: 50%; transform: translateX(-50%); gap: 4px; padding: 4px; }
+    /* walk bar sits above Back / Next on the right, under the Reset chip and the
+       map, clear of the Home + Appearance list on the left */
+    #viewbar { bottom: 68px; left: auto; right: 8px; transform: none; gap: 4px; padding: 4px; }
     #viewbar button.vbtn { padding: 0 10px; font-size: 14px; }
     #viewbar button.vbtn .vlabel { display: none; }
     #viewbar button.vbtn.walk { width: 44px; padding: 0; justify-content: center; font-size: 18px; }
@@ -275,6 +338,14 @@
     #qclose { width: 44px; height: 44px; top: 4px; right: 4px; }
     #finale { inset: 0; transform: none; width: auto; max-height: none; border-radius: 0;
       padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); animation: none; }
+
+    /* while a house's options are open the sheet owns the bottom of the screen,
+       so the top gives the house back its room: the prompt keeps only its title
+       and the jump bar, chip, hint and ? button step aside */
+    body.quiz-open #prompt .pbody { display: none; }
+    body.quiz-open #prompt .ptitle { margin-bottom: 0; }
+    body.quiz-open #jumpbar, body.quiz-open #doorsleft, body.quiz-open #helpbtn,
+    body.quiz-open #draghint, body.quiz-open #resetview { display: none; }
   }
 
   @media (max-width: 360px) {
@@ -311,10 +382,18 @@
     #resetview { right: 8px; bottom: 112px; left: auto; padding: 0; width: 44px; height: 44px; }
     #resetview .rv-label { display: none; }
 
+    /* Home + Appearance bar: top right, below the quiz column when that is open */
     #lookbar { top: 8px; right: 8px; bottom: auto; left: auto; z-index: 10; }
+    #lookbar button.lk-toggle .lk-current { display: none; }
+    #lookbar .lk-menu { top: 100%; bottom: auto; padding: 8px 0 0; }
 
     #finale { inset: 8px; transform: none; width: auto; max-height: none; border-radius: 14px;
       padding: 12px 16px 16px; animation: none; }
+
+    /* options open: the prompt keeps only its title so the house has the middle of the screen */
+    body.quiz-open #prompt .pbody { display: none; }
+    body.quiz-open #prompt .ptitle { margin-bottom: 0; }
+    body.quiz-open #doorsleft, body.quiz-open #draghint, body.quiz-open #resetview { display: none; }
   }
 </style>
 </head>
@@ -366,7 +445,8 @@
   <div id="progress" aria-hidden="true"></div>
 </div>
 
-<div id="doorsleft" class="hidden" aria-live="polite"></div>
+<!-- "N houses left": tap it to walk to the nearest house still to fill in -->
+<button id="doorsleft" type="button" class="hidden" aria-live="polite"></button>
 
 <div id="draghint" class="hidden" role="status">
   <svg viewBox="0 0 64 40" aria-hidden="true" fill="none" stroke="#ffd54a" stroke-width="2.2"
@@ -377,20 +457,47 @@
     <path d="M15 16.5 9.5 22l5.5 5.5" /><path d="M9.5 22h8.5" />
     <path d="M49 16.5 54.5 22 49 27.5" /><path d="M54.5 22H46" />
   </svg>
-  <div><b>Drag</b> to look around · Click the <b>arrows on the road</b> to walk · <b>Scroll / pinch</b> to zoom · Click a house marked <b>?</b> to answer</div>
+  <div><b>Drag</b> to look around · Click the <b>arrows on the road</b> to walk · <b>Scroll / pinch</b> to zoom · Click a house to <b>walk up to its number</b> · Click a house marked <b>?</b> to answer</div>
 </div>
 
 <button id="helpbtn" class="ghost" aria-label="How to use the controls">?</button>
 
-<!-- site bar: Home (this course has a single look, so no Appearance menu) -->
-<nav id="lookbar" aria-label="Home">
+<!-- site bar: Home + the Appearance menu (the four looks of this course) -->
+<nav id="lookbar" aria-label="Home and appearance">
   <a class="lk-home" href="https://jomocodes.github.io/Stop_Finder/" aria-label="Home: back to the Stop Finder menu">
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v10h13V10" /><path d="M10 20v-6h4v6" />
     </svg>
     <span>Home</span>
   </a>
+  <button class="lk-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lk-menu">
+    <span class="lk-title">Appearance</span><span class="lk-current">Classic</span><span class="lk-caret" aria-hidden="true">▼</span>
+  </button>
+  <div class="lk-menu" id="lk-menu">
+    <div class="lk-list" role="group" aria-label="Appearance">
+      <a href="houses.html" aria-current="page" title="Classic look (the original flat-colour build)">Classic <small>flat-colour original</small></a>
+      <a href="houses-realistic-a.html" title="Realistic look A: Sunbelt ranch street">Sunbelt <small>stucco ranch street</small></a>
+      <a href="houses-realistic-b.html" title="Realistic look B: Midwest brick street">Brick <small>Midwest brick street</small></a>
+      <a href="houses-realistic-c.html" title="Realistic look C: new-build subdivision">Suburban <small>new-build subdivision</small></a>
+    </div>
+  </div>
 </nav>
+<script>
+/* Appearance menu: click / Enter toggles, Escape and focus-out close, tap outside closes.
+   Mouse hover is handled in CSS (hover: hover) so touch taps never double-toggle. */
+(() => {
+  const bar = document.getElementById('lookbar');
+  const btn = bar.querySelector('.lk-toggle');
+  const isOpen = () => bar.classList.contains('open');
+  const setOpen = (on) => { bar.classList.toggle('open', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+  btn.addEventListener('click', () => setOpen(!isOpen()));
+  document.addEventListener('pointerdown', (e) => { if (isOpen() && !bar.contains(e.target)) setOpen(false); });
+  bar.addEventListener('focusout', (e) => { if (isOpen() && !bar.contains(e.relatedTarget)) setOpen(false); });
+  bar.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isOpen()) { e.stopPropagation(); e.preventDefault(); setOpen(false); btn.focus(); }
+  });
+})();
+</script>
 
 <div id="bottombar" role="group" aria-label="Course navigation">
   <button id="back" class="ghost hidden">◀ Back</button>
@@ -1468,7 +1575,7 @@ function buildStageGroup(i) {
   if (layout.kind === 'street') buildStreetScene(g, st, layout, seed);
   else buildCourtScene(g, st, layout, seed);
 
-  const raycastList = [], blankStates = [];
+  const raycastList = [], blankStates = [], lookList = [];
   layout.houses.forEach((h, k) => {
     const built = buildHouse(g, {
       px: h.px, pz: h.pz, facing: h.facing, lotW: h.lotW, curb: h.curb,
@@ -1476,9 +1583,11 @@ function buildStageGroup(i) {
       styleHint: h.noLawn ? { lawn: false } : {},
     });
     h.plates = built.plates; h.group = built.group;
+    built.group.traverse(o => { if (o.isMesh && !o.userData.lawn) { o.userData.house = h; lookList.push(o); } });
     if (h.mask === null) return;
     const bstate = { value: h.value, solved: false, plate: built.plates[0], plates: built.plates,
       options: makeOptionsFor(h, st, layout), house: h };
+    h.bstate = bstate;
     built.group.traverse(o => {
       if (!o.isMesh || o.userData.lawn) return;
       o.userData.bstate = bstate;
@@ -1487,7 +1596,7 @@ function buildStageGroup(i) {
     blankStates.push(bstate);
   });
   const chevrons = [0, 1, 2, 3].map(() => makeChevron(g));
-  g.userData = { raycastList, blankStates, layout, chevrons, st, node: layout.start };
+  g.userData = { raycastList, blankStates, lookList, layout, chevrons, st, node: layout.start };
   return g;
 }
 
@@ -1691,6 +1800,143 @@ function resetView() {
 }
 if (resetChip) resetChip.onclick = resetView;
 
+/* ============================================================
+   reading a number: stand in front of the house and face its plate.
+   Used when a house's options open — on a phone the sheet would cover
+   the house, and from down the street the number is a few pixels wide —
+   and by the "houses left" chip, which walks to the nearest unsolved
+   house. The view is left alone when the plate is already readable and
+   in the free part of the screen. On a phone the field of view tightens
+   until the number reads; it opens out again when the options close,
+   unless the learner has looked elsewhere since.
+   ============================================================ */
+const phoneMQ = [matchMedia('(max-width: 640px)'), matchMedia('(max-height: 520px) and (orientation: landscape)')];
+const isPhoneLayout = () => phoneMQ.some(m => m.matches);
+const MIN_PLATE_PX = () => (isPhoneLayout() ? 80 : 72);      // a four-digit number reads at this width
+const FRAME_FOV_MIN = 40;                                     // never tighter than this: keep the house round the number
+const scratchCam = new THREE.PerspectiveCamera();
+scratchCam.rotation.order = 'YXZ';
+let framed = null;                                            // the look we set, so the close can undo the zoom
+
+/* the free part of the screen: below the prompt, beside or above the options, above the walk bar */
+function safeRect() {
+  const W = innerWidth, H = innerHeight;
+  const r = { left: 0, top: 0, right: W, bottom: H };
+  const box = el => (el && !el.classList.contains('hidden') ? el.getBoundingClientRect() : null);
+  const pr = box(ui.prompt);
+  if (pr) r.top = Math.max(r.top, pr.bottom);
+  const qr = box(ui.quiz);
+  if (qr) {
+    if (qr.top > H * 0.45) r.bottom = Math.min(r.bottom, qr.top);            // bottom sheet (phones, portrait)
+    else if (qr.left > W * 0.5) r.right = Math.min(r.right, qr.left);       // side panel
+  }
+  const vr = box(ui.viewbar);
+  if (vr && vr.top > H * 0.5) r.bottom = Math.min(r.bottom, vr.top);
+  if (r.bottom - r.top < H * 0.22) { r.top = 0; r.bottom = H; }              // chrome ate the screen: use all of it
+  return r;
+}
+/* how wide a plate is on screen (px) seen from `from` at a vertical fov, allowing for the viewing angle */
+function platePxFrom(plate, facing, from, fov) {
+  const P = plate.getWorldPosition(new THREE.Vector3());
+  const dx = from.x - P.x, dz = from.z - P.z, flat = Math.hypot(dx, dz) || 1;
+  const cosInc = Math.max(0.15, (dx * facing.x + dz * facing.z) / flat);
+  const ang = 2 * Math.atan(plate.geometry.parameters.width * cosInc / 2 / (P.distanceTo(from) || 1));
+  const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * camera.aspect);
+  return innerWidth * ang / hfov;
+}
+/* the viewpoint that sees a plate best: near it and as face-on as the road allows */
+function bestNodeFor(P, facing) {
+  const ud = curUD();
+  let best = ud.node, bs = Infinity;
+  ud.layout.nodes.forEach((nd, i) => {
+    const dx = nd.x - P.x, dz = nd.z - P.z, d = Math.hypot(dx, dz) || 1;
+    const cosInc = (dx * facing.x + dz * facing.z) / d;
+    if (cosInc < 0.35) return;                                // a grazing view of the plate
+    const score = d * (1.6 - cosInc);
+    if (score < bs) { bs = score; best = i; }
+  });
+  return best;
+}
+/* yaw / pitch that put world point P at the centre of `rect` from `from` at the given fov */
+function poseToward(P, from, fov, rect) {
+  const tx = (rect.left + rect.right) / innerWidth - 1, ty = 1 - (rect.top + rect.bottom) / innerHeight;
+  const dx = P.x - from.x, dz = P.z - from.z;
+  let yaw = yawTo(dx, dz), pitch = Math.atan2(P.y - from.y, Math.hypot(dx, dz) || 1);
+  scratchCam.fov = fov; scratchCam.aspect = camera.aspect; scratchCam.updateProjectionMatrix();
+  scratchCam.position.copy(from);
+  const tanV = Math.tan(THREE.MathUtils.degToRad(fov) / 2), tanH = tanV * camera.aspect;
+  for (let i = 0; i < 3; i++) {                               // a few corrections: the offsets are not quite linear in angle
+    scratchCam.rotation.set(pitch, yaw, 0); scratchCam.updateMatrixWorld(true);
+    const v = P.clone().project(scratchCam);
+    yaw += Math.atan((tx - v.x) * tanH);
+    pitch -= Math.atan((ty - v.y) * tanV);
+  }
+  return { yaw: wrapAngle(yaw), pitch: THREE.MathUtils.clamp(pitch, PITCH_MIN, PITCH_MAX), fov };
+}
+/* walk in front of a house and face its number plate. Returns false when the
+   view was already good and nothing moved. `zoom` tightens the fov until the
+   plate reads (phones); `force` frames even a readable plate. */
+function frameHouse(bstate, opts) {
+  return !!(bstate && bstate.plate && bstate.house) && framePlate(bstate.plate, bstate.house.facing, opts);
+}
+function frameAnyHouse(house, opts) {
+  return !!(house && house.plates && house.plates[0]) && framePlate(house.plates[0], house.facing, opts);
+}
+function framePlate(plate, facing, { zoom = false, via = 'frame', force = false } = {}) {
+  const ud = curUD();
+  if (!ud || !plate || !facing) return false;
+  const P = plate.getWorldPosition(new THREE.Vector3());
+  const rect = safeRect();
+  if (!force) {
+    camera.updateMatrixWorld();                               // a tap can land before the next frame renders
+    const v = P.clone().project(camera);
+    const sx = (v.x * 0.5 + 0.5) * innerWidth, sy = (-v.y * 0.5 + 0.5) * innerHeight;
+    const inView = v.z < 1 && sx > rect.left + 16 && sx < rect.right - 16 && sy > rect.top + 16 && sy < rect.bottom - 16;
+    if (inView && platePxFrom(plate, facing, camera.position, look.fov) >= MIN_PLATE_PX()) return false;
+  }
+  const ni = bestNodeFor(P, facing);
+  const nd = ud.layout.nodes[ni];
+  const from = new THREE.Vector3(nd.x, EYE, nd.z);
+  let fov = fovDefault();
+  if (zoom) {
+    const px = platePxFrom(plate, facing, from, fov);
+    if (px < MIN_PLATE_PX()) fov = THREE.MathUtils.clamp(fov * px / MIN_PLATE_PX(), FRAME_FOV_MIN, fov);
+  }
+  const pose = poseToward(P, from, fov, rect);
+  const ms = prefersReducedMotion() ? 0 : 640;
+  if (ni !== ud.node) walkTo(ni, via, ms);                    // the step and the turn run together
+  easeLook(pose, ms);
+  framed = pose;
+  return true;
+}
+/* the "houses left" chip: the nearest unsolved house that is not already readable on screen */
+function findNextHouse() {
+  const ud = curUD();
+  if (!ud || !currentStage || currentStage.kind !== 'quiz') return;
+  const open = ud.blankStates.filter(b => !b.solved);
+  if (!open.length) return;
+  const pos = camera.position, dist = new Map();
+  for (const b of open) { const P = b.plate.getWorldPosition(new THREE.Vector3()); dist.set(b, Math.hypot(P.x - pos.x, P.z - pos.z)); }
+  open.sort((a, b) => dist.get(a) - dist.get(b));
+  if (activeBlank) closeQuiz();
+  const zoom = isPhoneLayout();
+  for (const b of open) if (frameHouse(b, { zoom, via: 'find' })) return;
+  frameHouse(open[0], { zoom, via: 'find', force: true });
+}
+document.addEventListener('quizopen', e => {
+  document.body.classList.add('quiz-open');                   // phones: the prompt shrinks to its title, the chrome steps aside
+  frameHouse(e.detail && e.detail.bstate, { zoom: isPhoneLayout(), via: 'frame' });
+});
+document.addEventListener('quizclose', () => {
+  document.body.classList.remove('quiz-open');
+  const f = framed; framed = null;
+  if (!f || !curUD()) return;
+  if (Math.abs(look.fov - f.fov) > 0.5 || Math.abs(look.pitch - f.pitch) > 0.02) return;   // the learner has looked elsewhere since
+  if (Math.abs(look.fov - fovDefault()) < 0.5 && Math.abs(look.pitch) < 0.02) return;
+  easeLook({ fov: fovDefault(), pitch: 0 }, 450);            // open the view out again, still facing the house
+});
+document.addEventListener('stagechange', () => { framed = null; });
+
 /* one-time swing on the very first framing: start 22 degrees off and glide
    in, so "you can look round" is shown, not told */
 let firstFrame = true;
@@ -1784,8 +2030,9 @@ canvas.addEventListener('dblclick', e => {           // Street View habit: doubl
   if (hit && hit.node !== undefined) walkTo(hit.node, 'road');
 });
 
-/* what is under a screen point: a walking arrow, a blank house (its plates
-   win over its walls), or a spot on the road near a viewpoint */
+/* what is under a screen point: a walking arrow, the nearest house — a blank
+   one opens its options, any other is walked up to so its number can be
+   read — or a spot on the road near a viewpoint */
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -1800,15 +2047,11 @@ function pickAt(clientX, clientY) {
   const discs = ud.chevrons.filter(c => c.visible).map(c => c.userData.hit);
   const ch = raycaster.intersectObjects(discs, false)[0];
   if (ch) return { chevron: ch.object.userData.chevron };
-  if (currentStage.kind === 'quiz' && blanks.length) {
-    let body = null;
-    for (const h of raycaster.intersectObjects(blanks, false)) {
-      const bs = h.object.userData.bstate;
-      if (!bs || bs.solved) continue;
-      if (bs.plates.includes(h.object)) return { bstate: bs };
-      if (!body && h.distance < 40) body = bs;
-    }
-    if (body) return { bstate: body };
+  const hh = raycaster.intersectObjects(ud.lookList, false)[0];   // nearest first, so a house in front hides one behind
+  if (hh && hh.distance < 70) {
+    const h = hh.object.userData.house, bs = h.bstate;
+    if (bs && !bs.solved && currentStage.kind === 'quiz') return { bstate: bs };
+    return { house: h };
   }
   if (raycaster.ray.intersectPlane(groundPlane, hitPt)) {
     let best = -1, bd = 6.5;
@@ -1825,6 +2068,7 @@ function handleClick(x, y) {
   if (!hit) return;
   if (hit.chevron) { const li = hit.chevron.userData.link; if (li >= 0) walkTo(li, 'chevron'); return; }
   if (hit.bstate) { openQuiz(hit.bstate); return; }
+  if (hit.house) { frameAnyHouse(hit.house, { zoom: isPhoneLayout(), via: 'look' }); return; }
   if (hit.node !== undefined) walkTo(hit.node, 'road');
 }
 
@@ -2009,9 +2253,14 @@ function promptFor(st) {
   const val = v => (typeof v === 'function' ? v(st.label) : v);
   return { title: val(row.title), body: val(row.body), short: val(row.short) };
 }
+/* on a touch screen the copy says tap, not click */
+const COARSE_POINTER = matchMedia('(pointer: coarse)').matches;
+const touchWording = html => (COARSE_POINTER
+  ? html.replace(/\bClick\b/g, 'Tap').replace(/\bclick\b/g, 'tap').replace(/Scroll \/ pinch/g, 'Pinch')
+  : html);
 function setPrompt({ title, body, short }) {
   const useShort = short && matchMedia('(max-width: 640px)').matches;
-  ui.prompt.innerHTML = `<div class="ptitle">${title}</div><div class="pbody">${useShort ? short : body}</div>`;
+  ui.prompt.innerHTML = touchWording(`<div class="ptitle">${title}</div><div class="pbody">${useShort ? short : body}</div>`);
 }
 
 /* ============================================================
@@ -2380,9 +2629,13 @@ let hintOnDrag = null;
   function updateChip(ud) {
     if (!ud || !isQuizStage()) { chip.className = 'hidden'; return; }
     const left = ud.blankStates.filter(s => !s.solved).length;
-    if (left > 0) { chip.className = ''; chip.innerHTML = `<b>${left}</b> house${left === 1 ? '' : 's'} left`; }
-    else { chip.className = 'done'; chip.textContent = 'Done ✓'; }
+    if (left > 0) {
+      chip.className = '';
+      chip.innerHTML = `<b>${left}</b> house${left === 1 ? '' : 's'} left <span class="dl-go" aria-hidden="true">▸</span>`;
+      chip.title = 'Walk to the nearest house still to fill in';
+    } else { chip.className = 'done'; chip.textContent = 'Done ✓'; chip.title = ''; }
   }
+  chip.addEventListener('click', () => findNextHouse());
   let stageIndex = -1, chipSig = '';
   function onStage() {
     const ud = curUD();
@@ -2421,7 +2674,7 @@ let hintOnDrag = null;
       hoveredChevron = ch;
       if (hoveredChevron) { hoveredChevron.userData.arrow.material.opacity = 1; hoveredChevron.scale.setScalar(0.9); }
     }
-    if (!dragging) canvas.style.cursor = (hovered || hoveredChevron || (hit && hit.node !== undefined)) ? 'pointer' : 'grab';
+    if (!dragging) canvas.style.cursor = (hovered || hoveredChevron || (hit && (hit.node !== undefined || hit.house))) ? 'pointer' : 'grab';
   }
 
   let hintTimer = 0, hideTimer = 0, firstStage = true, awaitingDrag = false;
@@ -2432,7 +2685,7 @@ let hintOnDrag = null;
   };
   function showHint(html, ms) {
     clearTimeout(hintTimer); clearTimeout(hideTimer);
-    hint.innerHTML = html;
+    hint.innerHTML = touchWording(html);
     hint.classList.remove('hidden');
     requestAnimationFrame(() => hint.classList.add('show'));
     hintTimer = setTimeout(hideHint, ms);
@@ -2729,6 +2982,11 @@ window.sfHouses = {
   ud: curUD, open: k => { const ud = curUD(); const b = ud && ud.blankStates.filter(s => !s.solved)[k || 0]; if (b) openQuiz(b); return b ? b.value : null; },
   solve() { const ud = curUD(); if (!ud) return; for (const b of ud.blankStates) if (!b.solved) { openQuiz(b); const btn = [...ui.qopts.children][b.options.indexOf(b.value)]; btn.click(); } },
   node: () => curUD() && curUD().node,
+  screenOf(k) { const ud = curUD(); const h = ud && ud.layout.houses[k]; if (!h) return null; camera.updateMatrixWorld(); const v = h.plates[0].getWorldPosition(new THREE.Vector3()).project(camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight, behind: v.z > 1, value: h.value }; },
+  faceHouse(k) { const ud = curUD(); const h = ud && ud.layout.houses[k]; if (!h) return; const P = h.plates[0].getWorldPosition(new THREE.Vector3()); look.yaw = yawTo(P.x - camera.position.x, P.z - camera.position.z); look.pitch = 0; applyLook(); mmSync(); },
+  pick: (x, y) => { const h = pickAt(x, y); return h && (h.bstate ? { blank: h.bstate.value } : h.house ? { house: h.house.value } : h.chevron ? { chevron: h.chevron.userData.link } : h); },
+  info: () => ({ ...renderer.info.render, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }),
+  find: findNextHouse, frame: (k, o) => { const ud = curUD(); const b = ud && ud.blankStates.filter(s => !s.solved)[k || 0]; return b ? frameHouse(b, o || { zoom: isPhoneLayout(), force: true }) : false; },
 };
 </script>
 </body>
