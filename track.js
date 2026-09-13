@@ -116,7 +116,7 @@ function stageProps(stage, index) {
     stage: index,
     part: stage.part,
     kind: stage.kind,                        // example | quiz
-    type: stage.type,                        // plex | tower | row | block | seq
+    type: stage.type,                        // apartments: plex | tower | row | block | seq · houses: street | block | court | loop
     stage_name: String(stage.label ?? stage.number ?? stage.building ?? ''),
   };
 }
@@ -174,7 +174,7 @@ function wireCourse() {
       seconds: secs(o.at),
     };
     if (!d.correct) {
-      props.place = d.type === 'building' ? 'building' : wrongPlace(d.chosen, d.expected);
+      props.place = d.place || (d.type === 'building' ? 'building' : wrongPlace(d.chosen, d.expected));   // a course may name the place itself
       run.wrong++; stageWrong++;
     }
     track('answer', props);
@@ -218,7 +218,14 @@ function wireCourse() {
     track('part_retry', { part: d.part, seconds: secs(run.t0), wrong: run.wrong });
   });
 
-  /* ---- UI signals: help, camera reset, Part 5 view buttons, jump bar ---- */
+  // the Houses course: a step to another viewpoint (chevron / map / key / button / road)
+  document.addEventListener('walk', e => {
+    const d = e.detail || {};
+    if (d.via === 'stage') return;                         // placed there by the stage, not a step
+    track('walk', { ...stageProps(cur, curIndex), via: String(d.via || ''), node: d.node });
+  });
+
+  /* ---- UI signals: help, camera reset, view / walk buttons, jump bar ---- */
   const on = (sel, fn) => document.querySelectorAll(sel).forEach(el => el.addEventListener('click', fn));
   on('#helpbtn', () => track('help_open', stageProps(cur, curIndex)));
   on('#resetview', () => track('view_reset', stageProps(cur, curIndex)));

@@ -23,8 +23,9 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 | `apartment-realistic-a.html` | Same course, **Sunbelt garden-style** look (brick/stucco, breezeway railings, parking, warm low sun). |
 | `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
 | `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). |
+| `houses.html`           | **Houses** course: house-numbering patterns taught in a **Street View** style scene (Three.js). The learner stands at eye height on the road, drags to look round and walks between viewpoints. One look only. See map below and `docs/houses-course/README.md`. |
 | `track.js`              | Course run tracking, shared by every page: listens to the course's `document` events and sends anonymous events to Umami. Setup and the event list: `docs/tracking.md`. |
-| `report.js`             | The end-of-run report, shared by every course page: listens to the same `document` events, keeps the run record (per question / building / part, on an active clock), and renders the report into the `#finale` dialog when the course completes. What it shows, the grade model and the copy: `docs/report.md`; the design reviews it came from: `docs/run-report/`. |
+| `report.js`             | The end-of-run report, shared by every course page: listens to the same `document` events, keeps the run record (per question / building / part, on an active clock), and renders the report into the `#finale` dialog when the course completes. The apartment curriculum is its default; another course describes itself through the exported `configure()` (titles, digit places, copy, `stageName` / `maskFor` / `splitPlaces`) — `houses.html` does this. What it shows, the grade model and the copy: `docs/report.md`; the design reviews it came from: `docs/run-report/`. |
 
 ### The three realistic looks
 Each `apartment-realistic-*.html` is a copy of `apartment-mockup.html` with **only the
@@ -108,8 +109,36 @@ units where leading digit(s) = building → **(4)** everything combined, numbere
 around both the front and back faces → **(5)** a single running count around
 all four faces of one building — no floor digit at all.
 
+The Houses course's five parts: **(1)** odd numbers on one side, even on the
+other → **(2)** numbers rise away from the start of the street → **(3)** each
+cross street starts a new hundred (leading digits = block) → **(4)** gaps are
+normal: numbers measure distance, not houses → **(5)** round a court the two
+sides meet at the far end (plus one court that counts round in a single run).
+
 Design rationale for the current look and behaviour lives in
 `docs/apartment-course-review/` (reviews → summaries → design docs → QA).
+
+## Map of `houses.html` (~2700 lines, one file)
+Same skeleton as the apartment course (same panel ids, same `document` events, so
+`track.js` and `report.js` need no page-specific code), with these differences:
+- **Camera** is first-person: `look` (yaw / pitch / fov) with drag-to-look, inertia,
+  wheel / pinch zoom; `walkTo(node)` steps between **viewpoints** (`layout.nodes`,
+  each with `links` to its neighbours and a default `heading`). Walking: the
+  chevrons on the road (`placeChevrons`), the `#viewbar` walk bar (turn · walk ·
+  turn), the `#minimap` dots, double-click / click on the road, arrow keys / WASD.
+  `resetView` faces down the street again (Home key, `#resetview` chip).
+- **Layouts**: `layoutStreet(st)` (cross street · block · cross street …, lots as
+  wide as their number step) and `layoutCourt(st)` (main street, entrance, bulb).
+  `buildHouse` draws one house in a local frame (front wall at the origin, local +z
+  toward the road) with the number on a plate over the door **and** on the mailbox
+  (`bstate.plates`); a blank house's whole body is clickable.
+- **`STAGES`** (15 streets, 3 per part) and `makeOptionsFor` are the curriculum:
+  each wrong option breaks exactly one rule (other side · wrong hundred · wrong spot),
+  and on the gap streets the wrong spot is outside the visible neighbours. The
+  quiz's `answer` event carries the broken rule as `place` (`block` / `side` / `lot`).
+- Console handle for checking without a mouse: `sfHouses.go(i)`, `.walk(n)`,
+  `.face(deg)`, `.open(k)`, `.solve()`.
+- Design notes and the numbering patterns taught: `docs/houses-course/README.md`.
 
 ## Previewing
 It's a static site, but the import map uses ES modules, so open it over HTTP

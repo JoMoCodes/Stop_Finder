@@ -6,7 +6,8 @@ cookies, no names or emails. Each run of the course gets a random 8-character
 id so answers can be grouped per run, and that id is forgotten on reload.
 
 All of the code lives in one shared module, `track.js`, imported by every
-`apartment-*.html` and by `index.html` (pageviews only there).
+course page (`apartment-*.html`, `houses.html`) and by `index.html` (pageviews
+only there).
 
 ## Setup (one time)
 
@@ -41,18 +42,19 @@ If you self-host Umami, change `src` to your instance's `script.js`.
 ## What is tracked
 
 Every event carries: `look` (which page: `apartment-mockup`,
-`apartment-realistic-a` …), `device` (phone / tablet / desktop by width),
+`apartment-realistic-a` …, `houses`), `device` (phone / tablet / desktop by width),
 `input` (touch / pointer), `motion` (reduced / full), `run` (random id) and
 `t` (seconds since the run started). Stage events also carry `stage` (index
-in `STAGES`), `part` (1–5), `kind` (example / quiz), `type` (plex / tower /
-row / block / seq) and `stage_name`.
+in `STAGES`), `part` (1–5), `kind` (example / quiz), `type` (apartments: plex /
+tower / row / block / seq; houses: street / block / court / loop) and
+`stage_name` (the building, or the street name).
 
 | Event | When | Extra properties |
 |---|---|---|
 | `course_start` | course page loaded | `viewport` |
 | `stage_view` | a stage is shown | `from`, `from_seconds` (previous stage and time spent there) |
 | `quiz_open` | learner clicks a blank door or the roof sign | `quiz` (door / building), `expected` |
-| `answer` | every option pick, right or wrong | `quiz`, `result` (right / wrong), `picked`, `expected`, `attempt`, `seconds` since the quiz opened, and on a wrong pick `place` (building / floor / door: which digit was wrong) |
+| `answer` | every option pick, right or wrong | `quiz`, `result` (right / wrong), `picked`, `expected`, `attempt`, `seconds` since the quiz opened, and on a wrong pick `place`: which rule the pick broke — apartments: building / floor / door (which digit was wrong); houses: block / side / lot (wrong hundred, wrong side of the street, wrong spot along it) |
 | `blank_solved` | a blank is answered correctly | `quiz`, `value`, `attempts`, `seconds` |
 | `stage_complete` | a stage's blanks are all solved (examples complete on Next) | `seconds` on the stage, `wrong` picks on it |
 | `course_complete` | the last stage finished the course | `seconds`, `wrong`, `restarts` |
@@ -61,7 +63,8 @@ row / block / seq) and `stage_name`.
 | `jump` | a jump-bar click to a different part | `from_part`, `to_part`, `from` |
 | `help_open` | the ? button | stage props |
 | `view_reset` | the Reset view chip | stage props |
-| `view_switch` | Part 5 Front / Back / Left / Right | `view` |
+| `view_switch` | apartments: Part 5 Front / Back / Left / Right; houses: the walk bar | `view` (front / back / left / right, or turn-left / walk / turn-right) |
+| `walk` | houses only: a step to another viewpoint | `via` (chevron / map / key / button / road / console), `node` |
 | `hint_shown` | the first-run drag hint or the "click a glowing door" tip | `hint` (controls / tip) |
 | `leave` | the tab is hidden (best effort; once per stage per run) | `seconds`, `stages_done` |
 
@@ -80,7 +83,10 @@ row / block / seq) and `stage_name`.
 
 The course dispatches these events on `document`, and `track.js` listens:
 `stagechange`, `quizopen`, `answer`, `blanksolved`, `stagecomplete`,
-`coursecomplete`, `coursereset`, `partreset`. The UI signals come from click listeners on
+`coursecomplete`, `coursereset`, `partreset` (and `walk` from the Houses
+course). A course may put the broken rule straight into the `answer` event as
+`detail.place`; otherwise `track.js` works it out from the coloured digit
+segments (`chosen` / `expected`). The UI signals come from click listeners on
 the existing buttons and a `MutationObserver` on `#draghint`, so the course
 code itself only had to gain the `answer`, `stagecomplete`, `coursecomplete`
 and `coursereset` dispatches (identical in all four course files).

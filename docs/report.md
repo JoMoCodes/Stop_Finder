@@ -4,10 +4,21 @@ When the last of the 14 buildings is done, the course now shows a **report of
 the run** instead of the old "five patterns you learned" summary. It answers, in
 order: *am I okay?*, *what do I do next?*, and then *how did each part go?*
 
-All of it lives in one shared module, `report.js`, imported by every
-`apartment-*.html`. The course page keeps only the dialog shell (`#finale`, its
-CSS, and the two buttons the course wires at load) plus a small `retryPart()`
-so the report's primary button can rebuild one part.
+All of it lives in one shared module, `report.js`, imported by every course
+page (`apartment-*.html`, `houses.html`). The course page keeps only the dialog
+shell (`#finale`, its CSS, and the two buttons the course wires at load) plus a
+small `retryPart()` so the report's primary button can rebuild one part.
+
+The apartment curriculum is the module's default. Another course describes
+itself by importing `configure()` and calling it before its first stage:
+`site` and `scope` (the eyebrow), `unit` (door / house), `partTitles`,
+`placeOrder` (ties in "most missed" go to the first), `stageName(st)`,
+`maskFor(st, value)`, `splitPlaces(value, type)`, `headlinePerfect`,
+`perfectTry`, `missLine(part, place)` and `readyLine(misses, place, part)`. The
+Houses course passes `block` / `side` / `lot` as its places and names the broken
+rule itself in each `answer` event (`detail.place`), which the report prefers
+over its own digit comparison. The place colours come from the page's `.pl-*`
+CSS classes, so each course defines its own.
 
 Nothing is stored or sent. The report is built from what happened in this tab
 and is thrown away on "Start over".

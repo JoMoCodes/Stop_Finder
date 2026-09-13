@@ -28,16 +28,69 @@
      playing the course.
    ============================================================ */
 
-/* ---- the curriculum, as the report describes it ---- */
-const PART_TITLES = {
-  1: 'Count in order',
-  2: 'First digit = floor',
-  3: 'Leading digits = building',
-  4: 'Front and back',
-  5: 'No floor digit',
+/* ---- the curriculum, as the report describes it ----
+   The apartment course is the default. Another course page (houses.html)
+   imports configure() and passes its own titles, digit places, copy and
+   helpers before its first stage, so one report serves every course. ---- */
+const COURSE = {
+  site: 'Apartment numbers',
+  scope: 'all 14 buildings',
+  unit: 'door',                               // the noun for one question
+  partTitles: {
+    1: 'Count in order',
+    2: 'First digit = floor',
+    3: 'Leading digits = building',
+    4: 'Front and back',
+    5: 'No floor digit',
+  },
+  placeOrder: ['building', 'floor', 'door'],  // ties in "most missed" go to the costlier place
+  stageName(st) {
+    if (!st) return '';
+    if (st.type === 'plex') return `Building ${st.number}`;
+    if (st.type === 'tower') return `Building ${st.label}`;
+    return `Building ${st.building}`;
+  },
+  /* the partial number the door showed before it was solved (mirrors a11yMask) */
+  maskFor(st, value) {
+    if (!st) return '?';
+    if (st.type === 'row' && st.floors) {
+      for (const row of st.floors)
+        for (const cell of row)
+          if (Array.isArray(cell) && cell[0] === value) return cell[1];
+    } else if (st.type === 'block' && st.blanks) {
+      return st.blanks[value] || '?';
+    } else if (st.type === 'seq' && st.blanks) {
+      return st.blanks[value - st.base] || '?';
+    }
+    return '?';
+  },
+  /* digit places of a unit number, exactly as the course's splitPlaces() cuts them */
+  splitPlaces(val, type) {
+    const str = String(val), n = str.length;
+    if (type === 'building') return [{ text: str, place: 'building' }];
+    if (type === 'tower' && n === 3) return [{ text: str[0], place: 'floor' }, { text: str.slice(1), place: 'door' }];
+    if ((type === 'row' || type === 'block') && n >= 4)
+      return [{ text: str.slice(0, n - 3), place: 'building' }, { text: str[n - 3], place: 'floor' }, { text: str.slice(n - 2), place: 'door' }];
+    if (type === 'seq' && n >= 3) return [{ text: str.slice(0, n - 2), place: 'building' }, { text: str.slice(n - 2), place: 'door' }];
+    return [{ text: str, place: 'door' }];
+  },
+  headlinePerfect: 'Every door, first try.',
+  perfectTry: 'Nothing to fix. Go find some doors.',
+  /* the -> line when a part needs another go: names the part and what cost most */
+  missLine(part, place) {
+    if (part === 1) return 'In Part 1, count on from the door next to it — that’s where the misses were.';
+    if (part === 5) return 'In Part 5, one count runs round all four sides — that’s where the misses were.';
+    return `In Part ${part}, watch the ${placeHTML(place || 'door')} digit — most misses were there.`;
+  },
+  /* the -> line on a ready run */
+  readyLine(misses, place, part) {
+    if (place && part >= 2 && part <= 4) return `Only ${misses}, mostly the ${placeHTML(place)} digit. Worth a glance next time.`;
+    return `Only ${misses} in all. Worth a glance at Part ${part || ''} next time.`;
+  },
 };
+/** A course page calls this (before its first stage) to describe its own curriculum. */
+export function configure(cfg) { Object.assign(COURSE, cfg || {}); }
 const HOME_URL = 'https://jomocodes.github.io/Stop_Finder/';
-const PLACE_ORDER = ['building', 'floor', 'door'];   // ties in "most missed" go to the costlier place
 
 /* ---- active clock: performance.now() minus the time the learner was away ----
    "Away" is the tab being hidden, or no pointer / key / touch / wheel input
@@ -73,48 +126,16 @@ const deviceClass = () => (innerWidth <= 640 ? 'phone' : innerWidth <= 1024 ? 't
 const r1 = x => Math.round(x * 10) / 10;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function stageName(st) {
-  if (!st) return '';
-  if (st.type === 'plex') return `Building ${st.number}`;
-  if (st.type === 'tower') return `Building ${st.label}`;
-  return `Building ${st.building}`;
-}
-
-/* the partial number the door showed before it was solved (mirrors a11yMask) */
-function maskFor(st, value) {
-  if (!st) return '?';
-  if (st.type === 'row' && st.floors) {
-    for (const row of st.floors)
-      for (const cell of row)
-        if (Array.isArray(cell) && cell[0] === value) return cell[1];
-  } else if (st.type === 'block' && st.blanks) {
-    return st.blanks[value] || '?';
-  } else if (st.type === 'seq' && st.blanks) {
-    return st.blanks[value - st.base] || '?';
-  }
-  return '?';
-}
-
-/* digit places of a unit number, exactly as the course's splitPlaces() cuts them */
-function splitPlaces(val, type) {
-  const str = String(val), n = str.length;
-  if (type === 'building') return [{ text: str, place: 'building' }];
-  if (type === 'tower' && n === 3) return [{ text: str[0], place: 'floor' }, { text: str.slice(1), place: 'door' }];
-  if ((type === 'row' || type === 'block') && n >= 4)
-    return [{ text: str.slice(0, n - 3), place: 'building' }, { text: str[n - 3], place: 'floor' }, { text: str.slice(n - 2), place: 'door' }];
-  if (type === 'seq' && n >= 3) return [{ text: str.slice(0, n - 2), place: 'building' }, { text: str.slice(n - 2), place: 'door' }];
-  return [{ text: str, place: 'door' }];
-}
-
 /* which digit place a wrong pick got wrong, from the coloured segments the
    quiz draws for the pick and for the right answer */
 function wrongPlace(chosen, expected) {
-  if (!Array.isArray(chosen) || !Array.isArray(expected)) return 'door';
+  const last = COURSE.placeOrder[COURSE.placeOrder.length - 1];
+  if (!Array.isArray(chosen) || !Array.isArray(expected)) return last;
   for (const seg of expected) {
     const c = chosen.find(x => x.place === seg.place);
     if (!c || c.text !== seg.text) return seg.place;
   }
-  return 'door';
+  return last;
 }
 
 /* ============================================================
@@ -146,7 +167,7 @@ function stageRec(index, st) {
   if (!s) {
     s = {
       index, part: st ? st.part : 0, kind: st ? st.kind : 'quiz', type: st ? st.type : '',
-      name: stageName(st), seconds: 0, after: 0, visits: 0, completed: false, completedAt: null, questions: [],
+      name: COURSE.stageName(st), seconds: 0, after: 0, visits: 0, completed: false, completedAt: null, questions: [],
     };
     run.stages.set(index, s);
   }
@@ -185,7 +206,7 @@ function question(bstate, type) {
     id: run.questions.length + 1,
     part: s.part, stageIndex: s.index, building: s.name, kind,
     type: kind === 'building' ? 'building' : (st ? st.type : 'plex'),
-    mask: kind === 'building' ? '' : maskFor(st, bstate.value),
+    mask: kind === 'building' ? '' : COURSE.maskFor(st, bstate.value),
     value: bstate.value,
     opened: null, solved: null, seconds: 0, openSeconds: 0, firstPick: null,
     opens: 0, wrong: 0, places: [], picks: [],
@@ -218,7 +239,7 @@ function onAnswer(e) {
   if (q.firstPick === null) q.firstPick = at;
   const pick = { picked: d.picked, correct: !!d.correct, at: r1(at / 1000) };
   if (!d.correct) {
-    pick.place = d.type === 'building' ? 'building' : wrongPlace(d.chosen, d.expected);
+    pick.place = d.place || (d.type === 'building' ? 'building' : wrongPlace(d.chosen, d.expected));   // a course may name the place itself
     q.wrong++;
     q.places.push(pick.place);
   }
@@ -327,7 +348,7 @@ function summary() {
     const placeCount = {};
     for (const q of qs) for (const pl of q.places) placeCount[pl] = (placeCount[pl] || 0) + 1;
     return {
-      part: p, title: PART_TITLES[p], seconds, exampleSeconds, quizSeconds,
+      part: p, title: COURSE.partTitles[p], seconds, exampleSeconds, quizSeconds,
       buildings: ss.length, questions: qs.length, solved: qs.filter(q => q.solved).length,
       firstTry, wrong, picks: qs.reduce((n, q) => n + q.picks.length, 0),
       firstTryRate: qs.length ? firstTry / qs.length : 1,
@@ -387,7 +408,7 @@ function median(arr) {
 function mostMissed(placeCount) {
   const keys = Object.keys(placeCount).filter(k => placeCount[k] > 0);
   if (!keys.length) return null;
-  keys.sort((a, b) => (placeCount[b] - placeCount[a]) || (PLACE_ORDER.indexOf(a) - PLACE_ORDER.indexOf(b)));
+  keys.sort((a, b) => (placeCount[b] - placeCount[a]) || (COURSE.placeOrder.indexOf(a) - COURSE.placeOrder.indexOf(b)));
   return keys[0];
 }
 
@@ -430,7 +451,7 @@ function grade(sum) {
 function headline(g) {
   const n = g.target ? g.target.part : 0;
   return {
-    perfect: 'Every door, first try.',
+    perfect: COURSE.headlinePerfect,
     ready: 'You’re ready for the route.',
     nearly: `Nearly there — one more go at Part ${n}.`,
     again: `Worth another go at Part ${n}.`,
@@ -442,7 +463,7 @@ function goodLine(sum, g) {
   const t = sum.totals;
   if (t.firstTry === t.questions) return 'Every single one on the first try.';
   const clean = sum.parts.filter(p => p.questions > 0 && p.firstTry === p.questions);
-  if (clean.length) { const p = clean[clean.length - 1]; return `Every door in Part ${p.part} on the first try.`; }
+  if (clean.length) { const p = clean[clean.length - 1]; return `Every ${COURSE.unit} in Part ${p.part} on the first try.`; }
   const best = sum.parts.filter(p => p.questions > 0)
     .sort((a, b) => (b.firstTryRate - a.firstTryRate) || (b.part - a.part))[0];
   return best ? `Strongest: Part ${best.part} — ${best.firstTry} of ${best.questions} on the first try.` : '';
@@ -451,18 +472,11 @@ function goodLine(sum, g) {
 /* the one thing to try: names the target part and the digit place that cost most */
 function tryLine(sum, g) {
   const t = sum.totals;
-  if (g.outcome === 'perfect') return 'Nothing to fix. Go find some doors.';
+  if (g.outcome === 'perfect') return COURSE.perfectTry;
   const p = g.target;
   const misses = t.wrong === 1 ? '1 miss' : `${t.wrong} misses`;
-  if (g.outcome === 'ready') {
-    const pl = t.worstPlace;
-    if (pl && p && p.part >= 2 && p.part <= 4) return `Only ${misses}, mostly the ${placeHTML(pl)} digit. Worth a glance next time.`;
-    return `Only ${misses} in all. Worth a glance at Part ${p ? p.part : ''} next time.`;
-  }
-  if (p.part === 1) return 'In Part 1, count on from the door next to it — that’s where the misses were.';
-  if (p.part === 5) return 'In Part 5, one count runs round all four sides — that’s where the misses were.';
-  const pl = p.worstPlace || 'door';
-  return `In Part ${p.part}, watch the ${placeHTML(pl)} digit — most misses were there.`;
+  if (g.outcome === 'ready') return COURSE.readyLine(misses, t.worstPlace, p ? p.part : 0);
+  return COURSE.missLine(p.part, p.worstPlace);
 }
 
 /* ---- time formatting: m:ss, or "9 s" under a minute; a spoken version for screen readers ---- */
@@ -490,7 +504,7 @@ function placeHTML(place) { return `<span class="pl-${place}">${place}</span>`; 
 /* a unit number with its digit places coloured as the quiz colours them;
    `missed` places get a dotted underline as well as the word in the row */
 function unitHTML(value, type, missed = []) {
-  return `<span class="fnum">` + splitPlaces(value, type).map(sg =>
+  return `<span class="fnum">` + COURSE.splitPlaces(value, type).map(sg =>
     `<span class="pl pl-${sg.place}${missed.includes(sg.place) ? ' pl-miss' : ''}">${esc(sg.text)}</span>`).join('') + '</span>';
 }
 function maskHTML(mask) {
@@ -532,7 +546,7 @@ function render(sum) {
   const n = t.questions;
   const parts = sum.parts;
 
-  const eyebrow = `<span class="fsite">Apartment numbers · </span>all 14 buildings` +
+  const eyebrow = `<span class="fsite">${COURSE.site} · </span>${COURSE.scope}` +
     (t.restarts ? ` · run ${t.restarts + 1}` : '') +
     (t.retries ? ` · ${t.retries === 1 ? 'one part' : t.retries + ' parts'} retried` : '');
 
@@ -619,10 +633,10 @@ function partRow(p, g, sum) {
       .sort((a, b) => (a.kind === 'building') - (b.kind === 'building') || a.value - b.value);
     const doors = qs.filter(q => q.kind === 'door').length;
     const named = qs.some(q => q.kind === 'building');
-    const head = `${esc(s.name)} · ${doors} door${doors === 1 ? '' : 's'}${named ? ' + name' : ''} · ${timeHTML(s.seconds)}`;
+    const head = `${esc(s.name)} · ${doors} ${COURSE.unit}${doors === 1 ? '' : 's'}${named ? ' + name' : ''} · ${timeHTML(s.seconds)}`;
     return `<div class="fbld">${head}</div>` + qs.map(questionRow).join('');
   }).join('');
-  const pace = has && p.pace ? ` · about ${Math.round(p.pace)} s a door` : '';
+  const pace = has && p.pace ? ` · about ${Math.round(p.pace)} s a ${COURSE.unit}` : '';
   const split = `<p class="fsplit">Reading the example ${timeHTML(p.exampleSeconds)} · answering ${timeHTML(p.quizSeconds)}${pace}</p>`;
   const firstGo = p.firstGo ? `<p class="fsplit">Second go · first go: ${p.firstGo.firstTry} of ${p.firstGo.questions} in ${timeHTML(p.firstGo.seconds)}.</p>` : '';
   return `
@@ -912,4 +926,5 @@ window.sfReport = {
   grade: () => { const s = summary(); return s ? grade(s) : null; },
   render: () => render(summary()),
   demo,
+  configure,
 };
