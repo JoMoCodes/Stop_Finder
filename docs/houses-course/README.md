@@ -18,25 +18,29 @@ this order of usefulness when you are looking for a stop:
 | # | Pattern | Why it matters on the road |
 |---|---------|----------------------------|
 | 1 | **Odd on one side, even on the other.** Houses facing each other are one apart (105 faces 106). | Read one number and you know which side of the street to scan. Which side is odd varies by town, so check a neighbour rather than remembering a rule. |
-| 2 | **Numbers rise away from the start of the street** — the baseline (a main road, the river, the town centre) — on both sides at once. | Two numbers tell you which way to drive; a lower number means turn round. |
-| 3 | **Each block is a hundred.** Crossing a street bumps the number to the next hundred: 100 block, 200 block … 1200 block. The leading digits are the *block* (how many streets from the start), the last two digits count along it; street-sign blades often carry the block number. | 1245 is in the 1200 block, twelve blocks from the baseline. You can count cross streets instead of reading every house. |
-| 4 | **Gaps are normal.** Numbers are assigned by *frontage* (distance along the street, so many feet per number), not one per house: 1402, 1410, 1416. A wide lot eats several numbers. | A missing number is not a missing house, and the exact gap tells you nothing. Bracket the stop between its neighbours; side, direction and block still hold. |
-| 5 | **Round a court** (cul-de-sac) the numbers rise going in, odd one side and even the other, right round the bulb until the two sides meet at the far end. Corner houses face the main street and take its numbers. Some courts, closes and older lanes instead count round in **one run** (1, 2, 3 … up one side, back down the other): two neighbours one apart give it away. | Loops are where drivers lose the thread: walk the bulb once and the pattern reappears. |
+| 2 | **Numbers rise or fall depending on your direction.** Away from the start of the street — the baseline (a main road, the river, the town centre) — they rise on both sides at once; back toward it they fall. | Two numbers tell you which way to drive; a lower number means turn round. |
+| 3 | **Round a court** (cul-de-sac) the numbers rise going in, odd one side and even the other, right round the bulb until the two sides meet at the far end. Corner houses face the main street and take its numbers. Some courts, closes and older lanes instead count round in **one run** (1, 2, 3 … up one side, back down the other): two neighbours one apart give it away. | Loops are where drivers lose the thread: walk the bulb once and the pattern reappears. |
+| 4 | **Each block is a hundred.** Crossing a street bumps the number to the next hundred: 100 block, 200 block … 1200 block. The leading digits are the *block* (how many streets from the start), the last two digits count along it; street-sign blades often carry the block number. | 1245 is in the 1200 block, twelve blocks from the baseline. You can count cross streets instead of reading every house. |
 
-Patterns the course does not teach (yet): quadrant prefixes (N / S / E / W of
-the baseline), distance-based rural numbering (thousands per mile), letter and
-half suffixes for infill (12A, 12½), and streets that reset numbering at each
-municipality line.
+The step between neighbours is not always two: the second street of Parts 1–3
+counts by four (201, 205, 209 …), so the learner reads the step off two
+neighbours instead of assuming it.
 
-## The five parts (15 streets, 50 questions)
+Patterns the course does not teach (yet): gaps in the numbers (numbers handed
+out by frontage, so a wide lot eats several: 1402, 1410, 1416 — the old Part 4,
+dropped in September 2026), quadrant prefixes (N / S / E / W of the baseline),
+distance-based rural numbering (thousands per mile), letter and half suffixes
+for infill (12A, 12½), and streets that reset numbering at each municipality
+line.
+
+## The four parts (12 streets, 45 questions)
 
 | Part | Streets | Type | What changes |
 |------|---------|------|--------------|
-| 1 · Odd side, even side | Maple St (example) · Elm St · Birch St | `street` | one block, 5 houses a side; Birch swaps the sides so the learner has to check a neighbour |
-| 2 · Rising away from the start | Oak St (example, arrows from Main St) · Pine St · Cedar St | `street` | 6–7 houses a side; the quiz streets start the camera at the far end or mid-block, facing back, with blanks at the ends of the street |
-| 3 · Each block is a hundred | Ash St (example, 100 / 200 / 300) · Hickory St (1100 / 1200) · Poplar St (2300–2500) | `block` | cross streets with blade signs carrying the block; partial numbers like `12▢3`, `__01`; the quiz key shows **block · lot** |
-| 4 · Gaps are normal | Sycamore Dr (example) · Juniper Dr · Laurel Dr | `block` + `gaps` | explicit number lists per side; lot widths follow the number steps so a bigger jump is visibly a wider lot |
-| 5 · Round the court | Willow Ct (example) · Hazel Ct (sides swapped) · Fern Ct (one run, 1–10) | `court` / `loop` | a main street with corner houses, an entrance with two lots a side, a bulb with three houses a side |
+| 1 · Odd or Even? | Maple St (example) · Elm St · Birch St | `street` | one block, 5 houses a side; Elm St is 8 a side counting by four (`step: 4`, six blanks); Birch swaps the sides so the learner has to check a neighbour |
+| 2 · Numbers rise or fall depending on your direction | Oak St (example, arrows and a "numbers rise / numbers fall" board pair from Main St) · Pine St · Cedar St | `street` | 6–9 houses a side; Pine St counts by four; the quiz streets start the camera at the far end or mid-block, facing back, with blanks at the ends of the street |
+| 3 · Round the court | Willow Ct (example) · Hazel Ct (sides swapped, counting by four) · Fern Ct (one run, 1–14) | `court` / `loop` | a main street with corner houses, an entrance with four lots a side, a bulb with three houses a side; no mailboxes (`mailbox: false`), so the number is read off the house |
+| 4 · Each block is a hundred | Ash St (example, 100 / 200 / 300) · Hickory St (1100 / 1200) · Poplar St (2300–2500) | `block` | cross streets with blade signs carrying the block; partial numbers like `12▢3`, `__01`; the quiz key shows **block · lot** |
 
 ### The quiz
 Every question offers four numbers. The three wrong ones each break exactly one
@@ -44,10 +48,9 @@ rule the part teaches, so a wrong pick says something:
 
 - the **other side** (parity flipped: 1103 → 1104),
 - the **wrong hundred** (1103 → 1003 / 1203) on the block and court streets,
-- the **wrong spot** along the block (1103 → 1123). On the gap streets any
-  same-parity number *between* the visible neighbours would fit the pattern, so
-  the wrong spot always lies outside them (below the lower neighbour or above
-  the upper one).
+- the **wrong spot** along the block (1103 → 1123). On a street that counts by
+  four the nearest wrong spot is two away (209 → 207 / 211): the right side,
+  but not on the step.
 
 The broken rule is passed to `track.js` and `report.js` as the `place` of the
 miss (`block` / `side` / `lot`), which is what "most misses were the side" in
@@ -60,20 +63,21 @@ street"), and after a second miss the part's rule is appended.
 - **Metres.** Road 7 m wide, kerbs, 2 m sidewalks, 5 m front yards, house
   fronts 10.5 m from the road centre, regular lots 14 m, cross streets 8 m.
   The camera stands 1.65 m up. Every house carries its number over the door
-  **and** on the mailbox at the kerb, so it can be read from the road.
+  **and** on the mailbox at the kerb, so it can be read from the road — except
+  on the courts, which have no mailboxes.
 - **Houses** are procedural (seeded by street and number, so a street rebuilds
   identically): one or two storeys, side or front gable, garage and driveway
   on wider lots, porch roof, windows, shrubs and a tree; twelve siding colours.
   On the court the bulb houses face its centre.
 - **Viewpoints** sit on the road centre line: one per cross street and one
-  every ~14 m along a block; on the court, five along the main street, three up
+  every ~14 m along a block; on the court, five along the main street, five up
   the entrance and six round the bulb. Each viewpoint knows its `links` and a
   default `heading` (down the street toward rising numbers; round the bulb the
   way the left side counts).
 - **Guides on example streets**: ODD SIDE / EVEN SIDE boards (Part 1), yellow
-  arrows and a "numbers start here" board at Main St (Part 2), the coloured
-  block · lot key and "+100" boards over each crossing (Part 3), "gaps are
-  normal" boards (Part 4), arrows into and round the bulb (Part 5).
+  arrows, a "numbers start here" board at Main St and a NUMBERS RISE / NUMBERS
+  FALL pair mid-block (Part 2), arrows into and round the bulb (Part 3), the
+  coloured block · lot key and "+100" boards over each crossing (Part 4).
 - **Street map** (bottom left): the road, cross streets and block numbers,
   every house (amber = blank, green = solved), the viewpoints as dots you can
   tap, and a "you are here" wedge that follows the camera. The court is drawn
@@ -151,7 +155,7 @@ the quiz keeps focus, and everything moves instantly under reduced motion.
 Open the page over HTTP (`python3 -m http.server`) and use the console handle:
 
 ```js
-sfHouses.go(7)        // show stage 7 (Hickory St)
+sfHouses.go(7)        // show stage 7 (Hazel Ct)
 sfHouses.walk(5)      // step to viewpoint 5
 sfHouses.face(0)      // face north (degrees of yaw; -90 is up the street)
 sfHouses.open(0)      // open the first unsolved house's options

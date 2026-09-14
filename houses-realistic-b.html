@@ -436,11 +436,10 @@
 <div id="jumpbar" role="navigation" aria-label="Jump to part">
   <div class="jbtitle">Jump to part</div>
   <div class="jbtns">
-    <button class="ghost jbtn" data-part="1" aria-label="Part 1: odd numbers on one side, even on the other">1</button>
-    <button class="ghost jbtn" data-part="2" aria-label="Part 2: numbers rise away from the start of the street">2</button>
-    <button class="ghost jbtn" data-part="3" aria-label="Part 3: each block is a new hundred">3</button>
-    <button class="ghost jbtn" data-part="4" aria-label="Part 4: gaps in the numbers are normal">4</button>
-    <button class="ghost jbtn" data-part="5" aria-label="Part 5: numbers round a court">5</button>
+    <button class="ghost jbtn" data-part="1" aria-label="Part 1: odd or even — odd numbers on one side, even on the other">1</button>
+    <button class="ghost jbtn" data-part="2" aria-label="Part 2: numbers rise or fall depending on your direction">2</button>
+    <button class="ghost jbtn" data-part="3" aria-label="Part 3: numbers round a court">3</button>
+    <button class="ghost jbtn" data-part="4" aria-label="Part 4: each block is a new hundred">4</button>
   </div>
   <div id="progress" aria-hidden="true"></div>
 </div>
@@ -529,17 +528,19 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
    viewpoints ("nodes"), drags to look round, and walks by clicking the
    arrows on the road, tapping the map, or with the keyboard. Each stage
    is one street scene: a straight street of one or more blocks (Parts
-   1-4) or a court with a bulb at the end (Part 5). Houses carry their
-   number on a plate beside the door and on the mailbox at the kerb; a
-   blank house shows "?" or a partial number and opens the quiz.
+   1, 2 and 4) or a court with a bulb at the end (Part 3). Houses carry
+   their number on a plate beside the door and, except on the courts, on
+   the mailbox at the kerb; a blank house shows "?" or a partial number and
+   opens the quiz.
 
    Curriculum (STAGES, further down):
      1  odd numbers on one side, even on the other
-     2  numbers rise away from the start of the street
-     3  each block is a new hundred: leading digits = block
-     4  gaps are normal: numbers measure distance, not houses
-     5  round a court: the two sides meet at the far end (and one court
+     2  numbers rise one way and fall the other, depending on your direction
+     3  round a court: the two sides meet at the far end (and one court
         that counts round in a single run)
+     4  each block is a new hundred: leading digits = block
+   The second street of Parts 1-3 counts by four instead of two, so the
+   step has to be read off the neighbours rather than assumed.
    ============================================================ */
 
 /* ---- layout constants (metres) ---- */
@@ -553,8 +554,8 @@ const CROSS_W = 8;                     // a cross street (road only)
 const EYE = 1.65;                      // camera height
 const NODE_STEP = 14;                  // viewpoints along a block
 
-/* court (Part 5) */
-const CT = { entryLots: [[-21, -33], [-33, -45]], bulbZ: -62, bulbR: 10, ringR: 5.5,
+/* court (Part 3): four lots a side on the way in, then the bulb */
+const CT = { entryLots: [[-21, -33], [-33, -45], [-45, -57], [-57, -69]], bulbZ: -86, bulbR: 10, ringR: 5.5,
              houseR: 17, leftPhi: [62, 105, 148], mainLots: [[-33.5, -19.5], [-19.5, -5.5], [5.5, 19.5], [19.5, 33.5]] };
 
 /* ---- BRICK LOOK: an older Midwest neighbourhood — a Chicago bungalow
@@ -581,7 +582,8 @@ const COLOR = {
 const PLACE_COLORS = { block: '#f28c6a', lot: '#eef2f6', side: '#7cc4ff', path: '#ffd54a' };
 
 /* split a house number into its places. Parts 1-2 and the running-count
-   court show a plain number; from Part 3 the leading digits are the block. */
+   court show a plain number; on the numbered courts (Part 3) and the block
+   streets (Part 4) the leading digits are the block. */
 function splitPlaces(str, type) {
   const s = String(str), n = s.length;
   if ((type === 'block' || type === 'court') && n >= 3)
@@ -1429,6 +1431,7 @@ function buildHouse(parent, spec) {
   slab(g, 1.0, curb - WALK_W - pd - 1.0, 'concrete', dx, 0.02, pd + 1.0 + (curb - WALK_W - pd - 1.0) / 2);
 
   // the number: on the porch beam (or beside the door), and hanging from a yard lamp post by the walk
+  // (the courts have no kerb number: no lamp post there)
   let plates = [];
   if (!decor) {
     const shown = mask === null ? String(value) : mask;
@@ -1436,16 +1439,19 @@ function buildHouse(parent, spec) {
     box(g, PLATE_W + 0.08, PLATE_H + 0.08, 0.04, COLOR.post, plateAt[0], plateAt[1], plateAt[2] + 0.02);
     const plate = label(g, shown, PLATE_W, PLATE_H, plateOpts);
     plate.position.set(plateAt[0], plateAt[1], plateAt[2] + 0.045); plate.userData.keep = true;
-    const lx = dx + doorSide * 1.4, lz = curb - WALK_W - 0.6;
-    box(g, 0.08, 2.4, 0.08, COLOR.post, lx, 1.2, lz);
-    box(g, 0.3, 0.42, 0.3, COLOR.post, lx, 2.5, lz);
-    meshAt(g, new THREE.BoxGeometry(0.22, 0.3, 0.22), MAT_LAMP, lx, 2.5, lz);
-    box(g, 0.38, 0.06, 0.38, COLOR.post, lx, 2.74, lz);
-    box(g, 0.7, 0.04, 0.04, COLOR.post, lx + doorSide * 0.33, 1.6, lz);
-    box(g, MB_PLATE_W + 0.06, MB_PLATE_H + 0.06, 0.03, COLOR.post, lx + doorSide * 0.36, 1.38, lz);
-    const mbPlate = label(g, shown, MB_PLATE_W, MB_PLATE_H, plateOpts);
-    mbPlate.position.set(lx + doorSide * 0.36, 1.38, lz + 0.02); mbPlate.userData.keep = true;
-    plates = [plate, mbPlate];
+    plates = [plate];
+    if (styleHint.mailbox !== false) {
+      const lx = dx + doorSide * 1.4, lz = curb - WALK_W - 0.6;
+      box(g, 0.08, 2.4, 0.08, COLOR.post, lx, 1.2, lz);
+      box(g, 0.3, 0.42, 0.3, COLOR.post, lx, 2.5, lz);
+      meshAt(g, new THREE.BoxGeometry(0.22, 0.3, 0.22), MAT_LAMP, lx, 2.5, lz);
+      box(g, 0.38, 0.06, 0.38, COLOR.post, lx, 2.74, lz);
+      box(g, 0.7, 0.04, 0.04, COLOR.post, lx + doorSide * 0.33, 1.6, lz);
+      box(g, MB_PLATE_W + 0.06, MB_PLATE_H + 0.06, 0.03, COLOR.post, lx + doorSide * 0.36, 1.38, lz);
+      const mbPlate = label(g, shown, MB_PLATE_W, MB_PLATE_H, plateOpts);
+      mbPlate.position.set(lx + doorSide * 0.36, 1.38, lz + 0.02); mbPlate.userData.keep = true;
+      plates.push(mbPlate);
+    }
   }
 
   // planting: shrubs under the windows, a maple in the parkway, sometimes a hedge along the walk
@@ -1494,12 +1500,22 @@ function makeChevron(parent) {
 const yawTo = (dx, dz) => Math.atan2(-dx, -dz);
 const YAW_EAST = yawTo(1, 0), YAW_NORTH = yawTo(0, -1);
 
-/* numbers for one side of a block: explicit lists (Part 4) or 2i+1 / 2i+2 */
+/* numbers for one side of a block: explicit lists, or counting by `step`
+   (2 unless the block says otherwise): 1, 3, 5 … on the odd side, 2, 4, 6 … on the even */
 function numbersFor(b, side, oddSide) {
   if (b.left && b.right) return side < 0 ? b.left : b.right;
-  const odd = side === oddSide;
-  return Array.from({ length: b.n }, (_, i) => b.hundred * 100 + (odd ? 2 * i + 1 : 2 * i + 2));
+  const odd = side === oddSide, step = b.step || 2;
+  return Array.from({ length: b.n }, (_, i) => b.hundred * 100 + step * i + (odd ? 1 : 2));
 }
+/* how far apart the numbers along one side of a stage are: 2 on most streets,
+   4 on the wide-lot streets, 1 round the running-count court */
+function stepOf(st) {
+  if (st.type === 'loop') return 1;
+  if (st.type === 'court') return Math.abs(st.left[1] - st.left[0]) || 2;
+  return Math.max(...st.blocks.map(b => b.step || 2));
+}
+const STEP_WORD = { 1: 'one', 2: 'two', 4: 'four' };
+const stepWord = st => STEP_WORD[stepOf(st)] || String(stepOf(st));
 const maskOf = (st, v) => (st.blanks && st.blanks[v] !== undefined ? st.blanks[v] : null);
 
 /* a straight street along x: cross street, block, cross street, block ...
@@ -1575,9 +1591,9 @@ function nearestHouses(nd, houses) {
 }
 
 /* a court: a short stretch of the main street with the court opening off
-   its north side, two lots either side of the entrance, then a bulb with
-   three houses on each half. `left` / `right` list each side's numbers in
-   walking-in order (entrance first, then round the bulb). */
+   its north side, four lots either side of the entrance (CT.entryLots), then
+   a bulb with three houses on each half. `left` / `right` list each side's
+   numbers in walking-in order (entrance first, then round the bulb). */
 function layoutCourt(st) {
   const houses = [], nodes = [];
   const m = st.main;
@@ -1610,7 +1626,8 @@ function layoutCourt(st) {
   mainX.forEach(x => nodes.push({ x, z: 0, kind: 'main', heading: YAW_EAST }));
   const MOUTH = 2;
   nodes[MOUTH].heading = YAW_NORTH;
-  const entryZ = [-14, -27, -40];
+  const entryZ = [];                       // a viewpoint every 13 m up the entrance, stopping short of the bulb
+  for (let z = -14; z > CT.bulbZ + CT.ringR + 12; z -= 13) entryZ.push(z);
   const E0 = nodes.length;
   entryZ.forEach(z => nodes.push({ x: 0, z, kind: 'entry', heading: YAW_NORTH }));
   const R0 = nodes.length;
@@ -1634,7 +1651,7 @@ function layoutCourt(st) {
   for (const nd of nodes) nd.near = nd.kind === 'main' ? nearestHouses(nd, houses.filter(h => h.main))
     : houses.filter(h => !h.main && Math.hypot(h.px - nd.x, h.pz - nd.z) < 15).slice(0, 2);
   return { kind: 'court', houses, nodes, start: MOUTH, mouth: MOUTH, ring0: R0,
-    bounds: { x0: -36, x1: 36, z0: -84, z1: 22 } };
+    bounds: { x0: -36, x1: 36, z0: CT.bulbZ - CT.houseR - 5, z1: 22 } };
 }
 
 /* ============================================================
@@ -1644,54 +1661,44 @@ function layoutCourt(st) {
 const STAGES = [
   // ---- PART 1 — odd numbers on one side of the street, even on the other ----
   { part: 1, type: 'street', kind: 'example', label: 'Maple St', odd: 'left', blocks: [{ hundred: 1, n: 5 }] },
-  { part: 1, type: 'street', kind: 'quiz', label: 'Elm St', odd: 'left', blocks: [{ hundred: 2, n: 5 }],
-    blanks: { 205: '?', 204: '?', 210: '?' } },
+  // a longer street that counts by four: odd / even still holds, the step is read off the neighbours
+  { part: 1, type: 'street', kind: 'quiz', label: 'Elm St', odd: 'left', blocks: [{ hundred: 2, n: 8, step: 4 }],
+    blanks: { 205: '?', 213: '?', 225: '?', 206: '?', 218: '?', 226: '?' } },
   { part: 1, type: 'street', kind: 'quiz', label: 'Birch St', odd: 'right', blocks: [{ hundred: 3, n: 5 }],
     blanks: { 306: '?', 310: '?', 301: '?', 307: '?' } },
 
-  // ---- PART 2 — numbers rise away from the start of the street ----
+  // ---- PART 2 — numbers rise one way and fall the other, depending on your direction ----
   { part: 2, type: 'street', kind: 'example', label: 'Oak St', odd: 'left', blocks: [{ hundred: 1, n: 6 }] },
-  { part: 2, type: 'street', kind: 'quiz', label: 'Pine St', odd: 'left', blocks: [{ hundred: 2, n: 6 }], startNode: 'far',
-    blanks: { 211: '?', 202: '?', 208: '?' } },
+  // counts by four; starts at the far end facing back, with blanks at both ends of the street
+  { part: 2, type: 'street', kind: 'quiz', label: 'Pine St', odd: 'left', blocks: [{ hundred: 2, n: 9, step: 4 }], startNode: 'far',
+    blanks: { 201: '?', 217: '?', 233: '?', 202: '?', 222: '?', 234: '?' } },
   { part: 2, type: 'street', kind: 'quiz', label: 'Cedar St', odd: 'right', blocks: [{ hundred: 4, n: 7 }], startNode: 'mid',
     blanks: { 401: '?', 414: '?', 405: '?', 410: '?', 408: '?' } },
 
-  // ---- PART 3 — cross a street and the numbers jump to the next hundred ----
-  { part: 3, type: 'block', kind: 'example', label: 'Ash St', odd: 'left',
+  // ---- PART 3 — round a court: the two sides meet at the far end (no mailboxes here) ----
+  { part: 3, type: 'court', kind: 'example', label: 'Willow Ct', odd: 'left', mailbox: false,
+    main: { name: 'Ash St', north: [810, 812, 814, 816], south: [809, 811, 813, 815] },
+    left: [1601, 1603, 1605, 1607, 1609, 1611, 1613], right: [1602, 1604, 1606, 1608, 1610, 1612, 1614] },
+  // sides swapped, and each side counts by four
+  { part: 3, type: 'court', kind: 'quiz', label: 'Hazel Ct', odd: 'right', mailbox: false,
+    main: { name: 'Elm St', north: [504, 506, 508, 510], south: [503, 505, 507, 509] },
+    left: [2102, 2106, 2110, 2114, 2118, 2122, 2126], right: [2101, 2105, 2109, 2113, 2117, 2121, 2125],
+    blanks: { 2106: '?', 2114: '?', 2126: '?', 2105: '?', 2113: '?', 2121: '?' } },
+  // one court that counts round in a single run: 1, 2, 3 ... up one side, back down the other
+  { part: 3, type: 'loop', kind: 'quiz', label: 'Fern Ct', mailbox: false,
+    main: { name: 'Pine St', north: [2202, 2204, 2206, 2208], south: [2201, 2203, 2205, 2207] },
+    left: [1, 2, 3, 4, 5, 6, 7], right: [14, 13, 12, 11, 10, 9, 8],
+    blanks: { 3: '?', 5: '?', 7: '?', 9: '?', 12: '?', 14: '?' } },
+
+  // ---- PART 4 — cross a street and the numbers jump to the next hundred ----
+  { part: 4, type: 'block', kind: 'example', label: 'Ash St', odd: 'left',
     blocks: [{ hundred: 1, n: 4 }, { hundred: 2, n: 4 }, { hundred: 3, n: 4 }] },
-  { part: 3, type: 'block', kind: 'quiz', label: 'Hickory St', odd: 'left',
+  { part: 4, type: 'block', kind: 'quiz', label: 'Hickory St', odd: 'left',
     blocks: [{ hundred: 11, n: 5 }, { hundred: 12, n: 5 }],
     blanks: { 1103: '11_3', 1108: '1_08', 1201: '__01', 1206: '120_', 1209: '12__' } },
-  { part: 3, type: 'block', kind: 'quiz', label: 'Poplar St', odd: 'right',
+  { part: 4, type: 'block', kind: 'quiz', label: 'Poplar St', odd: 'right',
     blocks: [{ hundred: 23, n: 4 }, { hundred: 24, n: 4 }, { hundred: 25, n: 4 }],
     blanks: { 2302: '2_02', 2307: '__07', 2404: '24__', 2405: '2_05', 2408: '?', 2503: '25__', 2506: '__06' } },
-
-  // ---- PART 4 — gaps: numbers measure distance along the street, not houses ----
-  { part: 4, type: 'block', kind: 'example', label: 'Sycamore Dr', odd: 'left', gaps: true,
-    blocks: [{ hundred: 14, left: [1401, 1407, 1413, 1421], right: [1402, 1410, 1416, 1420] },
-             { hundred: 15, left: [1501, 1505, 1513, 1519], right: [1504, 1508, 1512, 1522] }] },
-  { part: 4, type: 'block', kind: 'quiz', label: 'Juniper Dr', odd: 'left', gaps: true,
-    blocks: [{ hundred: 16, left: [1601, 1609, 1615, 1621], right: [1604, 1608, 1616, 1624] },
-             { hundred: 17, left: [1703, 1707, 1715, 1723], right: [1702, 1710, 1714, 1720] }],
-    blanks: { 1609: '16_9', 1616: '161_', 1621: '?', 1702: '1_02', 1715: '17__', 1720: '__20' } },
-  { part: 4, type: 'block', kind: 'quiz', label: 'Laurel Dr', odd: 'right', gaps: true,
-    blocks: [{ hundred: 31, left: [3102, 3106, 3114, 3118, 3126], right: [3101, 3105, 3111, 3117, 3123] },
-             { hundred: 32, left: [3204, 3208, 3216, 3222, 3228], right: [3203, 3207, 3211, 3219, 3225] }],
-    blanks: { 3106: '?', 3117: '31__', 3126: '3_26', 3204: '__04', 3211: '32__', 3219: '3_19', 3228: '?' } },
-
-  // ---- PART 5 — round a court: the two sides meet at the far end ----
-  { part: 5, type: 'court', kind: 'example', label: 'Willow Ct', odd: 'left',
-    main: { name: 'Ash St', north: [810, 812, 814, 816], south: [809, 811, 813, 815] },
-    left: [1601, 1603, 1605, 1607, 1609], right: [1602, 1604, 1606, 1608, 1610] },
-  { part: 5, type: 'court', kind: 'quiz', label: 'Hazel Ct', odd: 'right',
-    main: { name: 'Elm St', north: [504, 506, 508, 510], south: [503, 505, 507, 509] },
-    left: [2102, 2104, 2106, 2108, 2110], right: [2101, 2103, 2105, 2107, 2109],
-    blanks: { 2104: '21__', 2108: '2_08', 2110: '?', 2103: '210_', 2109: '?' } },
-  // one court that counts round in a single run: 1, 2, 3 ... up one side, back down the other
-  { part: 5, type: 'loop', kind: 'quiz', label: 'Fern Ct',
-    main: { name: 'Pine St', north: [2202, 2204, 2206, 2208], south: [2201, 2203, 2205, 2207] },
-    left: [1, 2, 3, 4, 5], right: [10, 9, 8, 7, 6],
-    blanks: { 3: '?', 5: '?', 7: '?', 8: '?', 10: '?' } },
 ];
 
 function shuffle(a) {
@@ -1702,25 +1709,8 @@ function shuffle(a) {
   return a;
 }
 
-/* the nearest numbers shown from the start on the same side of the same
-   block, below and above this house (null when there is none) */
-function shownNeighbours(house, layout) {
-  let lo = null, hi = null;
-  for (const h of layout.houses) {
-    if (h === house || h.mask !== null || h.main) continue;
-    const sameRun = layout.kind === 'court' ? h.courtSide === house.courtSide
-      : (h.side === house.side && h.block === house.block);
-    if (!sameRun) continue;
-    if (h.value < house.value && (lo === null || h.value > lo)) lo = h.value;
-    if (h.value > house.value && (hi === null || h.value < hi)) hi = h.value;
-  }
-  return { lo, hi };
-}
-
 /* three wrong answers that each break exactly one rule the part teaches:
-   the other side (parity), the wrong hundred, the wrong spot along the block.
-   For the gap streets the "wrong spot" lies outside the visible neighbours,
-   since any same-parity number between them would fit the pattern. */
+   the other side (parity), the wrong hundred, the wrong spot along the block. */
 function makeOptionsFor(house, st, layout) {
   const v = house.value, out = [];
   const pick = cands => {
@@ -1740,20 +1730,10 @@ function makeOptionsFor(house, st, layout) {
     pick([v - 1, v + 1]);
     pick([v - 2, v + 2]);
     pick([v - 4, v + 4, v - 10, v + 10, v - 6, v + 6]);
-  } else if (st.gaps) {
-    pick([v - 1, v + 1]);
-    pick([v - 100, v + 100]);
-    const { lo, hi } = shownNeighbours(house, layout);
-    const inBlock = n => Math.floor(n / 100) === Math.floor(v / 100) && n % 100 > 0;
-    const cands = [];
-    if (lo !== null) cands.push(lo - 2, lo - 4); else cands.push(v - 12, v - 20);
-    if (hi !== null) cands.push(hi + 2, hi + 4); else cands.push(v + 12, v + 20);
-    pick(cands.filter(inBlock));
-    if (out.length < 3) pick([v - 20, v + 20, v + 30, v - 30].filter(inBlock));
   } else {                                           // block, court
     pick([v - 1, v + 1]);
     pick([v - 100, v + 100].filter(n => n >= 100));
-    pick([v - 2, v + 2, v - 4, v + 4, v - 20, v + 20]);
+    pick([v - 2, v + 2, v - 4, v + 4, v - 20, v + 20].filter(n => Math.floor(n / 100) === Math.floor(v / 100)));   // the wrong spot stays in the hundred
   }
   while (out.length < 3) pick([v + 3, v - 3, v + 5, v - 5, v + 7, v + 9]);
   return shuffle([v, ...out.slice(0, 3)]);
@@ -1894,17 +1874,12 @@ function buildStreetScene(g, st, L, seed) {
       }
     }
     addBoard(g, ['NUMBERS RISE', 'away from Main St →'], mid, 3.3, -(HALF_ROAD + WALK_W + 0.9), 0, 4.6, 1.4);
+    addBoard(g, ['NUMBERS FALL', 'back toward Main St →'], mid, 3.3, HALF_ROAD + WALK_W + 0.9, Math.PI, 4.6, 1.4);
   }
-  if (st.part === 3) {
+  if (st.part === 4) {
     addPlaceKey(g, [['2', 'block'], ['05', 'lot']], L.blocks[1].x0 + 0.6, 3.0, -(HALF_ROAD + WALK_W + 0.9), -Math.PI / 2);
     for (const c of L.crossings.slice(1, -1))
       addBoard(g, ['+100', `the ${c.blockAhead} block`], (c.x0 + c.x1) / 2, 4.8, -(HALF_ROAD - 0.6), -Math.PI / 2, 3.4, 1.2);
-  }
-  if (st.part === 4) {
-    addPlaceKey(g, [['14', 'block'], ['02', 'lot']], b0.x0 + 0.6, 3.0, -(HALF_ROAD + WALK_W + 0.9), -Math.PI / 2);
-    const rightNums = L.houses.filter(h => h.side === 1 && h.block === 0).map(h => h.value);
-    addBoard(g, ['GAPS ARE NORMAL', rightNums.join(' · ')], mid, 3.3, HALF_ROAD + WALK_W + 0.9, Math.PI, 5.2, 1.4);
-    addBoard(g, ['A WIDER LOT', 'a bigger jump'], mid + 6, 3.3, -(HALF_ROAD + WALK_W + 0.9), 0, 4.2, 1.3);
   }
 }
 
@@ -1966,7 +1941,7 @@ function buildCourtScene(g, st, L, seed) {
   // arrows along both sidewalks going in, and round the bulb
   for (const s of [-1, 1]) {
     const x = s * (HALF_ROAD + WALK_W + 0.6);
-    for (const z of [-12, -30]) arrow(g, new THREE.Vector3(x, 0.6, z), new THREE.Vector3(x, 0.6, z - 7), COLOR.arrow, 0.11);
+    for (let z = -12; z > CT.bulbZ + CT.bulbR + 8; z -= 18) arrow(g, new THREE.Vector3(x, 0.6, z), new THREE.Vector3(x, 0.6, z - 7), COLOR.arrow, 0.11);
     for (const deg of [35, 85, 135]) {
       const a0 = (s < 0 ? deg : 360 - deg) * Math.PI / 180, a1 = a0 + (s < 0 ? 1 : -1) * 0.34;
       const rr = CT.bulbR + WALK_W + 0.6;
@@ -1989,7 +1964,7 @@ function buildStageGroup(i) {
     const built = buildHouse(g, {
       px: h.px, pz: h.pz, facing: h.facing, lotW: h.lotW, curb: h.curb,
       seed: (seed + k * 7919 + h.value * 31) >>> 0, value: h.value, mask: h.mask,
-      styleHint: h.noLawn ? { lawn: false } : {},
+      styleHint: { ...(h.noLawn ? { lawn: false } : {}), ...(st.mailbox === false ? { mailbox: false } : {}) },
     });
     h.plates = built.plates; h.group = built.group;
     built.group.traverse(o => { if (o.isMesh && !o.userData.lawn) { o.userData.house = h; lookList.push(o); } });
@@ -2042,7 +2017,7 @@ configureReport({
   site: 'House numbers',
   scope: `all ${STAGES.length} streets`,
   unit: 'house',
-  partTitles: { 1: 'Odd side, even side', 2: 'Rising away from the start', 3: 'Each block is a hundred', 4: 'Gaps are normal', 5: 'Round the court' },
+  partTitles: { 1: 'Odd or Even?', 2: 'Rise or fall with direction', 3: 'Round the court', 4: 'Each block is a hundred' },
   placeOrder: ['block', 'side', 'lot'],
   stageName: st => (st && st.label) || '',
   maskFor: (st, v) => (st && st.blanks && st.blanks[v]) || '?',
@@ -2051,10 +2026,10 @@ configureReport({
   perfectTry: 'Nothing to fix. Go find some houses.',
   missLine: (part, place) => {
     if (place === 'side') return `In Part ${part}, check which side is odd and which is even — most misses were the <span class="pl-side">side</span>.`;
+    if (place === 'block' && part === 3) return 'In Part 3, keep the <span class="pl-block">leading digits</span> — every house on a court shares them.';
     if (place === 'block') return `In Part ${part}, read the <span class="pl-block">block</span> off the street sign — most misses were the hundred.`;
     if (part === 2) return 'In Part 2, check which way the numbers climb before you count on.';
-    if (part === 4) return 'In Part 4, bracket the house between its neighbours — the gap size does not matter.';
-    if (part === 5) return 'In Part 5, follow one side round the bulb — the two sides meet at the far end.';
+    if (part === 3) return 'In Part 3, follow one side round the bulb — the two sides meet at the far end.';
     return `In Part ${part}, count on from the house next door — most misses were the <span class="pl-lot">lot</span>.`;
   },
   readyLine: (misses, place) => place ? `Only ${misses}, mostly the <span class="pl-${place}">${place}</span>. Worth a glance next time.` : `Only ${misses} in all.`,
@@ -2594,73 +2569,62 @@ new ResizeObserver(([e]) => document.documentElement.style.setProperty('--prompt
 const plSpan = (cls, txt) => `<span class="pl pl-${cls}">${txt}</span>`;
 const PROMPTS = {
   p1example: {
-    title: 'Part 1 · Odd side, even side',
+    title: 'Part 1 · Odd or Even?',
     body: 'One side of the street has the <b>odd</b> numbers, the other the <b>even</b>: 101, 103, 105 on the left; 102, 104, 106 on the right. ' +
           'Houses facing each other are one apart. <b>Drag</b> to look round, click the <b>arrows on the road</b> to walk.',
     short: 'Odd numbers on one side, even on the other; facing houses are one apart. Drag to look, tap the road arrows to walk.',
   },
   p1quiz: {
     title: n => `${n} · Which side is which?`,
-    body: 'Click a house marked <b>?</b> and pick its number. Check a neighbour on the <b>same side</b> — along one side the numbers go up by two.',
-    short: 'Click a <b>?</b> house. Same side, same odd or even, counting by two.',
+    body: (n, st) => `Click a house marked <b>?</b> and pick its number. Check a neighbour on the <b>same side</b> — along one side the numbers go up by ${stepWord(st)}.`,
+    short: (n, st) => `Click a <b>?</b> house. Same side, same odd or even, counting by ${stepWord(st)}.`,
   },
   p2example: {
-    title: 'Part 2 · Numbers rise away from the start',
-    body: 'Oak St starts at Main St. Walk away from Main St and the numbers climb on both sides — the <b>yellow arrows</b> show the way. ' +
-          'Need a lower number? Turn round.',
-    short: 'Numbers climb as you walk away from Main St. Need a lower number? Turn round.',
+    title: 'Part 2 · Numbers rise or fall depending on your direction',
+    body: 'Oak St starts at Main St. Walk away from Main St and the numbers rise on both sides; walk back toward it and they fall — ' +
+          'the <b>yellow arrows</b> point the rising way. Need a lower number? Turn round.',
+    short: 'Numbers rise as you walk away from Main St and fall on the way back. Need a lower number? Turn round.',
   },
   p2quiz: {
     title: n => `${n} · Which way do they climb?`,
-    body: 'Read two numbers to see which way they rise, then count on to the houses marked <b>?</b> — some are at the ends of the street.',
-    short: 'Read two numbers to find the direction, then count on to the <b>?</b> houses.',
+    body: (n, st) => `Read two numbers to see which way they rise, then count on by ${stepWord(st)} to the houses marked <b>?</b> — some are at the ends of the street.`,
+    short: (n, st) => `Read two numbers to find the direction, then count on by ${stepWord(st)} to the <b>?</b> houses.`,
   },
   p3example: {
-    title: 'Part 3 · Each block is a hundred',
+    title: 'Part 3 · Round the court',
+    body: 'A court is a dead end with a loop. The numbers rise as you go in — odd on one side, even on the other — right round the bulb, ' +
+          'until the two sides <b>meet at the far end</b>. The corner houses face the main street, so their numbers belong to it.',
+    short: 'Numbers rise going in, odd one side, even the other, round the bulb until the sides <b>meet at the far end</b>.',
+  },
+  p3quiz: {
+    title: n => `${n} · Round the bulb`,
+    body: (n, st) => `Walk in and round. Click a house marked <b>?</b> and pick its number — each side counts by ${stepWord(st)}, and the two sides meet at the far end.`,
+    short: (n, st) => `Walk in and round. Click a <b>?</b> house — each side counts by ${stepWord(st)}; the sides meet at the far end.`,
+  },
+  p3loop: {
+    title: n => `${n} · One run round the loop`,
+    body: 'Some courts count round in <b>one run</b>: 1, 2, 3 … up one side and back down the other. Two neighbours one apart tell you so. ' +
+          'Click a house marked <b>?</b>.',
+    short: 'This court counts round in <b>one run</b>: up one side, back down the other. Click a <b>?</b> house.',
+  },
+  p4example: {
+    title: 'Part 4 · Each block is a hundred',
     body: 'Cross a street and the numbers jump to the next hundred: the 100 block, the 200 block, the 300 block. ' +
           'The leading digits are the ' + plSpan('block', 'block') + ', the last two count along it: ' +
           plSpan('block', '2') + '·' + plSpan('lot', '05') + '. The street signs show the block.',
     short: 'Each cross street adds a hundred. ' + plSpan('block', 'Block') + ' · ' + plSpan('lot', 'lot') + ': ' +
            plSpan('block', '2') + '·' + plSpan('lot', '05') + '. The street signs show the block.',
   },
-  p3quiz: {
+  p4quiz: {
     title: n => `${n} · Read the block`,
     body: 'Click a house with a <b>partial number</b> (like 12▢3) and pick the full one. The street sign at the corner tells you the block.',
     short: 'Click a <b>partial number</b> (like 12▢3). The corner sign gives the block.',
-  },
-  p4example: {
-    title: 'Part 4 · Gaps are normal',
-    body: 'Numbers are handed out by <b>distance</b> along the street, not one per house, so they skip: 1402, 1410, 1416. ' +
-          'A missing number is not a missing house. The side, the direction and the block still hold.',
-    short: 'Numbers measure distance, so they skip: 1402, 1410, 1416. A missing number is not a missing house.',
-  },
-  p4quiz: {
-    title: n => `${n} · Mind the gaps`,
-    body: 'Pick the number that fits <b>between its neighbours</b>: right side, right block, rising the right way. The size of the gap does not matter.',
-    short: 'Pick what fits <b>between the neighbours</b>: right side, right block, right direction.',
-  },
-  p5example: {
-    title: 'Part 5 · Round the court',
-    body: 'A court is a dead end with a loop. The numbers rise as you go in — odd on one side, even on the other — right round the bulb, ' +
-          'until the two sides <b>meet at the far end</b>. The corner houses face the main street, so their numbers belong to it.',
-    short: 'Numbers rise going in, odd one side, even the other, round the bulb until the sides <b>meet at the far end</b>.',
-  },
-  p5quiz: {
-    title: n => `${n} · Round the bulb`,
-    body: 'Walk in and round. Click a house marked <b>?</b> and pick its number — the two sides meet at the far end.',
-    short: 'Walk in and round. Click a <b>?</b> house — the sides meet at the far end.',
-  },
-  p5loop: {
-    title: n => `${n} · One run round the loop`,
-    body: 'Some courts count round in <b>one run</b>: 1, 2, 3 … up one side and back down the other. Two neighbours one apart tell you so. ' +
-          'Click a house marked <b>?</b>.',
-    short: 'This court counts round in <b>one run</b>: up one side, back down the other. Click a <b>?</b> house.',
   },
 };
 function promptFor(st) {
   const key = `p${st.part}${st.kind === 'example' ? 'example' : (st.type === 'loop' ? 'loop' : 'quiz')}`;
   const row = PROMPTS[key] || PROMPTS.p1quiz;
-  const val = v => (typeof v === 'function' ? v(st.label) : v);
+  const val = v => (typeof v === 'function' ? v(st.label, st) : v);
   return { title: val(row.title), body: val(row.body), short: val(row.short) };
 }
 /* on a touch screen the copy says tap, not click */
@@ -2713,10 +2677,9 @@ function showStage(i) {
    ============================================================ */
 const RULE_BY_PART = {
   1: 'Odd on one side, even on the other.',
-  2: 'Numbers rise away from the start of the street.',
-  3: 'Cross a street and the hundred goes up.',
-  4: 'Keep the side, the block and the direction — the gap size does not matter.',
-  5: 'Round the court the two sides meet at the far end.',
+  2: 'Numbers rise one way and fall the other — check your direction.',
+  3: 'Round the court the two sides meet at the far end.',
+  4: 'Cross a street and the hundred goes up.',
 };
 const quizType = () => (currentStage ? currentStage.type : 'street');
 const quizPlaces = (val, type) => splitPlaces(String(val), type);
@@ -2739,15 +2702,15 @@ function placeOf(chosen, correct, st) {
 }
 /* why the pick was wrong, in a short line — never reveals the answer */
 function explainWrong(chosen, correct, st) {
-  const pl = placeOf(chosen, correct, st);
-  if (pl === 'block') return 'Right spot, wrong hundred — the street sign gives the block.';
+  const pl = placeOf(chosen, correct, st), by = stepWord(st);
+  if (pl === 'block') return st.type === 'court' ? 'Right spot, wrong leading digits — every house on this court shares them.'
+                                                : 'Right spot, wrong hundred — the street sign gives the block.';
   if (pl === 'side') return `${chosen} is ${parityWord(chosen)} — that’s the other side of the street.`;
   if (st.type === 'loop') return 'One run round the loop — count on by one from the house next door.';
-  if (st.gaps) return 'Right side and block — but it must sit between its neighbours.';
-  if (st.part === 2) return 'Right side — check which way the numbers climb, then count on by two.';
-  if (st.type === 'court') return 'Right side — follow that side round the bulb, counting by two.';
-  if (st.type === 'block') return 'Right side and block — count on by two from the house next door.';
-  return 'Right side — count on by two from the house next door.';
+  if (st.part === 2) return `Right side — check which way the numbers climb, then count on by ${by}.`;
+  if (st.type === 'court') return `Right side — follow that side round the bulb, counting by ${by}.`;
+  if (st.type === 'block') return `Right side and block — count on by ${by} from the house next door.`;
+  return `Right side — count on by ${by} from the house next door.`;
 }
 
 let quizCloseTimer = null;

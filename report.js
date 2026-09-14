@@ -336,7 +336,7 @@ function summary() {
     };
   });
 
-  const parts = [1, 2, 3, 4, 5].map(p => {
+  const parts = Object.keys(COURSE.partTitles).map(Number).sort((a, b) => a - b).map(p => {
     const ss = stages.filter(s => s.part === p);
     const qs = questions.filter(q => q.part === p);
     const seconds = r1(ss.reduce((n, s) => n + s.seconds, 0));

@@ -3,7 +3,7 @@
 Four files, one course. `houses.html` is the **classic** look (flat colours, the
 original build). Each `houses-realistic-*.html` is a copy of it in which only the
 visual layer is replaced — the segments listed under *What a look replaces* — so
-the fifteen streets, the quiz, the Street View camera and its number framing,
+the twelve streets, the quiz, the Street View camera and its number framing,
 the map, the report wiring, the Appearance bar and the accessibility code are
 byte-identical across the four files. A curriculum or UI change is made in
 `houses.html` and then applied to the other three; a look change stays inside
@@ -28,7 +28,8 @@ In order of appearance in the file:
    `buildShrubs` keep their names so the shared code can call them), `buildCar`,
    lamps, hydrants, walls;
 6. `buildHouse` — the plate positions may differ per look, but every house still
-   returns `{ group, plates: [doorPlate, kerbPlate] }`, marks its lawn or yard
+   returns `{ group, plates: [doorPlate, kerbPlate] }` (just the door plate when
+   `styleHint.mailbox` is false, as on the courts), marks its lawn or yard
    slab with `userData.lawn` (excluded from picking) and its plates with
    `userData.keep` (never merged);
 7. `buildWalks` / `buildRoadZ`;

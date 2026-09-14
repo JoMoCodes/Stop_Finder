@@ -45,7 +45,7 @@ Every event carries: `look` (which page: `apartment-mockup`,
 `apartment-realistic-a` …, `houses`, `houses-realistic-a` …), `device` (phone / tablet / desktop by width),
 `input` (touch / pointer), `motion` (reduced / full), `run` (random id) and
 `t` (seconds since the run started). Stage events also carry `stage` (index
-in `STAGES`), `part` (1–5), `kind` (example / quiz), `type` (apartments: plex /
+in `STAGES`), `part` (1–5; the Houses course has four parts), `kind` (example / quiz), `type` (apartments: plex /
 tower / row / block / seq; houses: street / block / court / loop) and
 `stage_name` (the building, or the street name).
 

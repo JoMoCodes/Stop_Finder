@@ -145,11 +145,12 @@ units where leading digit(s) = building → **(4)** everything combined, numbere
 around both the front and back faces → **(5)** a single running count around
 all four faces of one building — no floor digit at all.
 
-The Houses course's five parts: **(1)** odd numbers on one side, even on the
-other → **(2)** numbers rise away from the start of the street → **(3)** each
-cross street starts a new hundred (leading digits = block) → **(4)** gaps are
-normal: numbers measure distance, not houses → **(5)** round a court the two
-sides meet at the far end (plus one court that counts round in a single run).
+The Houses course's four parts: **(1)** odd numbers on one side, even on the
+other → **(2)** numbers rise one way and fall the other, depending on your
+direction → **(3)** round a court the two sides meet at the far end (plus one
+court that counts round in a single run; four lots a side on the way in, no
+mailboxes) → **(4)** each cross street starts a new hundred (leading digits =
+block). The old "gaps are normal" part was dropped in September 2026.
 
 Design rationale for the current look and behaviour lives in
 `docs/apartment-course-review/` (reviews → summaries → design docs → QA).
@@ -177,11 +178,14 @@ Same skeleton as the apartment course (same panel ids, same `document` events, s
   wide as their number step) and `layoutCourt(st)` (main street, entrance, bulb).
   `buildHouse` draws one house in a local frame (front wall at the origin, local +z
   toward the road) with the number on a plate over the door **and** on the mailbox
-  (`bstate.plates`); a blank house's whole body is clickable.
-- **`STAGES`** (15 streets, 3 per part) and `makeOptionsFor` are the curriculum:
-  each wrong option breaks exactly one rule (other side · wrong hundred · wrong spot),
-  and on the gap streets the wrong spot is outside the visible neighbours. The
-  quiz's `answer` event carries the broken rule as `place` (`block` / `side` / `lot`).
+  (`bstate.plates`; a stage with `mailbox: false` — the courts — has no mailbox and
+  one plate); a blank house's whole body is clickable.
+- **`STAGES`** (12 streets, 3 per part) and `makeOptionsFor` are the curriculum:
+  each wrong option breaks exactly one rule (other side · wrong hundred · wrong spot).
+  A block may count by `step` (4 on the second street of Parts 1–2; the courts list
+  their numbers, Hazel Ct by four); `stepOf` / `stepWord` word the prompts and the
+  wrong-pick explanations accordingly. The quiz's `answer` event carries the broken
+  rule as `place` (`block` / `side` / `lot`).
 - Console handle for checking without a mouse: `sfHouses.go(i)`, `.walk(n)`,
   `.face(deg)`, `.faceHouse(k)`, `.open(k)`, `.frame(k)`, `.find()`, `.pick(x, y)`,
   `.screenOf(k)`, `.info()` (draw calls), `.solve()`.
