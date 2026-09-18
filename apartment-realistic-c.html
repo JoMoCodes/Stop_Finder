@@ -283,11 +283,18 @@
     #qclose { width: 44px; height: 44px; }
   }
 
-  /* --- big desktops (at least 1280 x 900): the Part 5 mini-map grows with the height,
-     up to 240px wide, staying clear of the centred walk-around column above it --- */
+  /* --- big desktops (at least 1280 x 900): the Part 5 mini-map sits at the centre right and
+     grows with the height, up to 240px wide. A door's options open in the same column, so the
+     two stack there, the map above the options, the pair centred in the band between the chip
+     and the bottom controls: --quiz-h and --map-h are each panel's height plus the 12px gap,
+     0 while it is hidden (script). On the shortest screens the map gives up a little width
+     while the options are open, so the pair still fits the band (100vh - 198px) --- */
   @media (min-width: 1280px) and (min-height: 900px) {
-    #minimap { width: clamp(180px, calc(24vh - 40px), 240px); }
+    #minimap { left: auto; right: 22px; bottom: auto; top: calc(50% - 30px - var(--quiz-h, 0px) / 2);
+      transform: translateY(-50%); transition: top .25s ease, width .25s ease;
+      width: clamp(132px, min(clamp(180px, 24vh - 40px, 240px), (100vh - var(--quiz-h, 0px) - 212px) / 1.515), 240px); }
     #minimap .mmnote { font-size: clamp(10px, 1.2vh, 12px); margin-top: 6px; }
+    #quiz { top: calc(50% - 30px + var(--map-h, 0px) / 2); }
   }
 
   /* --- tablets 641-1024px: desktop layout holds, quiz just tucks in --- */
@@ -2394,6 +2401,12 @@ new ResizeObserver(([e]) => {
   document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px');
   if (typeof applyViewOffset === 'function') requestAnimationFrame(() => applyViewOffset());
 }).observe(document.getElementById('prompt'));
+// big desktops: the mini-map and the options panel share the right-hand column, the map above
+// the panel. Each publishes its height plus the 12px gap (0 while hidden) so the CSS can centre
+// the pair in the band between the chip and the bottom controls (the big-desktop media query).
+for (const [id, prop] of [['quiz', '--quiz-h'], ['minimap', '--map-h']])
+  new ResizeObserver(([e]) => document.documentElement.style.setProperty(prop, (e.target.offsetHeight ? e.target.offsetHeight + 12 : 0) + 'px'))
+    .observe(document.getElementById(id));
 // ... and the "doors left" chip's width, so the phone progress strip stops short of it
 // ("Name the building" is wider than "2 doors left"). Not updated while the chip is folded
 // away for screen readers, so the strip keeps its width while the options are open.

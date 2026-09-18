@@ -276,11 +276,17 @@
     #viewbar button.vbtn.turn { width: 44px; }
   }
 
-  /* --- big desktops (at least 1280 x 900): the street map grows with the room, up to
-     440px wide; its SVG scales with it, so dots, squares and names grow too --- */
+  /* --- big desktops (at least 1280 x 900): the street map sits at the centre right and grows
+     with the room, up to 440px wide; its SVG scales with it, so dots, squares and names grow
+     too. A house's options open in the same column, so the two stack there, the map above the
+     options, the pair centred in the band between the chip and the bottom controls: --quiz-h
+     and --map-h are each panel's height plus the 12px gap, 0 while it is hidden (script) --- */
   @media (min-width: 1280px) and (min-height: 900px) {
-    #minimap { width: clamp(360px, min(18vw, 30vh), 440px); padding: 10px 10px 8px; }
+    #minimap { left: auto; right: 22px; bottom: auto; top: calc(50% - 30px - var(--quiz-h, 0px) / 2);
+      transform: translateY(-50%); transition: top .25s ease;
+      width: clamp(360px, min(18vw, 30vh), 440px); padding: 10px 10px 8px; }
     #minimap .mmnote { font-size: 12px; margin-top: 6px; }
+    #quiz { top: calc(50% - 30px + var(--map-h, 0px) / 2); }
   }
 
   /* --- tablets 641-1024px --- */
@@ -2571,6 +2577,12 @@ for (const btn of jumpBtns) btn.onclick = () => showStage(partStart[Number(btn.d
 
 new ResizeObserver(([e]) => document.documentElement.style.setProperty('--prompt-h', (e.target.offsetHeight + 8) + 'px'))
   .observe(document.getElementById('prompt'));
+// big desktops: the mini-map and the options panel share the right-hand column, the map above
+// the panel. Each publishes its height plus the 12px gap (0 while hidden) so the CSS can centre
+// the pair in the band between the chip and the bottom controls (the big-desktop media query).
+for (const [id, prop] of [['quiz', '--quiz-h'], ['minimap', '--map-h']])
+  new ResizeObserver(([e]) => document.documentElement.style.setProperty(prop, (e.target.offsetHeight ? e.target.offsetHeight + 12 : 0) + 'px'))
+    .observe(document.getElementById(id));
 
 /* ---- prompt copy: one amber headline + a short plain-language body ---- */
 const plSpan = (cls, txt) => `<span class="pl pl-${cls}">${txt}</span>`;

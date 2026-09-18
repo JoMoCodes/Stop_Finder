@@ -77,7 +77,8 @@ Structure top-to-bottom:
   rules, then **all width/orientation media queries at the end** (phone
   portrait ≤640px turns `#quiz` into a bottom sheet; landscape phones;
   `pointer: coarse` tap targets; tablets; big desktops of 1280 x 900 and up grow the
-  mini-map). Keep new media queries there.
+  mini-map and set it at the centre right, stacked above the options panel when that is open,
+  from the `--quiz-h` / `--map-h` heights the script publishes). Keep new media queries there.
 - **DOM**: `#finale` (the end-of-run report dialog: an empty `#report` that
   `report.js` fills, plus the `#fagain` / `#fclose` buttons the course wires),
   `#app` (canvas mount), sr-only

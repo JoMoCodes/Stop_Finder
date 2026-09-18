@@ -78,11 +78,12 @@ street"), and after a second miss the part's rule is appended.
   arrows, a "numbers start here" board at Main St and a NUMBERS RISE / NUMBERS
   FALL pair mid-block (Part 2), arrows into and round the bulb (Part 3), the
   coloured block · lot key and "+100" boards over each crossing (Part 4).
-- **Street map** (bottom left): the road, cross streets and block numbers,
+- **Street map** (bottom left; centre right on big desktops): the road, cross streets and block numbers,
   every house (amber = blank, green = solved), the viewpoints as dots you can
   tap, and a "you are here" wedge that follows the camera. The court is drawn
   with its entrance running left to right so the map stays landscape. On big
-  desktops (1280 x 900 and up) it grows with the window, up to 440 px wide.
+  desktops (1280 x 900 and up) it sits at the centre right, above a house's options while
+  they are open, and grows with the window, up to 440 px wide.
 
 ## Controls
 
