@@ -1189,20 +1189,16 @@ function arrow(parent, from, to, color, radius = 0.08) {
    the jamb, sconce, frame, sill and glass are dressing only. */
 function doorUnit(g, x, base, surf, s, dw, plateW) {
   const halfOut = 0.07;
-  // the jamb and door stand a few centimetres proud of the skirt board, and their
-  // shadow onto it only ever rendered as acne, so neither casts one
-  box(g, dw + 0.3, 2.22, 0.1, COLOR.trim, x, base + 1.11, surf - s * 0.03).castShadow = false;   // white jamb + head
+  box(g, dw + 0.3, 2.22, 0.1, COLOR.trim, x, base + 1.11, surf - s * 0.03);                 // white jamb + head
   const door = box(g, dw, 2.05, 0.14, COLOR.door, x, base + 1.05, surf);
-  door.castShadow = false;
   const sx = x + plateW / 2 + 0.25;                                                          // wall sconce beside the plate
   box(g, 0.14, 0.24, 0.12, COLOR.sconce, sx, base + 1.95, surf + s * halfOut);
   return door;
 }
 /* side-wall door (Part 5 L/R faces): same kit turned 90 deg */
 function doorUnitSide(g, z, base, surfX, sx, dd, plateW) {
-  box(g, 0.1, 2.22, dd + 0.3, COLOR.trim, surfX - sx * 0.03, base + 1.11, z).castShadow = false;
+  box(g, 0.1, 2.22, dd + 0.3, COLOR.trim, surfX - sx * 0.03, base + 1.11, z);
   const door = box(g, 0.16, 2.05, dd, COLOR.door, surfX, base + 1.05, z);
-  door.castShadow = false;
   const sz = z - sx * (plateW / 2 + 0.25);
   box(g, 0.12, 0.24, 0.14, COLOR.sconce, surfX + sx * 0.07, base + 1.95, sz);
   return door;
@@ -1849,12 +1845,12 @@ function buildSeqFacade(g, getUnit, raycastList, blankStates) {
       const sx = slot.face === 'L' ? -1 : 1;
       yaw = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
       px = sx * (SQHW + 0.12); pz = slot.a;
-      door = doorUnitSide(g, slot.a, base, sx * (SQHW + 0.02), sx, 1.2, 1.95);
+      door = doorUnitSide(g, slot.a, base, sx * (SQHW + 0.05), sx, 1.2, 1.95);     // proud of the skirt board
     } else {
       const sz = slot.face === 'F' ? 1 : -1;
       yaw = sz > 0 ? 0 : Math.PI;
       px = slot.a; pz = sz * (SQHD + 0.12);
-      door = doorUnit(g, slot.a, base, sz * (SQHD + 0.02), sz, 1.2, 1.95);
+      door = doorUnit(g, slot.a, base, sz * (SQHD + 0.05), sz, 1.2, 1.95);
     }
 
     const u = getUnit(slot.d);
