@@ -686,6 +686,11 @@ const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
 const BH = BFLOORS * BFH, BHALF_D = BD / 2;
 const BDOORX = 3.6;                            // door offset from centre
 
+/* ---- Parts 4-5: an open breezeway runs through the middle of the block on
+   every floor, front wall to back wall, so the far face shows through the near
+   one. Its width; the doors sit either side of it. ---- */
+const HALL_W = 2.4;
+
 /* ---- Part 5: a uniform 3-story walk-up in the same solid-slab style as
    Parts 3-4. The unit number is a single running count with NO floor digit,
    so floor 1 owns both the lowest numbers AND the highest. Doors sit around
@@ -1038,14 +1043,21 @@ function tbox(parent, w, h, d, name, x, y, z, extra = {}) {
   return m;
 }
 /* four thin wall slabs around a footprint (front/back and left/right each get
-   a tile repeat that matches their own width) */
-function wallRing(g, w, d, h, y, name, extra = {}) {
-  const t = 0.3;
-  for (const s of [1, -1]) {
-    tbox(g, w, h, t, name, 0, y, s * (d / 2 - t / 2), extra);
+   a tile repeat that matches their own width). `hall` > 0 leaves an opening
+   that wide in the middle of the front and back slabs and lines the passage
+   between them with two more slabs in the same finish (the ring is hollow). */
+function wallRing(g, w, d, h, y, name, extra = {}, hall = 0) {
+  const t = 0.3, wing = (w - hall) / 2;
+  const side = x => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(t, h, d - 2 * t), texMat(name, d, h, extra));
     m.castShadow = true; m.receiveShadow = true;
-    m.position.set(s * (w / 2 - t / 2), y, 0); g.add(m);
+    m.position.set(x, y, 0); g.add(m);
+  };
+  for (const s of [1, -1]) {
+    if (hall) for (const sx of [1, -1]) tbox(g, wing, h, t, name, sx * (hall + wing) / 2, y, s * (d / 2 - t / 2), extra);
+    else tbox(g, w, h, t, name, 0, y, s * (d / 2 - t / 2), extra);
+    side(s * (w / 2 - t / 2));
+    if (hall) side(s * (hall / 2 + t / 2));
   }
 }
 /* draw-call budget: every plain-material piece in a group (trim, railings,
@@ -1307,6 +1319,11 @@ function walkway(g, w, y, s, halfD, depth, doorXs = [], opts = {}) {
     const ds = [...doorXs].sort((a, b) => a - b), cand = [x0 + 0.3, x1 - 0.3];
     for (let i = 1; i < ds.length; i++) cand.push((ds[i - 1] + ds[i]) / 2);
     if (ds.length === 1) cand.push(ds[0] - 3.5, ds[0] + 3.5);
+    if (opts.hall) {                                  // a breezeway behind: a column each side of its mouth, none across it
+      const edge = opts.hall / 2 + 0.2;
+      for (let i = cand.length - 1; i >= 0; i--) if (Math.abs(cand[i]) < edge) cand.splice(i, 1);
+      cand.push(-edge, edge);
+    }
     for (const x of cand)
       if (x > x0 + 0.2 && x < x1 - 0.2 && ds.every(dx => Math.abs(dx - x) >= 1.4))
         column(g, x, y - 0.15, s * (halfD + depth - 0.2));
@@ -1385,17 +1402,26 @@ function doorAt(g, w, h, d, x, y, z) {
 /* stacked storeys: brick veneer on the ground floor, stucco above, a painted
    trim band at each floor line, a concrete plinth at grade, downspouts at the
    corners and the hipped roof on top */
-function buildWalls(g, w, d, floors, fh) {
+function buildWalls(g, w, d, floors, fh, hall = 0) {
   const h = floors * fh;
   mbox(g, w + 0.3, 0.2, d + 0.3, MAT.plinth, 0, -0.08, 0);
   for (let fi = 0; fi < floors; fi++) {
-    wallRing(g, w, d, fh, fi * fh + fh / 2, fi === 0 ? 'brick' : 'stucco');
+    wallRing(g, w, d, fh, fi * fh + fh / 2, fi === 0 ? 'brick' : 'stucco', {}, hall);
     if (fi > 0) mbox(g, w + 0.12, 0.16, d + 0.12, MAT.trim, 0, fi * fh, 0);
   }
+  // a breezeway: the plinth is its floor, the trim bands and roof soffit its ceilings; light them
+  if (hall) breezewayLights(g, hall, d, floors, fh, fi => fi < floors - 1 ? (fi + 1) * fh - 0.08 : h);
   if (floors === 1) mbox(g, w + 0.12, 0.16, d + 0.12, MAT.trim, 0, fh, 0);
   for (const sx of [1, -1]) for (const sz of [1, -1])                                   // downspouts
     mbox(g, 0.1, h, 0.1, MAT.white, sx * (w / 2 + 0.07), h / 2, sz * (d / 2 - 0.5));
   roofHip(g, w, d, h);
+}
+/* ceiling lights down a breezeway, one every ~7 m on every floor, flush under
+   the ceiling `ceilingAt(floor)` gives */
+function breezewayLights(g, hall, d, floors, fh, ceilingAt) {
+  const n = Math.max(1, Math.round(d / 7));
+  for (let fi = 0; fi < floors; fi++)
+    for (let i = 0; i < n; i++) mbox(g, 0.5, 0.05, 0.5, MAT.lamp, 0, ceilingAt(fi) - 0.025, (i + 0.5) / n * d - d / 2);
 }
 /* concrete sidewalk ring around a footprint */
 function sidewalks(g, w, d, sw = 2.2) {
@@ -1659,8 +1685,8 @@ function buildTowerFacade(g, getUnit, raycastList, blankStates) {
 
 /* a stacked-floor shell (brick base, stucco above, hipped roof, sidewalks)
    shared by Parts 3-5 */
-function buildSlabShell(g, w, d, floors, fh) {
-  buildWalls(g, w, d, floors, fh);
+function buildSlabShell(g, w, d, floors, fh, hall = 0) {
+  buildWalls(g, w, d, floors, fh, hall);
   sidewalks(g, w, d);
 }
 
@@ -1751,9 +1777,9 @@ function buildBlockFacade(g, s, isFront, getCell, raycastList, blankStates) {
         blankStates.push(bstate);
       }
     }
-    for (const wx of [-6.6, 0, 6.6]) windowAt(g, wx, base + 1.55, s * BHALF_D, 1.05, 1.25, 'z');
+    for (const wx of [-6.6, 6.6]) windowAt(g, wx, base + 1.55, s * BHALF_D, 1.05, 1.25, 'z');   // the breezeway takes the middle bay
     if (fi > 0) walkway(g, BW, base, s, BHALF_D, 1.5, [-BDOORX, BDOORX],          // a stair off the right end in front, the left end behind
-      s > 0 ? { openRight: true, railX1: BW / 2 - ST_LAND } : { openLeft: true, railX0: -BW / 2 + ST_LAND });
+      s > 0 ? { openRight: true, railX1: BW / 2 - ST_LAND, hall: HALL_W } : { openLeft: true, railX0: -BW / 2 + ST_LAND, hall: HALL_W });
   }
   if (s < 0) for (let fi = 0; fi < BFLOORS; fi++) windowAt(g, -BW / 2, fi * BFH + 1.55, 0, 1.05, 1.25, 'x');
 }
@@ -1787,7 +1813,7 @@ function buildSeqAccess(g, s) {
 /* shell in the shared style, windows, guarded walkways under the upper
    front/back doors, corner stairs, and the number on all four faces */
 function buildSeqStructure(g, number) {
-  buildSlabShell(g, SQW, SQD, SQFLOORS, SQFH);
+  buildSlabShell(g, SQW, SQD, SQFLOORS, SQFH, HALL_W);
 
   for (let fi = 0; fi < SQFLOORS; fi++) {
     const wy = fi * SQFH + 1.55;
@@ -1801,7 +1827,7 @@ function buildSeqStructure(g, number) {
   for (let fi = 1; fi < SQFLOORS; fi++)                          // guarded walkways
     for (const sz of [-1, 1])
       walkway(g, SQW, fi * SQFH, sz, SQHD, 1.5, [-3, 3],
-        sz > 0 ? { openRight: true, railX1: SQHW - ST_LAND } : { openLeft: true, railX0: -SQHW + ST_LAND });
+        sz > 0 ? { openRight: true, railX1: SQHW - ST_LAND, hall: HALL_W } : { openLeft: true, railX0: -SQHW + ST_LAND, hall: HALL_W });
   for (const s of [1, -1]) buildSeqAccess(g, s);
 
   // building number over the front and back, and mid-height on each side
@@ -2216,7 +2242,7 @@ function buildStageGroup(i) {
       raycastList.push(banner);
     }
   } else if (st.type === 'block') {
-    buildSlabShell(g, BW, BD, BFLOORS, BFH);
+    buildSlabShell(g, BW, BD, BFLOORS, BFH, HALL_W);
     buildBlockAccess(g);
     addTopBanner(g, BH, BHALF_D, `Building ${st.building}`);
     addBlockSideSigns(g, `Building ${st.building}`);
@@ -3799,10 +3825,11 @@ function a11yStageText() {
            `with five doors per floor, unit numbers ${Math.min(...all)} to ${Math.max(...all)}; ` +
            `the leading digits name the building and the next digit is the floor.`;
   } else if (st.type === 'block') {
-    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them; ` +
+    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them, ` +
+           `with an open hallway through the middle of every floor; ` +
            `five-digit units where the leading digits are the building, then the floor, then the door.`;
   } else if (st.type === 'seq') {
-    text = `Three-storey building ${st.building} with twenty doors around all four sides, ` +
+    text = `Three-storey building ${st.building} with twenty doors around all four sides and an open hallway through the middle of every floor, ` +
            `unit numbers ${st.base + 1} to ${st.base + 20}; one running count with no floor digit.`;
   } else {
     const last = st.kind === 'example' ? st.start + 7 : st.start + 3;

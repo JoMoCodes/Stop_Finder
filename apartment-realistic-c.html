@@ -692,6 +692,11 @@ const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
 const BH = BFLOORS * BFH, BHALF_D = BD / 2;
 const BDOORX = 3.6;                            // door offset from centre
 
+/* ---- Parts 4-5: an open breezeway runs through the middle of the block on
+   every floor, front wall to back wall, so the far face shows through the near
+   one. Its width; the doors sit either side of it. ---- */
+const HALL_W = 2.4;
+
 /* ---- Part 5: a uniform 3-story walk-up in the same solid-slab style as
    Parts 3-4. The unit number is a single running count with NO floor digit,
    so floor 1 owns both the lowest numbers AND the highest. Doors sit around
@@ -1291,7 +1296,7 @@ function trees(g, spots) {                        // spots: [x, z, scale]
    stoops at the ground-floor doors, shrubs under the windows, corner trees, a
    path out to the drive, mailbox cluster and condensers at the back ---- */
 const ROAD_Z = 18.5, ROAD_W = 7, ROAD_WALK_Z = 13.6;
-function siteBase(g, w, d, { frontDoors = [], backDoors = [], frontWins = [], backWins = [], paths = [0], treeX = null, treesBehind = false } = {}) {
+function siteBase(g, w, d, { frontDoors = [], backDoors = [], frontWins = [], backWins = [], paths = [0], treeX = null, treesBehind = false, hall = 0 } = {}) {
   const halfD = d / 2, sw = 2.2, sy = -0.14, st = 0.05;
   for (const s of [1, -1]) box(g, w + 2 * sw, st, sw, COLOR.walkway, 0, sy, s * (halfD + sw / 2));
   for (const ex of [1, -1]) box(g, sw, st, d + 2 * sw, COLOR.walkway, ex * (w / 2 + sw / 2), sy, 0);
@@ -1299,6 +1304,7 @@ function siteBase(g, w, d, { frontDoors = [], backDoors = [], frontWins = [], ba
     box(g, w, 0.07, 0.9, COLOR.mulch, 0, sy + 0.01, s * (halfD + 0.47));                         // planting bed
     box(g, w + 0.1, 0.09, 0.06, COLOR.kerb, 0, sy + 0.02, s * (halfD + 0.93));                   // bed edging
     for (const x of (s > 0 ? frontDoors : backDoors)) box(g, 1.9, 0.09, 1.0, COLOR.walkway, x, sy + 0.02, s * (halfD + 0.47));
+    if (hall) box(g, hall + 0.2, 0.09, 1.0, COLOR.walkway, 0, sy + 0.02, s * (halfD + 0.47));   // paving across the breezeway's mouth
     const spots = [];
     for (const x of (s > 0 ? frontWins : backWins)) { spots.push([x - 0.55, s * (halfD + 0.45), rnd(0.8, 1)]); spots.push([x + 0.55, s * (halfD + 0.45), rnd(0.8, 1)]); }
     if (spots.length) shrubs(g, spots);
@@ -1386,15 +1392,31 @@ function buildFacade(g, s, isFront, getUnit, raycastList, blankStates) {
    ============================================================ */
 /* body of every building: greige lap on the lower half, slate lap above,
    white floor bands, corner boards and skirt, downspouts, gabled roof */
-function buildBody(g, w, d, floors, fh, roofOpts = {}) {
-  const h = floors * fh, halfD = d / 2, split = Math.ceil(floors / 2);
-  for (let fi = 0; fi < floors; fi++)
-    box(g, w, fh, d, fi < split ? COLOR.brick : COLOR.siding, 0, fi * fh + fh / 2, 0);
+function buildBody(g, w, d, floors, fh, roofOpts = {}, hall = 0) {
+  const h = floors * fh, halfD = d / 2, split = Math.ceil(floors / 2), wing = (w - hall) / 2;
+  for (let fi = 0; fi < floors; fi++) {
+    const lap = fi < split ? COLOR.brick : COLOR.siding, y = fi * fh + fh / 2;
+    if (hall) for (const sx of [1, -1]) box(g, wing, fh, d, lap, sx * (hall + wing) / 2, y, 0);   // two wings either side of the breezeway
+    else box(g, w, fh, d, lap, 0, y, 0);
+  }
   for (let fi = 1; fi < floors; fi++) box(g, w + 0.16, 0.22, d + 0.16, COLOR.band, 0, fi * fh, 0);
   for (const sx of [1, -1]) for (const sz of [1, -1]) box(g, 0.24, h, 0.24, COLOR.band, sx * (w / 2), h / 2, sz * halfD);
-  box(g, w + 0.2, 0.32, d + 0.2, COLOR.band, 0, 0.1, 0);                                           // skirt board
+  if (hall) {                                                                                      // the breezeway: a skirt board either side of it ...
+    for (const sx of [1, -1]) box(g, wing + 0.1, 0.32, d + 0.2, COLOR.band, sx * (hall + wing + 0.1) / 2, 0.1, 0);
+    box(g, hall, 0.16, d, COLOR.walkway, 0, -0.06, 0);                                             // ... concrete paving at grade,
+    box(g, hall + 0.02, 0.16, d, COLOR.band, 0, h - 0.08, 0);                                      // a soffit under the roof (the bands are the other ceilings),
+    breezewayLights(g, hall, d, floors, fh, fi => fi < floors - 1 ? (fi + 1) * fh - 0.11 : h - 0.16);   // and lights on every floor
+  } else box(g, w + 0.2, 0.32, d + 0.2, COLOR.band, 0, 0.1, 0);                                    // skirt board
   for (const sx of [1, -1]) for (const sz of [1, -1]) box(g, 0.1, h, 0.1, COLOR.band, sx * (w / 2 + 0.13), h / 2, sz * (halfD - 0.7));
   gableRoof(g, w, d, h, roofOpts);
+}
+/* ceiling lights down a breezeway, one every ~7 m on every floor: a flush white
+   fitting with a warm glow, under the ceiling `ceilingAt(floor)` gives */
+function breezewayLights(g, hall, d, floors, fh, ceilingAt) {
+  const n = Math.max(1, Math.round(d / 7));
+  for (let fi = 0; fi < floors; fi++)
+    for (let i = 0; i < n; i++)
+      box(g, 0.5, 0.05, 0.5, COLOR.trim, 0, ceilingAt(fi) - 0.025, (i + 0.5) / n * d - d / 2, { emissive: 0xffe6b8, emissiveIntensity: 0.9 });
 }
 function buildShell(g, number) {
   buildBody(g, W, D, CONFIG.floors, FH, { over: 0.75, pitch: 0.3 });
@@ -1644,8 +1666,8 @@ function buildTowerFacade(g, getUnit, raycastList, blankStates) {
 
 /* a plain stacked-floor slab (walls, bands, roof, sidewalks) shared by
    Parts 3 and 4 */
-function buildSlabShell(g, w, d, floors, fh) {
-  buildBody(g, w, d, floors, fh, { over: 0.6, pitch: 0.22 });
+function buildSlabShell(g, w, d, floors, fh, hall = 0) {
+  buildBody(g, w, d, floors, fh, { over: 0.6, pitch: 0.22 }, hall);
 }
 
 /* a wide banner across the top of the front. Also the plate the learner
@@ -1741,7 +1763,7 @@ function buildBlockFacade(g, s, isFront, getCell, raycastList, blankStates) {
         blankStates.push(bstate);
       }
     }
-    for (const wx of [-6.6, 0, 6.6]) windowUnit(g, wx, base + 1.55, surf, s, 1.3, 1.5);
+    for (const wx of [-6.6, 6.6]) windowUnit(g, wx, base + 1.55, surf, s, 1.3, 1.5);   // the breezeway takes the middle bay
     if (fi > 0) {
       box(g, BW, 0.16, 1.5, COLOR.balcony, 0, base - 0.06, s * (BHALF_D + 0.8));
       const y = base + 0.02;
@@ -1752,13 +1774,14 @@ function buildBlockFacade(g, s, isFront, getCell, raycastList, blankStates) {
     }
   }
   const colH = (BFLOORS - 1) * BFH + 0.1;
-  for (const px of [-BW / 2 + 0.5, 0, BW / 2 - 0.5]) box(g, 0.16, colH, 0.16, COLOR.post, px, colH / 2 - 0.1, s * (zEdge - 0.12));
+  for (const px of [-BW / 2 + 0.5, -HALL_W / 2 - 0.2, HALL_W / 2 + 0.2, BW / 2 - 0.5])   // a post each side of the breezeway's mouth
+    box(g, 0.16, colH, 0.16, COLOR.post, px, colH / 2 - 0.1, s * (zEdge - 0.12));
 }
 
 /* switchback stairs off the ends of the walkways: front-right for the front
    doors, back-left for the doors behind them */
 function buildBlockAccess(g) {
-  siteBase(g, BW, BD, { frontDoors: [-BDOORX, BDOORX], backDoors: [-BDOORX, BDOORX], frontWins: [-6.6, 0, 6.6], backWins: [-6.6, 0, 6.6], paths: [0, BW / 2 + 0.9], treeX: BW / 2 + 8 });
+  siteBase(g, BW, BD, { frontDoors: [-BDOORX, BDOORX], backDoors: [-BDOORX, BDOORX], frontWins: [-6.6, 6.6], backWins: [-6.6, 6.6], paths: [0, BW / 2 + 0.9], treeX: BW / 2 + 8, hall: HALL_W });
   buildEndStair(g, BW, BHALF_D, BHALF_D + 0.8, 1.5, BFLOORS, BFH, 1, 1);
   buildEndStair(g, BW, BHALF_D, BHALF_D + 0.8, 1.5, BFLOORS, BFH, -1, -1);
 }
@@ -1786,8 +1809,8 @@ function buildSeqAccess(g, s) {
 /* slab shell in the shared style, windows, walkways under the upper
    front/back doors, corner stairs, and the number on all four faces */
 function buildSeqStructure(g, number) {
-  buildBody(g, SQW, SQD, SQFLOORS, SQFH, { over: 1.0, pitch: 0.24 });
-  siteBase(g, SQW, SQD, { frontDoors: [-3, 3], backDoors: [-3, 3], frontWins: [-4.9, 4.9], backWins: [-4.9, 4.9], paths: [0], treeX: SQHW + 9, treesBehind: true });
+  buildBody(g, SQW, SQD, SQFLOORS, SQFH, { over: 1.0, pitch: 0.24 }, HALL_W);
+  siteBase(g, SQW, SQD, { frontDoors: [-3, 3], backDoors: [-3, 3], frontWins: [-4.9, 4.9], backWins: [-4.9, 4.9], paths: [0], treeX: SQHW + 9, treesBehind: true, hall: HALL_W });
   /* the side walls have doors at |z| <= 8.1, so the shrubs there go under the floor-1 windows */
   shrubs(g, [[-(SQHW + 0.45), -5, .9], [-(SQHW + 0.45), 0, .9], [-(SQHW + 0.45), 5, .9], [SQHW + 0.45, -5, .9], [SQHW + 0.45, 0, .9], [SQHW + 0.45, 5, .9]]);
   box(g, 0.9, 0.07, SQD - 2, COLOR.mulch, -(SQHW + 0.47), -0.13, 0);
@@ -1815,7 +1838,7 @@ function buildSeqStructure(g, number) {
       railBetween(g, V3(xs, y, sz * SQHD), V3(xs, y, sz * zEdge));
     }
   const colH = (SQFLOORS - 1) * SQFH + 0.1;
-  for (const sz of [-1, 1]) for (const px of [-SQHW + 0.5, 0, SQHW - 0.5])
+  for (const sz of [-1, 1]) for (const px of [-SQHW + 0.5, -HALL_W / 2 - 0.2, HALL_W / 2 + 0.2, SQHW - 0.5])   // a post each side of the breezeway's mouth
     box(g, 0.16, colH, 0.16, COLOR.post, px, colH / 2 - 0.1, sz * (zEdge - 0.12));
   for (const s of [1, -1]) buildSeqAccess(g, s);
 
@@ -2118,7 +2141,7 @@ function buildStageGroup(i) {
       raycastList.push(banner);
     }
   } else if (st.type === 'block') {
-    buildSlabShell(g, BW, BD, BFLOORS, BFH);
+    buildSlabShell(g, BW, BD, BFLOORS, BFH, HALL_W);
     buildBlockAccess(g);
     addTopBanner(g, BH, BHALF_D, `Building ${st.building}`);
     addBlockSideSigns(g, `Building ${st.building}`);
@@ -3700,10 +3723,11 @@ function a11yStageText() {
            `with five doors per floor, unit numbers ${Math.min(...all)} to ${Math.max(...all)}; ` +
            `the leading digits name the building and the next digit is the floor.`;
   } else if (st.type === 'block') {
-    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them; ` +
+    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them, ` +
+           `with an open hallway through the middle of every floor; ` +
            `five-digit units where the leading digits are the building, then the floor, then the door.`;
   } else if (st.type === 'seq') {
-    text = `Three-storey building ${st.building} with twenty doors around all four sides, ` +
+    text = `Three-storey building ${st.building} with twenty doors around all four sides and an open hallway through the middle of every floor, ` +
            `unit numbers ${st.base + 1} to ${st.base + 20}; one running count with no floor digit.`;
   } else {
     const last = st.kind === 'example' ? st.start + 7 : st.start + 3;

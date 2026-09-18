@@ -683,6 +683,11 @@ const BW = 16, BD = 10, BFLOORS = 4, BFH = 3.2;
 const BH = BFLOORS * BFH, BHALF_D = BD / 2;
 const BDOORX = 3.6;                            // door offset from centre
 
+/* ---- Parts 4-5: an open breezeway runs through the middle of the block on
+   every floor, front wall to back wall, so the far face shows through the near
+   one. Its width; the doors sit either side of it. ---- */
+const HALL_W = 2.4;
+
 /* ---- Part 5: a uniform 3-story walk-up in the same solid-slab style as
    Parts 3-4. The unit number is a single running count with NO floor digit,
    so floor 1 owns both the lowest numbers AND the highest. Doors sit around
@@ -1122,10 +1127,21 @@ function doorUnit(g, b, w, h, x, yc, z, yaw, opts = {}) {
    membrane roof, limestone water table + belt courses, brick parapet with
    stone coping, corner downspouts, rooftop bulkhead + vents, concrete
    sidewalk apron, chain-link along the side lot lines, a dumpster out back. ---- */
-function brickShell(g, b, w, d, floors, fh) {
-  const h = floors * fh, hd = d / 2, hw = w / 2;
-  tbox(g, w, h, d, 'brick', 0, h / 2, 0, { top: 'roof' });
-  b.box('stone', w + 0.22, 0.32, d + 0.22, 0, 0.16, 0);                          // water table
+function brickShell(g, b, w, d, floors, fh, hall = 0) {
+  const h = floors * fh, hd = d / 2, hw = w / 2, wing = (w - hall) / 2;
+  if (hall) {                                                                      // a breezeway: two brick wings either side of it ...
+    for (const sx of [1, -1]) {
+      tbox(g, wing, h, d, 'brick', sx * (hall + wing) / 2, h / 2, 0, { top: 'roof' });
+      b.box('stone', wing + 0.11, 0.32, d + 0.22, sx * (hall + wing + 0.11) / 2, 0.16, 0);   // water table
+    }
+    tbox(g, hall, 0.06, d, 'roof', 0, h - 0.03, 0);                                // ... the roof carrying on over it,
+    tbox(g, hall, 0.22, d, 'concrete', 0, h - 0.17, 0);                            // a concrete ceiling under that,
+    tbox(g, hall, 0.16, d, 'concrete', 0, -0.06, 0);                               // concrete paving at grade,
+    breezewayLights(b, hall, d, floors, fh, fi => fi < floors - 1 ? (fi + 1) * fh - 0.07 : h - 0.28);   // and lights under the belt courses
+  } else {
+    tbox(g, w, h, d, 'brick', 0, h / 2, 0, { top: 'roof' });
+    b.box('stone', w + 0.22, 0.32, d + 0.22, 0, 0.16, 0);                          // water table
+  }
   for (let fi = 1; fi < floors; fi++) b.box('stone', w + 0.14, 0.14, d + 0.14, 0, fi * fh, 0);
   // parapet + coping
   const ph = 0.55, pt = 0.34;
@@ -1155,7 +1171,7 @@ function brickShell(g, b, w, d, floors, fh) {
     const n = Math.max(2, Math.round(w / 3));
     for (let i = 0; i < n; i++) {
       const x = -hw + 1.2 + (w - 2.4) * (n === 1 ? 0.5 : i / (n - 1));
-      if (Math.abs(x) < 2.6 && s > 0) continue;                                  // keep the front entrance clear
+      if (Math.abs(x) < 2.6 && (s > 0 || hall)) continue;                        // keep the front entrance (and both mouths of a breezeway) clear
       b.add('shrub', GEO.ico, 1.0, 0.7, 0.9, x, 0.2, s * (hd + sw + 0.55), 0, i, 0);
       b.add('shrub', GEO.ico, 0.7, 0.55, 0.7, x + 0.45, 0.15, s * (hd + sw + 0.35), 0, i * 2, 0);
     }
@@ -1172,6 +1188,16 @@ function brickShell(g, b, w, d, floors, fh) {
   b.box('galv', 0.9, 1.25, 0.42, -fx + 0.9, 0.62 - 0.14, zF - 0.6);       // on the left: the stair is off the right end
   b.box('lamp', 0.9, 0.16, 0.46, -fx + 0.9, 1.25 - 0.14, zF - 0.6);
   return h;
+}
+/* ceiling lights down a breezeway, one every ~7 m on every floor: a dark
+   fitting with a glowing diffuser, flush under the ceiling `ceilingAt(floor)` gives */
+function breezewayLights(b, hall, d, floors, fh, ceilingAt) {
+  const n = Math.max(1, Math.round(d / 7));
+  for (let fi = 0; fi < floors; fi++) for (let i = 0; i < n; i++) {
+    const y = ceilingAt(fi), z = (i + 0.5) / n * d - d / 2;
+    b.box('lamp', 0.56, 0.06, 0.56, 0, y - 0.03, z);
+    b.box('glow', 0.44, 0.03, 0.44, 0, y - 0.07, z);
+  }
 }
 function chainLink(g, b, x0, z0, x1, z1, h) {
   const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz), yaw = Math.atan2(dx, dz);
@@ -1602,9 +1628,9 @@ function buildTowerFacade(g, getUnit, raycastList, blankStates) {
 
 /* a plain stacked-floor slab (walls, bands, roof, sidewalks) shared by
    Parts 3 and 4 */
-function buildSlabShell(g, w, d, floors, fh) {
+function buildSlabShell(g, w, d, floors, fh, hall = 0) {
   const b = new Batch();
-  brickShell(g, b, w, d, floors, fh);
+  brickShell(g, b, w, d, floors, fh, hall);
   b.flush(g);
 }
 
@@ -1704,7 +1730,7 @@ function buildBlockFacade(g, s, isFront, getCell, raycastList, blankStates) {
         blankStates.push(bstate);
       }
     }
-    for (const wx of [-6.6, 0, 6.6]) windowUnit(g, b, 1.3, 1.5, wx, base + 1.55, face, yaw);
+    for (const wx of [-6.6, 6.6]) windowUnit(g, b, 1.3, 1.5, wx, base + 1.55, face, yaw);   // the breezeway takes the middle bay
     if (fi > 0) {
       const wz = s * (BHALF_D + 0.8), wd = 1.5, outer = wz + s * wd / 2, yTop = base + 0.02;
       tbox(g, BW, 0.16, wd, 'concrete', 0, base - 0.06, wz);
@@ -1755,7 +1781,7 @@ function buildSeqAccess(g, b, s) {
 /* solid slab shell in the shared style, windows, walkway ledges under the
    upper front/back doors, corner stairs, and the number on all four faces */
 function buildSeqStructure(g, number) {
-  buildSlabShell(g, SQW, SQD, SQFLOORS, SQFH);
+  buildSlabShell(g, SQW, SQD, SQFLOORS, SQFH, HALL_W);
   const b = new Batch();
 
   const win = (px, py, pz, onFB) => {          // onFB: window sits on the front/back wall
@@ -1781,7 +1807,7 @@ function buildSeqStructure(g, number) {
       const cx = sz > 0 ? -SQHW : SQHW;
       railing(b, cx, outer, cx, wz - sz * wd / 2, yTop);
     }
-  for (const sz of [-1, 1]) for (const px of [-SQHW + 0.5, 0, SQHW - 0.5])
+  for (const sz of [-1, 1]) for (const px of [-SQHW + 0.5, -HALL_W / 2 - 0.2, HALL_W / 2 + 0.2, SQHW - 0.5])   // a post each side of the breezeway's mouth
     b.box('steel', 0.16, SQH - SQFH, 0.16, px, (SQH - SQFH) / 2, sz * (SQHD + 1.4));
   for (const s of [1, -1]) buildSeqAccess(g, b, s);
   b.flush(g);
@@ -2052,7 +2078,7 @@ function buildStageGroup(i) {
       raycastList.push(banner);
     }
   } else if (st.type === 'block') {
-    buildSlabShell(g, BW, BD, BFLOORS, BFH);
+    buildSlabShell(g, BW, BD, BFLOORS, BFH, HALL_W);
     buildBlockAccess(g);
     addTopBanner(g, BH, BHALF_D, `Building ${st.building}`);
     addBlockSideSigns(g, `Building ${st.building}`);
@@ -3634,10 +3660,11 @@ function a11yStageText() {
            `with five doors per floor, unit numbers ${Math.min(...all)} to ${Math.max(...all)}; ` +
            `the leading digits name the building and the next digit is the floor.`;
   } else if (st.type === 'block') {
-    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them; ` +
+    text = `Four-storey building ${st.building}, two doors per floor on the front and two more directly behind them, ` +
+           `with an open hallway through the middle of every floor; ` +
            `five-digit units where the leading digits are the building, then the floor, then the door.`;
   } else if (st.type === 'seq') {
-    text = `Three-storey building ${st.building} with twenty doors around all four sides, ` +
+    text = `Three-storey building ${st.building} with twenty doors around all four sides and an open hallway through the middle of every floor, ` +
            `unit numbers ${st.base + 1} to ${st.base + 20}; one running count with no floor digit.`;
   } else {
     const last = st.kind === 'example' ? st.start + 7 : st.start + 3;

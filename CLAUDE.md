@@ -105,6 +105,10 @@ Structure top-to-bottom:
   banners (`addTopBanner`, `addBlockSideSigns`), wayfinding guides
   (`addArrows`, `addTowerArrows`, `addPlaceKey`, `addRowGuides`,
   `addBlockGuides`), where `*` is the part (tower, row, block, seq).
+  Parts 4 and 5 pass `HALL_W` to the slab shell, which opens a breezeway through
+  the middle of every floor (the walls become two wings, the floor bands are its
+  slabs, `buildBreezeway` adds its paving and ceiling lights); each look cuts its
+  own shell the same way, so a change to the breezeway is made four times.
 - **Course stages:** the `STAGES` array + `buildStageGroup(i)`; `getUnit(...)`
   decides each door's number/blank. **`STAGES` and the unit math are the
   curriculum; change them deliberately.**
