@@ -1193,7 +1193,7 @@ function brickShell(g, b, w, d, floors, fh, hall = 0, lotW = w) {   // lotW: the
     }
   }
   // chain-link along both side lot lines, running from the kerb to the back fence
-  const fx = lotW / 2 + sw + 2.6, zF = HALF_D + 5.4 - 3.2 - 0.2, zB = -(hd + sw + 4.5), fh2 = 1.2;   // clear of the end stairs
+  const fx = lotW / 2 + sw + 2.6, zF = hd + 7.6 - 3.2 - 0.2, zB = -(hd + sw + 4.5), fh2 = 1.2;   // to the kerb line (the street sits 7.6 past the half-depth); clear of the end stairs
   for (const sx of [-1, 1]) chainLink(g, b, sx * fx, zB, sx * fx, zF, fh2);
   chainLink(g, b, -fx, zB, fx, zB, fh2);
   // dumpster + a parked bike out back
@@ -1924,42 +1924,48 @@ function buildSeqFacade(g, getUnit, raycastList, blankStates) {
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.17;
   ground.receiveShadow = true; scene.add(ground);
 
-  const ROAD_Z = HALF_D + 5.4, ROAD_W = 6;
+  /* the street (road, kerbs, public sidewalk, trees, lights, cars) is built
+     for the Part 1 plex and slides with each stage's depth, so the near kerb
+     sits ROAD_GAP past every building's half-depth: clear of its sidewalk and
+     the corner stairs' paving (half-depth + 3.2) with a strip of lawn between */
+  const ROAD_GAP = 7.6, ROAD_Z = HALF_D + ROAD_GAP, ROAD_W = 6;
+  const street = new THREE.Group(); scene.add(street);
   const asph = TEX.asphalt.tex.clone(); asph.repeat.set(800 / TEX.asphalt.m, 1); asph.needsUpdate = true;
   const road = new THREE.Mesh(new THREE.PlaneGeometry(800, ROAD_W),
     new THREE.MeshStandardMaterial({ map: asph, roughness: 0.98 }));
   road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, ROAD_Z);
-  road.receiveShadow = true; scene.add(road);
+  road.receiveShadow = true; street.add(road);
 
-  const env = new Batch();
+  const env = new Batch(), far = new Batch();   // env: the street, which slides; far: the trees behind and beside the lot, which stay
   /* concrete kerbs, a public sidewalk + grass parkway on the far side */
-  for (const s of [-1, 1]) tbox(scene, 800, 0.14, 0.35, 'concrete', 0, -0.10, ROAD_Z + s * 3.2, { castShadow: false });
-  tbox(scene, 800, 0.06, 2.4, 'concrete', 0, -0.14, ROAD_Z + 3.2 + 0.175 + 1.2, { castShadow: false });
+  for (const s of [-1, 1]) tbox(street, 800, 0.14, 0.35, 'concrete', 0, -0.10, ROAD_Z + s * 3.2, { castShadow: false });
+  tbox(street, 800, 0.06, 2.4, 'concrete', 0, -0.14, ROAD_Z + 3.2 + 0.175 + 1.2, { castShadow: false });
   /* storm drains at the kerb line */
   for (const x of [-9, 21]) env.box('lamp', 0.9, 0.04, 0.5, x, -0.148, ROAD_Z + 2.7);
 
   /* street trees: far side of the road (|x| >= 24 keeps them out of every
      default pose) and behind the lot */
-  const tree = (x, z, hTrunk, r, seed) => {
+  const tree = (bt, x, z, hTrunk, r, seed) => {                             // bt: the batch it joins
     const rnd = mkRand(seed);
-    env.cyl('bark', 0.16 + rnd() * 0.06, hTrunk, x, -0.17 + hTrunk / 2, z);
+    bt.cyl('bark', 0.16 + rnd() * 0.06, hTrunk, x, -0.17 + hTrunk / 2, z);
     const n = 3 + Math.floor(rnd() * 2);
     for (let i = 0; i < n; i++) {
       const rr = r * (0.6 + rnd() * 0.5);
-      env.add(rnd() < 0.5 ? 'leaf' : 'leaf2', GEO.ico, rr * 2, rr * 1.6, rr * 2,
+      bt.add(rnd() < 0.5 ? 'leaf' : 'leaf2', GEO.ico, rr * 2, rr * 1.6, rr * 2,
         x + (rnd() - 0.5) * r * 1.1, hTrunk - 0.4 + rr * 0.8 + rnd() * r * 0.6, z + (rnd() - 0.5) * r * 1.1,
         rnd(), rnd() * 3, rnd());
     }
-    env.box('soil', 1.4, 0.05, 1.4, x, -0.16, z);                         // tree pit
+    bt.box('soil', 1.4, 0.05, 1.4, x, -0.16, z);                          // tree pit
   };
   const farZ = ROAD_Z + 3.2 + 2.4 + 0.9;
   let seed = 11;
-  for (const x of [-50, -39, -28, 28, 39, 50]) tree(x, farZ, 3.2 + (seed % 3) * 0.4, 2.3, seed++);
+  for (const x of [-50, -39, -28, 28, 39, 50]) tree(env, x, farZ, 3.2 + (seed % 3) * 0.4, 2.3, seed++);
   /* behind the lot and out to the sides: nothing within the Part 4/5 back and
-     side poses' view cones (|x| >= 24 behind, |x| >= 48 beside) */
-  for (const x of [-36, -24, 24, 36]) tree(x, -22 - (seed % 2) * 3, 3.6, 2.6, seed++);
+     side poses' view cones (|x| >= 24 behind, |x| >= 48 beside); the pair on
+     the street side of the lot slides with the street */
+  for (const x of [-36, -24, 24, 36]) tree(far, x, -22 - (seed % 2) * 3, 3.6, 2.6, seed++);
   for (const [x, z] of [[-48, -10], [48, -10], [-54, 14], [54, 14], [-30, -40], [30, -40], [-12, -52], [12, -52]])
-    tree(x, z, 3.4, 2.8, seed++);
+    tree(z > 0 ? env : far, x, z, 3.4, 2.8, seed++);
 
   /* street lights on the far kerb */
   for (const x of [-20, 20]) {
@@ -1999,7 +2005,11 @@ function buildSeqFacade(g, getUnit, raycastList, blankStates) {
   nb(-118, -20, 14, 3, 30); nb(-116, 22, 14, 4, 26); nb(118, -16, 12, 4, 28); nb(120, 24, 14, 3, 24);
   nb(-40, 124, 30, 3, 14); nb(2, 126, 26, 4, 14); nb(44, 122, 28, 3, 14);
   nb(-84, -84, 22, 4, 22); nb(84, -86, 24, 3, 22); nb(-86, 88, 22, 3, 22); nb(88, 86, 24, 4, 22);
-  env.flush(scene);
+  env.flush(street); far.flush(scene);
+
+  /* slide the street so the kerb keeps its distance from whichever façade is up */
+  const STAGE_HALF_D = { tower: THALF_D, row: RHALF_D, block: BHALF_D, seq: SQHD, plex: HALF_D };
+  document.addEventListener('stagechange', e => { street.position.z = (STAGE_HALF_D[e.detail.stage.type] ?? HALF_D) - HALF_D; });
 }
 
 /* ============================================================

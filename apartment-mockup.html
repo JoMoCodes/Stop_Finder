@@ -1498,13 +1498,24 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800),
 ground.rotation.x = -Math.PI / 2; ground.position.y = -0.17;
 ground.receiveShadow = true; scene.add(ground);
 
+/* the road and its kerbs slide with each stage so the near kerb sits the same
+   distance in front of every building: ROAD_GAP past its half-depth clears the
+   sidewalk and the corner stairs' paving (half-depth + 3.2) with a strip of
+   lawn between */
+const ROAD_GAP = 7.6;
 const road = new THREE.Mesh(new THREE.PlaneGeometry(800, 6),
   new THREE.MeshStandardMaterial({ color: COLOR.road, roughness: 1 }));
-road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, HALF_D + 5.4);
+road.rotation.x = -Math.PI / 2; road.position.set(0, -0.15, HALF_D + ROAD_GAP);
 road.receiveShadow = true; scene.add(road);
 
 /* kerb strips either side of the road */
-for (const s of [-1, 1]) box(scene, 800, 0.08, 0.35, COLOR.walkway, 0, -0.11, HALF_D + 5.4 + s * 3.2);
+const kerbs = [-1, 1].map(s => box(scene, 800, 0.08, 0.35, COLOR.walkway, 0, -0.11, HALF_D + ROAD_GAP + s * 3.2));
+const STAGE_HALF_D = { tower: THALF_D, row: RHALF_D, block: BHALF_D, seq: SQHD, plex: HALF_D };
+document.addEventListener('stagechange', e => {
+  const z = (STAGE_HALF_D[e.detail.stage.type] ?? HALF_D) + ROAD_GAP;
+  road.position.z = z;
+  kerbs.forEach((k, i) => { k.position.z = z + (i ? 3.2 : -3.2); });
+});
 
 /* ============================================================
    course stages
