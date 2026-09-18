@@ -723,6 +723,22 @@ const SQ_LAYOUT = [
   { d: 19, f: 0, face: 'R', a:  2.5 }, { d: 20, f: 0, face: 'R', a:  7.5 },
 ];
 
+/* ---- floor 1 only: the end bays of both long walls step out as single-storey
+   bump-outs (boxes in the floor-1 finish with a flat roof under the floor-2
+   windows). Each bay runs from the corner in to |z| = SQ_BAY_Z and stands
+   SQ_BAY_D out from the wall, so the middle of each long wall becomes a
+   recessed court between two bays: floor 1's end doors (1, 4, 17, 20) sit on
+   the bays' inner side walls facing each other across that court, and the two
+   middle doors stay on the main wall. The bays stop short of the corner
+   stairs' outer rails at |x| = SQHW + ST_RUN + ST_LAND. ---- */
+const SQ_BAY_Z = 5, SQ_BAY_D = 3.5;
+/* the x of a side wall's face on floor `f` at position z along it */
+const sqSideX = (f, z) => SQHW + (f === 0 && Math.abs(z) > SQ_BAY_Z ? SQ_BAY_D : 0);
+/* a floor-1 end door's place on its bay's inner wall: centre x, the wall's z
+   and the way it faces (s = +1 toward +z, -1 toward -z); null for other slots */
+const sqBayDoor = slot => slot.f === 0 && (slot.face === 'L' || slot.face === 'R') && Math.abs(slot.a) > SQ_BAY_Z
+  ? { x: (slot.face === 'L' ? -1 : 1) * (SQHW + SQ_BAY_D / 2), z: Math.sign(slot.a) * SQ_BAY_Z, s: -Math.sign(slot.a) } : null;
+
 /* ============================================================ */
 const app = document.getElementById('app');
 const scene = new THREE.Scene();
@@ -1379,8 +1395,8 @@ function windowAt(g, x, y, z, w, h, axis = 'z') {
 
 /* a six-panel door (the clickable mesh) in a trim frame, with a wall sconce
    beside it and a mat at its foot. Faces ±z when w > d, else ±x. */
-function doorAt(g, w, h, d, x, y, z) {
-  const alongX = w > d, sgn = alongX ? (Math.sign(z) || 1) : (Math.sign(x) || 1);
+function doorAt(g, w, h, d, x, y, z, facing = 0) {
+  const alongX = w > d, sgn = facing || (alongX ? (Math.sign(z) || 1) : (Math.sign(x) || 1));   // facing: which way it opens when the wall is not the building's outer one
   const door = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT.door);
   door.position.set(x, y, z); door.castShadow = true; door.receiveShadow = true;
   g.add(door);
@@ -1537,9 +1553,11 @@ function buildTowerShell(g, txt) {
    the bay one floor up. The stair reads as the walkway carrying on, the end
    wall stays clear for its sign and doors, and no tread meets a wall.
    w, halfD: the building; zc, depth: the walkway band (unsigned); floors, fh;
-   sx: +1 right end / -1 left end; sz: +1 front face / -1 back face. ---- */
+   sx: +1 right end / -1 left end; sz: +1 front face / -1 back face;
+   wallSide: a bay's end wall stands along the out flight and the half
+   landing (Part 5), so they keep only their outer rails. ---- */
 const ST_RUN = 2.5, ST_LAND = 1.4, ST_W = 1.3, ST_N = 6;   // flight run, landing width, flight width, treads per flight
-function buildEndStair(g, w, halfD, zc, depth, floors, fh, sx = 1, sz = 1) {
+function buildEndStair(g, w, halfD, zc, depth, floors, fh, sx = 1, sz = 1, { wallSide = false } = {}) {
   const zOutEdge = zc + depth / 2 + 0.1 + ST_LAND;                                      // outer band: beyond a 0.1 gap
   const zIn = sz * zc, zOut = sz * (zOutEdge - ST_LAND / 2), zHalf = sz * (zc + 0.75);
   const zBay = sz * (zc + depth / 2 + (ST_LAND + 0.1) / 2);
@@ -1548,9 +1566,9 @@ function buildEndStair(g, w, halfD, zc, depth, floors, fh, sx = 1, sz = 1) {
   const xFar = sx * (w / 2 + ST_RUN + ST_LAND), xBay = sx * (w / 2 - ST_LAND);
   for (let t = 0; t < floors - 1; t++) {
     const y0 = t ? t * fh : -0.1, yMid = t * fh + fh / 2, y1 = (t + 1) * fh;
-    flight(g, 'x', zIn, xEnd, xHead, y0, yMid, ST_N, ST_W, [1, -1]);                  // out, in the walkway band
+    flight(g, 'x', zIn, xEnd, xHead, y0, yMid, ST_N, ST_W, wallSide ? [sz] : [1, -1]);   // out, in the walkway band
     landingSlab(g, ST_LAND, depth + 1.5, xHalf, yMid, zHalf);                          // half landing, railed on three sides
-    railRun(g, [xHead, yMid, zNear], [xFar, yMid, zNear]);
+    if (!wallSide) railRun(g, [xHead, yMid, zNear], [xFar, yMid, zNear]);             // (two when a wall stands on the near side)
     railRun(g, [xFar, yMid, zNear], [xFar, yMid, zFar]);
     railRun(g, [xFar, yMid, zFar], [xHead, yMid, zFar]);
     flight(g, 'x', zOut, xHead, xEnd, yMid, y1, ST_N, ST_W, [sz]);                    // back, in the outer band
@@ -1807,21 +1825,50 @@ function addBlockSideSigns(g, text) {
 /* switchback stair off the end of a face's walkways (front-right s=1,
    back-left s=-1), so the side walls and their doors stay clear */
 function buildSeqAccess(g, s) {
-  buildEndStair(g, SQW, SQHD, SQHD + 0.75, 1.5, SQFLOORS, SQFH, s, s);
+  buildEndStair(g, SQW, SQHD, SQHD + 0.75, 1.5, SQFLOORS, SQFH, s, s, { wallSide: true });   // the out flight runs along a bay's end wall
 }
 
-/* shell in the shared style, windows, guarded walkways under the upper
-   front/back doors, corner stairs, and the number on all four faces */
+/* floor 1's end bays: brick-faced walls the height of the ground floor on the
+   plinth, standing SQ_BAY_D out from each long wall between the corner and
+   |z| = SQ_BAY_Z, with the trim band carried round the top, a flat shingle
+   cap, a downspout at each outer corner, mulch beds with shrubs and the
+   sidewalk stepping out round the bay; the two corners without a stair get a
+   window on the end wall */
+function buildSeqBays(g) {
+  const span = SQHD - SQ_BAY_Z, sw = 2.2, t = 0.3, xo = SQHW + SQ_BAY_D, xm = SQHW + SQ_BAY_D / 2;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const cz = sz * (SQ_BAY_Z + SQHD) / 2, y = SQFH / 2;
+    mbox(g, SQ_BAY_D + 0.15, 0.2, span + 0.3, MAT.plinth, sx * (xo + 0.15 - (SQ_BAY_D + 0.15) / 2), -0.08, cz);   // plinth, on from the building's
+    tbox(g, t, SQFH, span, 'brick', sx * (xo - t / 2), y, cz);                                                   // outer wall
+    tbox(g, SQ_BAY_D - t, SQFH, t, 'brick', sx * (xm - t / 2), y, sz * (SQHD - t / 2));                          // end wall
+    tbox(g, SQ_BAY_D - t, SQFH, t, 'brick', sx * (xm - t / 2), y, sz * (SQ_BAY_Z + t / 2));                      // inner wall, facing the court
+    mbox(g, SQ_BAY_D, 0.16, span + 0.12, MAT.trim, sx * (xo + 0.06 - SQ_BAY_D / 2), SQFH, cz);                   // trim band, on from the building's
+    tbox(g, SQ_BAY_D + 0.25, 0.1, span + 0.2, 'shingle', sx * (xo + 0.2 - (SQ_BAY_D + 0.25) / 2), SQFH + 0.13, cz - sz * 0.1);   // flat cap, flush with the end wall
+    for (const z of [SQHD - 0.5, SQ_BAY_Z + 0.5]) mbox(g, 0.1, SQFH, 0.1, MAT.white, sx * (xo + 0.07), y, sz * z);   // downspouts
+    tbox(g, SQ_BAY_D, 0.05, span + 2 * sw, 'concrete', sx * (SQHW + sw + SQ_BAY_D / 2), -0.14, sz * (SQHD + SQ_BAY_Z) / 2);   // sidewalk round the bay
+    shrubBed(g, sx * (xo + 0.55), cz, 1.0, span - 1.0, 4);                                                       // under the bay's windows
+    shrubBed(g, sx * (SQHW + 0.5), sz * (SQ_BAY_Z - 0.55), 0.8, 0.8, 1);                                         // either side of the court door
+    shrubBed(g, sx * (xo - 0.5), sz * (SQ_BAY_Z - 0.55), 0.8, 0.8, 1);
+    if (sx !== sz) windowAt(g, sx * xm, 1.55, sz * SQHD, 1.05, 1.25, 'z');
+  }
+  for (const sx of [-1, 1]) shrubBed(g, sx * (SQHW + 0.55), 0, 1.0, 3.0, 3);                                    // under the court's mid-wall window
+}
+
+/* shell in the shared style, the floor-1 bays, windows, guarded walkways
+   under the upper front/back doors, corner stairs, and the number on all
+   four faces */
 function buildSeqStructure(g, number) {
   buildSlabShell(g, SQW, SQD, SQFLOORS, SQFH, HALL_W);
+  buildSeqBays(g);
 
+  const SQ_BAY_WINS = [SQ_BAY_Z + 1.55, SQHD - 1.55];          // two windows on each bay's outer face
   for (let fi = 0; fi < SQFLOORS; fi++) {
     const wy = fi * SQFH + 1.55;
     for (const sz of [-1, 1]) for (const wx of [-4.9, 4.9])      // front + back, flanking the door pair
       windowAt(g, wx, wy, sz * SQHD, 1.05, 1.25, 'z');
-    // sides: between the doors on floor 1, above them on floors 2-3
-    for (const sx of [-1, 1]) for (const wz of (fi === 0 ? [-5, 0, 5] : [-7.5, -2.5, 2.5, 7.5]))
-      windowAt(g, sx * SQHW, wy, wz, 1.05, 1.25, 'x');
+    // sides: floor 1 has a mid-wall window in each court and two on each bay's outer face; floors 2-3 one above every door position
+    for (const sx of [-1, 1]) for (const wz of (fi === 0 ? [-SQ_BAY_WINS[1], -SQ_BAY_WINS[0], 0, SQ_BAY_WINS[0], SQ_BAY_WINS[1]] : [-7.5, -2.5, 2.5, 7.5]))
+      windowAt(g, sx * sqSideX(fi, wz), wy, wz, 1.05, 1.25, 'x');
   }
 
   for (let fi = 1; fi < SQFLOORS; fi++)                          // guarded walkways
@@ -1852,7 +1899,11 @@ function buildSeqFacade(g, getUnit, raycastList, blankStates) {
   for (const slot of SQ_LAYOUT) {
     const base = slot.f * SQFH;
     let x, z, yaw, dw, dd, px, pz;
-    if (slot.face === 'L' || slot.face === 'R') {
+    const bay = sqBayDoor(slot);
+    if (bay) {                                                    // floor 1's end doors: on the bay's inner wall, facing the court
+      x = bay.x; z = bay.z + bay.s * 0.02; yaw = bay.s > 0 ? 0 : Math.PI;
+      dw = 1.2; dd = 0.16; px = bay.x; pz = bay.z + bay.s * 0.12;
+    } else if (slot.face === 'L' || slot.face === 'R') {
       const sx = slot.face === 'L' ? -1 : 1;
       x = sx * (SQHW + 0.02); z = slot.a; yaw = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
       dw = 0.16; dd = 1.2; px = sx * (SQHW + 0.12); pz = slot.a;
@@ -1863,11 +1914,12 @@ function buildSeqFacade(g, getUnit, raycastList, blankStates) {
     }
 
     const u = getUnit(slot.d);
-    const door = doorAt(g, dw, 2.05, dd, x, base + 1.05, z);
+    const door = doorAt(g, dw, 2.05, dd, x, base + 1.05, z, bay ? bay.s : 0);
     const plate = label(g, u.mask === null ? String(u.value) : u.mask, 1.95, 0.92,
       u.mask === null ? {} : { fg: '#c0392b' });
     plate.position.set(px, base + 2.55, pz);
     plate.rotation.y = yaw;
+    if (bay) plate.userData.wall = slot.face === 'L' ? 'left' : 'right';         // for the door list: a court door belongs to its side wall, whichever way it faces
     if (u.mask !== null) {
       const bstate = { value: u.value, solved: false, plate, options: makeBigOptions(u.value) };
       plate.userData.bstate = bstate;
@@ -3763,6 +3815,7 @@ const A11Y_ORD = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
 
 /* which wall a plate sits on, from its yaw */
 function a11yFace(plate) {
+  if (plate.userData.wall) return plate.userData.wall;                            // a Part 5 court door faces along the building but belongs to its side wall
   const y = ((plate.rotation.y % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   if (Math.abs(y - Math.PI / 2) < 0.4) return 'right';
   if (Math.abs(y - Math.PI * 1.5) < 0.4) return 'left';

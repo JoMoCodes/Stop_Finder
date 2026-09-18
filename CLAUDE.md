@@ -22,7 +22,7 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 | `apartment-mockup.html` | 3D apartment-number course, **classic look** (Three.js). See map below. |
 | `apartment-realistic-a.html` | Same course, **Sunbelt garden-style** look (brick/stucco, breezeway railings, parking, warm low sun). |
 | `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
-| `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). Its Part 5 block alone has single-storey bump-outs at both ends of each long wall (`SQ_BAY_Z` / `SQ_BAY_D`, `buildSeqBays`): floor 1's end doors sit on the bays' inner walls, facing each other across the recessed court between them. |
+| `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). |
 | `houses.html`           | **Houses** course, **classic look**: house-numbering patterns taught in a **Street View** style scene (Three.js). The learner stands at eye height on the road, drags to look round and walks between viewpoints. See map below and `docs/houses-course/README.md`. |
 | `houses-realistic-a.html` | Same course, **Sunbelt** look (stucco ranch houses, tile roofs, gravel yards, palms and cacti, block walls, desert mountains, hard sun). |
 | `houses-realistic-b.html` | Same course, **Brick** look (Midwest bungalows and foursquares with porches and dormers, autumn maples in a grass parkway, a yard lamp post carrying the number, low crisp sun). |
@@ -153,7 +153,11 @@ The five parts teach progressively: **(1)** sequential numbering on a 2-story
 4-plex → **(2)** 3-digit units where the first digit = floor → **(3)** 4–5 digit
 units where leading digit(s) = building → **(4)** everything combined, numbered
 around both the front and back faces → **(5)** a single running count around
-all four faces of one building — no floor digit at all.
+all four faces of one building — no floor digit at all. Part 5's floor 1 has single-storey bump-outs at both ends of each long wall
+(`SQ_BAY_Z` / `SQ_BAY_D`, `sqBayDoor`, `buildSeqBays`): the end doors sit on the bays' inner walls,
+facing each other across the recessed court between them, so the Left / Right views see their
+plates edge-on by design (the learner drags round; the mini-map keeps its plain outline). Each
+look builds the bays with its own materials, so a change to the bay geometry is made four times.
 
 The Houses course's four parts: **(1)** odd numbers on one side, even on the
 other → **(2)** numbers rise one way and fall the other, depending on your
