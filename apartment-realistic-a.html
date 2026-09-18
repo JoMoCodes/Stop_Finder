@@ -1323,7 +1323,8 @@ function flight(g, axis, fixed, a0, a1, y0, y1, n, width, rails = [1]) {
     if (axis === 'z') mbox(g, width, 0.11, Math.abs(da) + 0.03, MAT.step, fixed, y, a);
     else              mbox(g, Math.abs(da) + 0.03, 0.11, width, MAT.step, a, y, fixed);
   }
-  const L = Math.hypot(a1 - a0, dy) + 0.25, ang = Math.atan2(dy, a1 - a0);
+  const rise = dy * n / (n + 1);                                                       // the tread line climbs n of the n + 1 risers
+  const L = Math.hypot(a1 - a0, rise) + 0.25, ang = Math.atan2(rise, a1 - a0);
   const ym = (y0 + y1) / 2 - 0.12, am = (a0 + a1) / 2;
   for (const side of [1, -1]) {                                                        // stringers
     const st = new THREE.Mesh(new THREE.BoxGeometry(axis === 'z' ? 0.06 : L, 0.3, axis === 'z' ? L : 0.06), MAT.metal);
