@@ -22,7 +22,7 @@ a card in `index.html`. The detail of how a course works lives in its own file.
 | `apartment-mockup.html` | 3D apartment-number course, **classic look** (Three.js). See map below. |
 | `apartment-realistic-a.html` | Same course, **Sunbelt garden-style** look (brick/stucco, breezeway railings, parking, warm low sun). |
 | `apartment-realistic-b.html` | Same course, **Midwest brick walk-up** look (procedural brick, stone trim, steel stairs, a street with cars and neighbours). |
-| `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). |
+| `apartment-realistic-c.html` | Same course, **contemporary suburban** look (lap siding, white railings, landscaping, golden hour, environment reflections). Its Part 5 block alone has single-storey bump-outs at both ends of each long wall (`SQ_BAY_Z` / `SQ_BAY_D`, `buildSeqBays`): floor 1's end doors sit on the bays' inner walls, facing each other across the recessed court between them. |
 | `houses.html`           | **Houses** course, **classic look**: house-numbering patterns taught in a **Street View** style scene (Three.js). The learner stands at eye height on the road, drags to look round and walks between viewpoints. See map below and `docs/houses-course/README.md`. |
 | `houses-realistic-a.html` | Same course, **Sunbelt** look (stucco ranch houses, tile roofs, gravel yards, palms and cacti, block walls, desert mountains, hard sun). |
 | `houses-realistic-b.html` | Same course, **Brick** look (Midwest bungalows and foursquares with porches and dormers, autumn maples in a grass parkway, a yard lamp post carrying the number, low crisp sun). |
