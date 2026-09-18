@@ -126,8 +126,9 @@ Structure top-to-bottom:
   on a wrong pick) / `closeQuiz`; door plates are clickable via raycasting,
   with hover tint, pulsing halos and `pickBlank()` for precision (`pickable()` also admits
   the roof sign that names a Part 3 building once every door is filled); on touch
-  screens a tap that misses snaps to the nearest unsolved plate (`nearestBlank`)
-  and the halo never shrinks below 48 px on screen.
+  screens a tap that misses snaps to the nearest unsolved plate (`nearestBlank`).
+  The halo is a fixed frame round its plate (1.16 × 1.34) on every screen and
+  every part, with no on-screen minimum, so it looks the same on every building.
 - **Flow + reward:** `checkComplete` / `showNext` / `resetCourse` /
   `retryPart` (rebuilds one part for the report's "Try Part N again"),
   `popPlate`, `markSolved`, progress bar, `fireConfetti` (per building,

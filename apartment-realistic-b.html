@@ -3246,7 +3246,13 @@ renderer.domElement.addEventListener('pointerup', e => {
   const isQuizStage = () => !!currentStage && currentStage.kind === 'quiz';
   const quizIsOpen = () => !ui.quiz.classList.contains('hidden');
 
-  /* ---- halo behind an unsolved plate ---- */
+  /* ---- halo behind an unsolved plate ----
+     A fixed frame round the plate (fw x fh of its size) on every screen and
+     every part, so it reads the same on the Part 1 four-plex as on the Part 2-5
+     buildings that phones frame from further away. No on-screen minimum: on
+     touch screens the tap target is the plate / door mesh plus the SNAP_PX
+     snap in nearestBlank(), not the glow (a 48 px floor used to make the glow
+     two to three times its plate on Parts 2-5 on phones). */
   function addHalo(bs, fw, fh) {
     if (!bs || bs.halo || bs.solved || !bs.plate || !bs.plate.geometry.parameters) return;
     const { width: pw, height: ph } = bs.plate.geometry.parameters;
@@ -3402,18 +3408,6 @@ renderer.domElement.addEventListener('pointerup', e => {
   });
   helpBtn.addEventListener('click', () => showHint(HINT_FULL, 6000));
 
-  /* touch screens: the glow is the tap target, so on screen it never shrinks
-     below HALO_MIN_PX however far the camera is (the plates are 1.7-2 units wide) */
-  const HALO_MIN_PX = 48, haloV = new THREE.Vector3();
-  function sizeHalo(bs) {
-    const pw = bs.plate.geometry.parameters.width;
-    const d = bs.plate.getWorldPosition(haloV).distanceTo(camera.position) || 1;
-    const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
-    const px = pw * 1.16 / (2 * d * Math.tan(hfov / 2)) * innerWidth;   // the halo's natural width on screen
-    const k = Math.max(1, HALO_MIN_PX / Math.max(1, px));
-    bs.halo.scale.set(k, k, 1);
-  }
-
   /* ---- our own loop: pulse + reconcile (doc 02 owns tick()) ---- */
   (function pulse(now) {
     requestAnimationFrame(pulse);
@@ -3424,7 +3418,6 @@ renderer.domElement.addEventListener('pointerup', e => {
     const o = reduceMotion.matches
       ? 0.6
       : 0.35 + 0.3 * (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 2 * 0.9));
-    if (coarsePointer.matches) for (const s of ud.blankStates) if (s.halo) sizeHalo(s);
     for (const s of ud.blankStates) if (s.halo) s.halo.material.opacity = (s === hovered ? 0.9 : o);
     if (ud.buildingState && ud.buildingState.halo) ud.buildingState.halo.material.opacity = o;
   })(performance.now());
