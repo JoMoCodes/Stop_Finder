@@ -1452,11 +1452,14 @@ function buildStreetScene(g, st, L, seed) {
     buildSignPole(g, c.x1 + 0.9, -(HALF_ROAD + 0.9), st.label, c.name, c.blockAhead);
     buildSignPole(g, c.x0 - 0.9, HALF_ROAD + 0.9, st.label, c.name, c.blockBehind);
   }
-  // a few parked cars at the kerb, never in front of a blank house's mailbox view
+  // a few parked cars at the kerb, halfway between viewpoints: none stands beside the learner or
+  // across the line from a viewpoint to a number, and none in front of a blank house's mailbox view
   for (const b of L.blocks) {
     const n = Math.round((b.x1 - b.x0) / 30);
-    for (let i = 0; i < n; i++) {
-      const x = b.x0 + 6 + r() * (b.x1 - b.x0 - 12), s = r() < 0.5 ? -1 : 1;
+    const xs = L.nodes.map(nd => nd.x).filter(x => x > b.x0 && x < b.x1).sort((p, q) => p - q);
+    const gaps = xs.slice(1).map((x, i) => (xs[i] + x) / 2);
+    for (let i = 0; i < n && gaps.length; i++) {
+      const x = gaps.splice(Math.floor(r() * gaps.length), 1)[0] + (r() - 0.5) * 2, s = r() < 0.5 ? -1 : 1;
       const blocked = L.houses.some(h => h.mask !== null && h.side === s && Math.abs(h.px - x) < 9);
       if (blocked) continue;
       buildCar(g, x, s * 2.5, s < 0 ? 0 : Math.PI, COLOR.car[Math.floor(r() * COLOR.car.length)]);
@@ -1533,8 +1536,8 @@ function buildCourtScene(g, st, L, seed) {
   addBoard(g, ['NO OUTLET'], HALF_ROAD + WALK_W + 1.0, 2.1, -(HALF_ROAD + WALK_W + 2.2), 0, 2.0, 0.9,
     { bg: '#f2c230', fg: '#1a1400', accent: '#1a1400', size: 110 });
   // a couple of parked cars on the main street
-  buildCar(g, -22, 2.5, Math.PI, COLOR.car[0]);
-  buildCar(g, 24, -2.5, 0, COLOR.car[2]);
+  buildCar(g, -21, 2.5, Math.PI, COLOR.car[0]);
+  buildCar(g, 21, -2.5, 0, COLOR.car[2]);
   buildCar(g, 6.4, -30, Math.PI / 2, COLOR.car[4]);
   for (const x of [-44, -52, 44, 52]) for (const s of [-1, 1]) buildTree(g, x + r() * 4, s * (7 + r() * 8), r);
   buildTree(g, 0, CT.bulbZ - CT.houseR - 12, r);   // behind the houses at the top of the bulb

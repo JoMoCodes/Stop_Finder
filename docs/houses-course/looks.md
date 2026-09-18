@@ -108,8 +108,16 @@ side of the front path or on the driveway side, palms at the lot corner, and
 porch beams sit above the plate (the plate is at 2.6–3.0 m; the line of sight
 from a viewer 1.65 m up on the road passes the porch front at about 2.5–2.9 m).
 The kerb plate (mailbox, pillar or lamp post) is always closer to the road than
-the door and never behind a hedge or a parked car (`buildStreetScene` keeps cars
-away from a blank house's kerb).
+the door and never behind a hedge or a parked car. Parked cars stand halfway
+between two viewpoints (`buildStreetScene` picks the gaps between
+`layout.nodes`, and still skips a blank house's kerb), so no car is beside the
+learner or across the line from a viewpoint to a number. The palms, maples or
+young trees that ring a court's bulb sit between the houses (the `deg` list in
+`buildCourtScene`), never in front of a door; the Brick parkway maple stands at
+the lot line on the door side, and a Sunbelt saguaro only at the door-side lot
+corner. A scripted screenshot tour (kept outside the repo: one frame per
+viewpoint, framed house, plate and mailbox in every look) found each of these,
+so rerun it after moving anything near a viewpoint or a plate.
 
 ## Left alone on purpose
 
@@ -122,7 +130,7 @@ configuration, the DOM and CSS.
 
 - Trees and shrubs are low-poly icosahedra and spheres; palms are alpha-tested
   planes. Fine at street distances, plain up close.
-- Cars are box models, kept away from the bays in front of blank houses.
+- Cars are box models, parked halfway between viewpoints and away from the bays in front of blank houses.
 - The `decor` houses beyond the course reuse `buildHouse` without plates; a
   stage's first build takes a little longer than the classic look's
   (procedural textures are made once per page, houses once per stage).

@@ -1509,7 +1509,10 @@ function buildHouse(parent, spec) {
     const x = doorSide * (0.6 + r() * (half - 2.4)), z = 1.2 + r() * Math.max(1, curb - WALK_W - 3.2);
     if (Math.abs(x - dx) < 1.3) continue;
     const k = r();
-    if (k < 0.45) buildAgave(g, x, z, r, 0.7 + r() * 0.6); else if (k < 0.8) buildBarrel(g, x, z, r); else buildSaguaro(g, x, z, r);
+    if (k < 0.45) buildAgave(g, x, z, r, 0.7 + r() * 0.6);
+    else if (k < 0.8) buildBarrel(g, x, z, r);
+    else if (Math.abs(doorSide * (half - 1.4) - dx) >= 2.2) buildSaguaro(g, doorSide * (half - 1.4), 1 + r() * 2, r);   // at the lot corner, well off the line to the number
+    else buildAgave(g, x, z, r, 0.9 + r() * 0.5);
   }
   if (r() < 0.5) buildShrubs(g, farX - 1.4, farX + 1.4, 0.9, r);
 
@@ -1892,11 +1895,14 @@ function buildStreetScene(g, st, L, seed) {
     buildSignPole(g, c.x0 - 0.9, HALF_ROAD + 0.9, st.label, c.name, c.blockBehind);
     buildLamp(g, c.x0 - 1.2, -(HALF_ROAD + 1.1), -1);
   }
-  // a few parked cars at the kerb, never in front of a blank house's mailbox view
+  // a few parked cars at the kerb, halfway between viewpoints: none stands beside the learner or
+  // across the line from a viewpoint to a number, and none in front of a blank house's mailbox view
   for (const b of L.blocks) {
     const n = Math.round((b.x1 - b.x0) / 30);
-    for (let i = 0; i < n; i++) {
-      const x = b.x0 + 6 + r() * (b.x1 - b.x0 - 12), s = r() < 0.5 ? -1 : 1;
+    const xs = L.nodes.map(nd => nd.x).filter(x => x > b.x0 && x < b.x1).sort((p, q) => p - q);
+    const gaps = xs.slice(1).map((x, i) => (xs[i] + x) / 2);
+    for (let i = 0; i < n && gaps.length; i++) {
+      const x = gaps.splice(Math.floor(r() * gaps.length), 1)[0] + (r() - 0.5) * 2, s = r() < 0.5 ? -1 : 1;
       const blocked = L.houses.some(h => h.mask !== null && h.side === s && Math.abs(h.px - x) < 9);
       if (blocked) continue;
       buildCar(g, x, s * 2.5, s < 0 ? 0 : Math.PI, COLOR.car[Math.floor(r() * COLOR.car.length)]);
@@ -1979,13 +1985,13 @@ function buildCourtScene(g, st, L, seed) {
     { bg: '#f2c230', fg: '#1a1400', accent: '#1a1400', size: 110 });
   buildLamp(g, -(HALF_ROAD + WALK_W + 1.2), -(HALF_ROAD + WALK_W + 4), -1);
   // a couple of parked cars on the main street
-  buildCar(g, -22, 2.5, Math.PI, COLOR.car[0]);
-  buildCar(g, 24, -2.5, 0, COLOR.car[2]);
+  buildCar(g, -21, 2.5, Math.PI, COLOR.car[0]);
+  buildCar(g, 21, -2.5, 0, COLOR.car[2]);
   buildCar(g, 6.4, -30, Math.PI / 2, COLOR.car[4]);
   // the main street carries on both ways, and palms ring the bulb
   buildDecorHouses(g, st, -36, -1, 2);
   buildDecorHouses(g, st, 36, 1, 2);
-  for (const deg of [20, 90, 160, 200, 270, 340])
+  for (const deg of [42, 84, 127, 180, 233, 276, 318])   // between the houses, never across the line from a viewpoint to a number
     buildPalm(g, -(CT.bulbR + WALK_W + 2.5) * Math.sin(deg * Math.PI / 180), CT.bulbZ + (CT.bulbR + WALK_W + 2.5) * Math.cos(deg * Math.PI / 180), r, 7 + r() * 3);
   buildPaloVerde(g, 0, CT.bulbZ - CT.houseR - 12, r);   // behind the houses at the top of the bulb
   if (st.kind !== 'example') return;
