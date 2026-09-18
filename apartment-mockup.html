@@ -918,6 +918,15 @@ function arrow(parent, from, to, color, radius = 0.08) {
   parent.add(grp);
 }
 
+/* ---- a straight flight of treads along x, from the foot (x0, y0) up to the
+   head (x1, y1) at a fixed z. n treads, n + 1 equal risers: the last riser is
+   the step onto whatever the flight arrives at. ---- */
+function straightFlight(g, x0, x1, y0, y1, z, n, width) {
+  const dx = (x1 - x0) / n, dy = (y1 - y0) / (n + 1);
+  for (let i = 0; i < n; i++)
+    box(g, Math.abs(dx) + 0.02, 0.12, width, COLOR.step, x0 + dx * (i + 0.5), y0 + dy * (i + 1) - 0.06, z);
+}
+
 /* ============================================================
    façade pieces shared by every building
    ============================================================ */
@@ -929,14 +938,12 @@ function addWindows(g, fi, s) {
   }
 }
 function addFacadeCommon(g, s) {
-  // open 2nd-floor landing (no fence)
-  box(g, 6.6, 0.16, 1.5, COLOR.balcony, 0, FH - 0.06, s * (HALF_D + 0.75));
-  // central staircase, no handrail
-  const z = s * (HALF_D + 1.0), x0 = 3.0, x1 = -0.4, y0 = 0.12, y1 = FH - 0.05;
-  for (let i = 0; i < 12; i++) {
-    const t = i / 11;
-    box(g, 0.7, 0.12, 1.25, COLOR.step, THREE.MathUtils.lerp(x0, x1, t) * s, THREE.MathUtils.lerp(y0, y1, t), z);
-  }
+  // open 2nd-floor landing (no fence) that stops short of the right-hand window,
+  // so the stair can carry on in the same line
+  const xTop = 3.9, xFoot = 7.7;
+  box(g, W / 2 + xTop, 0.16, 1.5, COLOR.balcony, s * (xTop - W / 2) / 2, FH - 0.06, s * (HALF_D + 0.75));
+  // straight stair in line with the landing, rising along the wall from beyond the end
+  straightFlight(g, s * xFoot, s * xTop, -0.1, FH - 0.05, s * (HALF_D + 0.75), 13, 1.25);
   box(g, 7, 0.4, 1.7, COLOR.canopy, 0, H - 0.05, s * (HALF_D + 0.9));   // eyebrow canopy
 }
 
@@ -997,7 +1004,7 @@ function buildShell(g, number) {
 /* arrows tracing the counting order on the example front façade:
    bottom-left -> bottom-right -> up to top-left -> top-right */
 function addArrows(g) {
-  // pushed forward to sit right at the front edge of the central staircase
+  // pushed forward to sit just in front of the landing
   const z = HALF_D + 1.55, yb = 2.0, yt = 5.25, xl = -CONFIG.doorOffsetX, xr = CONFIG.doorOffsetX;
   arrow(g, new THREE.Vector3(xl, yb, z), new THREE.Vector3(xr, yb, z), COLOR.arrow); // 1st -> 2nd
   arrow(g, new THREE.Vector3(xr, yb, z), new THREE.Vector3(xl, yt, z), COLOR.arrow); // wrap up
@@ -1034,7 +1041,32 @@ function buildTowerShell(g, txt) {
   }
 }
 
-/* exterior walkways on floors 2-4, a ground stoop, and a switchback stair */
+/* ---- switchback stair off the end of a walkway (Parts 2, 4 and 5) ----------
+   The walkway's last 1.4 m widens outward into a landing bay. Flight A leaves
+   the bay in the walkway's own band and climbs half a floor beyond the end
+   wall, a half landing turns it, and flight B climbs back in the outer band to
+   the bay one floor up. The stair reads as the walkway carrying on, the end
+   wall stays clear for its sign and doors, and no tread meets a wall.
+   w, halfD: the building; zc, depth: the walkway band (unsigned); floors, fh;
+   sx: +1 right end / -1 left end; sz: +1 front face / -1 back face. ---- */
+const ST_RUN = 2.5, ST_LAND = 1.4, ST_W = 1.3, ST_N = 6;   // flight run, landing width, flight width, treads per flight
+function buildEndStair(g, w, halfD, zc, depth, floors, fh, sx = 1, sz = 1) {
+  const zIn = sz * zc, zOut = sz * (zc + depth / 2 + 0.1 + ST_LAND / 2), zHalf = sz * (zc + 0.75);
+  const zBay = sz * (zc + depth / 2 + (ST_LAND + 0.1) / 2);
+  const xEnd = sx * w / 2, xHead = sx * (w / 2 + ST_RUN), xHalf = sx * (w / 2 + ST_RUN + ST_LAND / 2);
+  for (let t = 0; t < floors - 1; t++) {
+    const y0 = t ? t * fh : -0.1, yMid = t * fh + fh / 2, y1 = (t + 1) * fh;
+    straightFlight(g, xEnd, xHead, y0, yMid, zIn, ST_N, ST_W);                            // out, in the walkway band
+    box(g, ST_LAND, 0.14, depth + 1.5, COLOR.balcony, xHalf, yMid - 0.07, zHalf);          // half landing
+    straightFlight(g, xHead, xEnd, yMid, y1, zOut, ST_N, ST_W);                            // back, in the outer band
+    box(g, ST_LAND, 0.16, ST_LAND + 0.1, COLOR.balcony, sx * (w / 2 - ST_LAND / 2), y1 - 0.06, zBay);   // landing bay off the walkway
+  }
+  // paving under the stair
+  box(g, ST_RUN + ST_LAND + 1.8, 0.05, depth + 1.7, COLOR.walkway, sx * (w / 2 + 1.25), -0.13, sz * (halfD + (depth + 1.7) / 2));
+}
+
+/* exterior walkways on floors 2-4, a ground stoop, and the switchback stair
+   off the right end of the walkways */
 function buildTowerAccess(g) {
   const wDepth = 1.7, wzc = THALF_D + 0.85;
   for (let fi = 1; fi < TFLOORS; fi++) {
@@ -1043,25 +1075,7 @@ function buildTowerAccess(g) {
       box(g, 0.18, fi * TFH, 0.18, COLOR.trim, px, (fi * TFH) / 2, wzc + wDepth / 2 - 0.2);
   }
   box(g, TW, 0.12, wDepth, COLOR.step, 0, 0.0, wzc); // ground stoop
-
-  const flight = (x, z0, z1, y0, y1, n = 6) => {
-    const dz = (z1 - z0) / n;
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-      box(g, 1.4, 0.12, Math.abs(dz) + 0.02, COLOR.step, x, y0 + (y1 - y0) * t, z0 + dz * (i + 0.5));
-    }
-  };
-  const landing = (yc, zc) => box(g, 3.0, 0.14, 1.4, COLOR.balcony, 10.8, yc - 0.07, zc);
-
-  const zF = THALF_D + 0.9, zB = -1.6, xA = 10.0, xB = 11.6;
-  for (let t = 0; t < TFLOORS - 1; t++) {
-    const yFloor = t * TFH, yMid = t * TFH + TFH / 2, yNext = (t + 1) * TFH;
-    landing(yFloor, zF);
-    flight(xA, zF - 0.7, zB + 0.7, yFloor, yMid);
-    landing(yMid, zB);
-    flight(xB, zB + 0.7, zF - 0.7, yMid, yNext);
-  }
-  landing((TFLOORS - 1) * TFH, zF);
+  buildEndStair(g, TW, THALF_D, wzc, wDepth, TFLOORS, TFH, 1, 1);
 }
 
 /* big up-arrow + floor badges on the left: shows the first digit climbing 1->4 */
@@ -1228,15 +1242,12 @@ function buildRowFacade(g, floorsData, raycastList, blankStates) {
       box(g, 1.0, 1.15, 0.06, COLOR.glass, wx, base + 1.55, surf + 0.03, { roughness: 0.3, metalness: 0.1 });
     }
   }
-  // open 2nd-floor landing + a straight stair clear of the doors at the right end
-  box(g, RW, 0.16, 1.5, COLOR.balcony, 0, RFH - 0.06, RHALF_D + 0.78);
-  const z = RHALF_D + 1.05;
-  for (let i = 0; i < 11; i++) {
-    const t = i / 10;
-    box(g, 0.8, 0.12, 1.25, COLOR.step,
-      THREE.MathUtils.lerp(12.4, 10.6, t),
-      THREE.MathUtils.lerp(0.12, RFH - 0.05, t), z);
-  }
+  // open 2nd-floor landing that stops short of the right end, and a straight
+  // stair carrying on in the same line from beyond the end wall (clear of 1109's plate)
+  const xTop = 10.9, xFoot = 14.7, wz = RHALF_D + 0.78;
+  box(g, RW / 2 + xTop, 0.16, 1.5, COLOR.balcony, (xTop - RW / 2) / 2, RFH - 0.06, wz);
+  straightFlight(g, xFoot, xTop, -0.1, RFH - 0.05, wz, 13, 1.25);
+  box(g, 3.2, 0.05, 2.2, COLOR.walkway, RW / 2 + 1.6, -0.13, RHALF_D + 1.1);   // paving under the stair's foot
 }
 
 /* ============================================================
@@ -1288,25 +1299,11 @@ function buildBlockFacade(g, s, isFront, getCell, raycastList, blankStates) {
   }
 }
 
-/* switchback stair on the right end serving the upper landings */
+/* switchback stairs off the ends of the walkways: front-right for the front
+   doors, back-left for the doors behind them */
 function buildBlockAccess(g) {
-  const flight = (x, z0, z1, y0, y1, n = 6) => {
-    const dz = (z1 - z0) / n;
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-      box(g, 1.3, 0.12, Math.abs(dz) + 0.02, COLOR.step, x, y0 + (y1 - y0) * t, z0 + dz * (i + 0.5));
-    }
-  };
-  const landing = (x, yc, zc) => box(g, 2.6, 0.14, 1.4, COLOR.balcony, x, yc - 0.07, zc);
-  const zF = BHALF_D + 0.9, zB = -1.4, xA = BW / 2 + 0.2, xB = BW / 2 + 1.6;
-  for (let t = 0; t < BFLOORS - 1; t++) {
-    const yFloor = t * BFH, yMid = t * BFH + BFH / 2, yNext = (t + 1) * BFH;
-    landing(xA, yFloor, zF);
-    flight(xA, zF - 0.7, zB + 0.7, yFloor, yMid);
-    landing(xB, yMid, zB);
-    flight(xB, zB + 0.7, zF - 0.7, yMid, yNext);
-  }
-  landing(xA, (BFLOORS - 1) * BFH, zF);
+  buildEndStair(g, BW, BHALF_D, BHALF_D + 0.8, 1.5, BFLOORS, BFH, 1, 1);
+  buildEndStair(g, BW, BHALF_D, BHALF_D + 0.8, 1.5, BFLOORS, BFH, -1, -1);
 }
 
 /* the building label on both ends so it reads from the front or the back */
@@ -1323,27 +1320,10 @@ function addBlockSideSigns(g, text) {
    PART 5 — running count with NO floor digit, on a solid walk-up block.
    ============================================================ */
 
-/* switchback stair hugging one corner (front-right s=1, back-left s=-1),
-   serving the upper front/back walkways while staying clear of the
-   side-wall doors (door 20 / door 4 end at |z| = 8.1). */
+/* switchback stair off the end of a face's walkways (front-right s=1,
+   back-left s=-1), so the side walls and their doors stay clear */
 function buildSeqAccess(g, s) {
-  const flight = (x, z0, z1, y0, y1, n = 6) => {
-    const dz = (z1 - z0) / n;
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-      box(g, 1.3, 0.12, Math.abs(dz) + 0.02, COLOR.step, x, y0 + (y1 - y0) * t, z0 + dz * (i + 0.5));
-    }
-  };
-  const landing = (x, yc, zc) => box(g, 2.6, 0.14, 1.4, COLOR.balcony, x, yc - 0.07, zc);
-  const zF = s * (SQHD + 0.9), zB = s * 8.6, xA = s * (SQHW + 0.2), xB = s * (SQHW + 1.6);
-  for (let t = 0; t < SQFLOORS - 1; t++) {
-    const yFloor = t * SQFH, yMid = t * SQFH + SQFH / 2, yNext = (t + 1) * SQFH;
-    landing(xA, yFloor, zF);
-    flight(xA, zF - s * 0.7, zB + s * 0.7, yFloor, yMid);
-    landing(xB, yMid, zB);
-    flight(xB, zB + s * 0.7, zF - s * 0.7, yMid, yNext);
-  }
-  landing(xA, (SQFLOORS - 1) * SQFH, zF);
+  buildEndStair(g, SQW, SQHD, SQHD + 0.8, 1.5, SQFLOORS, SQFH, s, s);
 }
 
 /* solid slab shell in the shared style, windows, walkway ledges under the
@@ -1927,7 +1907,7 @@ const SEQ_VIEW_FILL = 0.88;
    Never nearer than PORTRAIT_MIN of the desktop distance. */
 const PORTRAIT_MIN = 0.75;
 const FOOTPRINT = {                         // width (x), depth (z) and share of the screen width to fill
-  tower: [TW, TD, 0.84], row: [RW, RD, 0.78], block: [BW, BD, 0.84], seq: [SQW + 4, SQD + 4, 0.75], plex: [W, D, 0.85],
+  tower: [TW + 4, TD, 0.84], row: [RW, RD, 0.78], block: [BW + 4, BD, 0.84], seq: [SQW + 7, SQD + 4, 0.75], plex: [W, D, 0.85],   // widths take in the end stairs
 };
 function portraitPos(type, pos, tgt, fillOverride) {
   const [w, d, fill0] = FOOTPRINT[type] || FOOTPRINT.plex;

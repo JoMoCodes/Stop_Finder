@@ -95,6 +95,12 @@ Structure top-to-bottom:
 - **Generic builders:** `box` (casts/receives shadows), plate typography
   constants, `makeTextTexture` (fit-to-width numerals, dashed frames for
   blanks), `label`, `setPlateText`, `arrow`.
+- **Stairs:** `straightFlight` serves Parts 1 and 3 (a flight in line with a
+  walkway that stops short of the end wall) and `buildEndStair` serves Parts 2,
+  4 and 5 (a switchback hanging off the end of a walkway: flight out in the
+  walkway's own band, half landing, flight back to a widened landing bay; Part 4
+  has one per face, Part 5 one per corner). Each look carries its own copy with
+  its materials and rails, so a change to the stair geometry is made four times.
 - **Per-part builders:** `build*Shell` / `build*Facade` / `*Access`, signs and
   banners (`addTopBanner`, `addBlockSideSigns`), wayfinding guides
   (`addArrows`, `addTowerArrows`, `addPlaceKey`, `addRowGuides`,
