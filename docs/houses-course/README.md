@@ -81,7 +81,8 @@ street"), and after a second miss the part's rule is appended.
 - **Street map** (bottom left): the road, cross streets and block numbers,
   every house (amber = blank, green = solved), the viewpoints as dots you can
   tap, and a "you are here" wedge that follows the camera. The court is drawn
-  with its entrance running left to right so the map stays landscape.
+  with its entrance running left to right so the map stays landscape. On big
+  desktops (1280 x 900 and up) it grows with the window, up to 440 px wide.
 
 ## Controls
 

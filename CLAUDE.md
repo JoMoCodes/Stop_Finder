@@ -76,7 +76,8 @@ Structure top-to-bottom:
 - **`<style>`**: base rules per panel, then `.sr-only` / focus / reduced-motion
   rules, then **all width/orientation media queries at the end** (phone
   portrait ≤640px turns `#quiz` into a bottom sheet; landscape phones;
-  `pointer: coarse` tap targets; tablets). Keep new media queries there.
+  `pointer: coarse` tap targets; tablets; big desktops of 1280 x 900 and up grow the
+  mini-map). Keep new media queries there.
 - **DOM**: `#finale` (the end-of-run report dialog: an empty `#report` that
   `report.js` fills, plus the `#fagain` / `#fclose` buttons the course wires),
   `#app` (canvas mount), sr-only

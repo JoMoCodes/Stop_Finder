@@ -276,6 +276,13 @@
     #viewbar button.vbtn.turn { width: 44px; }
   }
 
+  /* --- big desktops (at least 1280 x 900): the street map grows with the room, up to
+     440px wide; its SVG scales with it, so dots, squares and names grow too --- */
+  @media (min-width: 1280px) and (min-height: 900px) {
+    #minimap { width: clamp(360px, min(18vw, 30vh), 440px); padding: 10px 10px 8px; }
+    #minimap .mmnote { font-size: 12px; margin-top: 6px; }
+  }
+
   /* --- tablets 641-1024px --- */
   @media (min-width: 641px) and (max-width: 1024px) {
     #quiz { right: 12px; width: 248px; }

@@ -283,6 +283,13 @@
     #qclose { width: 44px; height: 44px; }
   }
 
+  /* --- big desktops (at least 1280 x 900): the Part 5 mini-map grows with the height,
+     up to 240px wide, staying clear of the centred walk-around column above it --- */
+  @media (min-width: 1280px) and (min-height: 900px) {
+    #minimap { width: clamp(180px, calc(24vh - 40px), 240px); }
+    #minimap .mmnote { font-size: clamp(10px, 1.2vh, 12px); margin-top: 6px; }
+  }
+
   /* --- tablets 641-1024px: desktop layout holds, quiz just tucks in --- */
   @media (min-width: 641px) and (max-width: 1024px) {
     #quiz { right: 12px; width: 248px; }
