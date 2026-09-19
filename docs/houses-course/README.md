@@ -81,9 +81,13 @@ street"), and after a second miss the part's rule is appended.
 - **Street map** (bottom left; centre right on big desktops): the road, cross streets and block numbers,
   every house (amber = blank, green = solved), the viewpoints as dots you can
   tap, and a "you are here" wedge that follows the camera. The court is drawn
-  with its entrance running left to right so the map stays landscape. On big
+  with its entrance running left to right so the map stays landscape. Its box
+  is only as tall as the street needs (a three-block street is a wide, shallow
+  picture), so nothing is wasted on empty band. On big
   desktops (1280 x 900 and up) it sits at the centre right, above a house's options while
-  they are open, and grows with the window, up to 440 px wide.
+  they are open, and grows with the window, up to 440 px wide. **On a phone it
+  is behind the map button in the walk bar** and opens across the width, where
+  its dots are big enough to hit — see `mobile-chrome.md`.
 
 ## Controls
 
@@ -97,7 +101,8 @@ street"), and after a second miss the part's rule is appended.
 | click a house marked `?` | open its options; 1–4 / a–d pick, Esc closes. The camera walks to the viewpoint in front of the house and faces its number (see *Reading a number* below) |
 | click any other house | walk up to it and face its number, so a neighbour can be read from a phone |
 | the "N houses left" chip | walk to the nearest house still to fill in and face it |
-| Appearance (bottom right; bottom left on a phone) | switch between the four looks of the course: Classic, Sunbelt, Brick, Suburban |
+| the map button in the walk bar (phones only) | show / hide the street map; Escape, a tap outside or a tap on a dot closes it again |
+| Home + Appearance (bottom right; one `⋯` button on a phone) | back to the menu, or switch between the four looks of the course: Classic, Sunbelt, Brick, Suburban |
 
 The Reset view chip appears when the view is zoomed, tilted well up or down,
 or facing backwards. The first-run hint, the "click a glowing house" tip, the
@@ -126,9 +131,10 @@ to the learner rather than the other way round:
 - The **"N houses left" chip** is a button: it walks to the nearest unsolved
   house that is not already readable on screen.
 - While the sheet is open on a phone the prompt shrinks to its title and the
-  jump bar, chip, hint and reset chip step aside, so the house has the top
-  two-thirds of the screen. On touch screens the copy says *tap* rather than
-  *click*.
+  progress strip, chip, map, hint, help and reset chip step aside, so the house
+  has the top two-thirds of the screen. On touch screens the copy says *tap*
+  rather than *click*. The rest of the phone frame — which panels fold on a quiz
+  street and which stay put on a worked example — is in `mobile-chrome.md`.
 
 These walk-ups are reported to `track.js` as `walk` events with `via` =
 `frame` (options opened), `look` (a numbered house tapped) or `find` (the chip).

@@ -54,7 +54,8 @@ texture helpers (`mat` / `box` / `slab` keep their signatures), ground and aspha
 furniture builders (`buildRoad` … `buildCar`, plus the look's trees, plants, lamps), `buildHouse`,
 `buildWalks` / `buildRoadZ`, and `buildStreetScene` / `buildCourtScene` (the guide boards inside
 them are unchanged). Layouts, `STAGES`, `makeOptionsFor`, the quiz, the camera and framing, the map,
-the report wiring, the lookbar and the accessibility code are byte-identical across all four files,
+the report wiring, the lookbar, the phone chrome block and the accessibility code are
+byte-identical across all four files,
 so a curriculum, camera or UI change in `houses.html` has to be applied to the other three too
 (the visual layer of a look is a contiguous set of segments, so a file diff shows exactly what a
 look changes). The realistic looks share one material per colour / texture, tile procedural canvas
@@ -172,15 +173,31 @@ block). The old "gaps are normal" part was dropped in September 2026.
 Design rationale for the current look and behaviour lives in
 `docs/apartment-course-review/` (reviews → summaries → design docs → QA).
 
-## Map of `houses.html` (~2700 lines, one file)
+## Map of `houses.html` (~3250 lines, one file)
 Same skeleton as the apartment course (same panel ids, same `document` events, so
 `track.js` and `report.js` need no page-specific code), with these differences:
 - **Camera** is first-person: `look` (yaw / pitch / fov) with drag-to-look, inertia,
   wheel / pinch zoom; `walkTo(node)` steps between **viewpoints** (`layout.nodes`,
   each with `links` to its neighbours and a default `heading`). Walking: the
-  chevrons on the road (`placeChevrons`), the `#viewbar` walk bar (turn · walk ·
+  chevrons on the road (`placeChevrons`), the `#viewbar` walk bar (map · turn · walk ·
   turn), the `#minimap` dots, double-click / click on the road, arrow keys / WASD.
   `resetView` faces down the street again (Home key, `#resetview` chip).
+- **Chrome block (phones)**, the same model as the apartment course: listens to the
+  events below and sets `body.stage-quiz` / `.stage-example` / `.quiz-open` / `.map-open`.
+  On quiz streets the jump bar is a progress strip (tap to expand; the part buttons peek
+  for 3 s when a part is finished), the prompt folds to its headline after the first house
+  of a part is opened (`#prompt.brief`, tap to unfold), the `#doorsleft` chip sits on the
+  strip's row (the strip stops short of it via `--chip-w`), Home + Appearance are the one
+  `⋯` button (`#lookbar .lk-menubtn`), and a finished street's prompt reads "Elm St ✓".
+  Worked examples keep the full frame. The CSS for all of this is the last section of
+  `<style>` (CHROME STATES ON PHONES). Rationale and the shipped table:
+  `docs/houses-course/mobile-chrome.md`.
+- **The street map** (`mmFit` / `mmDraw` / `mmSync`) draws into a viewBox that is 220 wide
+  and only as tall as the street needs (`mmH`, 64–140), so a three-block street is a wide,
+  shallow picture rather than a letterboxed square. On phones it is hidden behind the
+  `#mapbtn` map button in the walk bar (`body.map-open`) and opens across the width, where
+  `mmBig()` draws its marks larger and each viewpoint dot sits in a transparent tap disc
+  half a viewpoint wide. Desktop keeps the always-on map.
 - **Reading a number** (`framePlate` / `frameHouse` / `frameAnyHouse`): when a house's
   options open (`quizopen`), or a numbered house is tapped (`look` in `pickAt`), or the
   `#doorsleft` chip is pressed (`findNextHouse`, nearest unsolved house), the camera walks to
@@ -190,7 +207,8 @@ Same skeleton as the apartment course (same panel ids, same `document` events, s
   the plate is `MIN_PLATE_PX` wide, and opens out again on `quizclose` unless the learner has
   looked elsewhere. Nothing moves when the plate is already readable and in view.
   `body.quiz-open` (toggled on `quizopen` / `quizclose`) collapses the prompt to its title and
-  hides the jump bar, chip and hint on phones so the house has the screen.
+  hides the progress strip, chip, map, hint, help and reset chip on phones so the house has
+  the screen — which is why `safeRect` need only measure the prompt, the options and the walk bar.
 - **Layouts**: `layoutStreet(st)` (cross street · block · cross street …, lots as
   wide as their number step) and `layoutCourt(st)` (main street, entrance, bulb).
   `buildHouse` draws one house in a local frame (front wall at the origin, local +z
