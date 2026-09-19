@@ -2280,13 +2280,31 @@ function linkTowards(sign) {
   }
   return best;
 }
-function walkAhead(via) { const li = linkTowards(1); if (li >= 0) walkTo(li, via); else turnBy(180, 520); }
+/* nothing ahead — which is where the course leaves you every time it turns you
+   to face a house. Face the road again rather than spinning blindly 180: the
+   neighbouring viewpoint nearest the way you already look becomes "ahead", so
+   the same button walks on the next press. At the end of a street the only
+   viewpoint is behind you, and this is the turn round it always was. */
+function turnToRoad() {
+  const ud = curUD();
+  if (!ud) return;
+  const nd = ud.layout.nodes[ud.node], f = forwardXZ();
+  let best = null, bc = -2;
+  for (const li of nd.links) {
+    const to = ud.layout.nodes[li];
+    const dx = to.x - nd.x, dz = to.z - nd.z, d = Math.hypot(dx, dz) || 1;
+    const c = (dx * f.x + dz * f.z) / d;
+    if (c > bc) { bc = c; best = { x: dx / d, z: dz / d }; }
+  }
+  if (best) easeLook({ yaw: yawTo(best.x, best.z) }, 420); else turnBy(180, 520);
+}
+function walkAhead(via) { const li = linkTowards(1); if (li >= 0) walkTo(li, via); else turnToRoad(); }
 function walkBack(via) { const li = linkTowards(-1); if (li >= 0) walkTo(li, via); }
 function syncWalkButton() {
   if (!ui.walkBtn) return;
   const ahead = linkTowards(1) >= 0;
-  ui.walkBtn.setAttribute('aria-label', ahead ? 'Walk to the next viewpoint ahead' : 'Dead end ahead — turn round');
-  ui.walkBtn.title = ahead ? 'Walk ahead' : 'Turn round';
+  ui.walkBtn.setAttribute('aria-label', ahead ? 'Walk to the next viewpoint ahead' : 'Turn to face along the street');
+  ui.walkBtn.title = ahead ? 'Walk ahead' : 'Turn to the street';
   ui.walkBtn.querySelector('span[aria-hidden]').textContent = ahead ? '▲' : '↻';
   ui.walkBtn.querySelector('.vlabel').textContent = ahead ? 'Walk' : 'Turn';
 }

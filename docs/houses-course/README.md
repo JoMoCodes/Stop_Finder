@@ -100,7 +100,7 @@ street"), and after a second miss the part's rule is appended.
 | drag | look round, with a glide after a flick. One thumb-swipe comes about — see *Turning* below |
 | wheel · pinch | zoom (22°–80° field of view). A trackpad's two-finger sweep sideways turns instead |
 | click anywhere on the road · an arrow on it · a dot on the map · double-click the road | walk to the nearest viewpoint there (eased step, longer for a longer walk, instant under reduced motion) |
-| walk bar | turn left 45° · walk to the viewpoint ahead (or turn round at a dead end) · turn right 45°. **Hold** a turn arrow and it keeps turning, 105° a second |
+| walk bar | turn left 45° · walk to the viewpoint ahead · turn right 45°. **Hold** a turn arrow and it keeps turning, 105° a second. With nothing ahead — square-on to a house, which is where reading a number leaves you — the walk button turns you back to the road instead (at the end of a street that is the turn round it always was), and the next press walks |
 | ← → / A D · ↑ ↓ / W S · PgUp PgDn · Home | turn 26° · walk ahead / back · tilt · face down the street again |
 | click a house marked `?` | open its options; 1–4 / a–d pick, Esc closes. The camera walks to the viewpoint in front of the house and faces its number (see *Reading a number* below) |
 | click any other house | walk up to it and face its number, so a neighbour can be read from a phone |
