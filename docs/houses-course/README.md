@@ -73,7 +73,11 @@ street"), and after a second miss the part's rule is appended.
   every ~14 m along a block; on the court, five along the main street, five up
   the entrance and six round the bulb. Each viewpoint knows its `links` and a
   default `heading` (down the street toward rising numbers; round the bulb the
-  way the left side counts).
+  way the left side counts). A click on the road takes the viewpoint nearest
+  that spot, out to 8.5 m — further than half the gap between two of them, so
+  there is nowhere on the road a tap does nothing — and the step takes longer
+  the further it goes, so a tap at the end of the street reads as a walk rather
+  than a jump.
 - **Guides on example streets**: ODD SIDE / EVEN SIDE boards (Part 1), yellow
   arrows, a "numbers start here" board at Main St and a NUMBERS RISE / NUMBERS
   FALL pair mid-block (Part 2), arrows into and round the bulb (Part 3), the
@@ -93,11 +97,11 @@ street"), and after a second miss the part's rule is appended.
 
 | Input | Does |
 |-------|------|
-| drag | look round (the scene follows the pointer, as in Street View), with a short glide after a flick |
-| wheel · pinch | zoom (22°–80° field of view) |
-| click an arrow on the road · a dot on the map · double-click the road | walk to that viewpoint (eased step, instant under reduced motion) |
-| walk bar | turn left 45° · walk to the viewpoint ahead (or turn round at a dead end) · turn right 45° |
-| ← → / A D · ↑ ↓ / W S · PgUp PgDn · Home | turn 20° · walk ahead / back · tilt · face down the street again |
+| drag | look round, with a glide after a flick. One thumb-swipe comes about — see *Turning* below |
+| wheel · pinch | zoom (22°–80° field of view). A trackpad's two-finger sweep sideways turns instead |
+| click anywhere on the road · an arrow on it · a dot on the map · double-click the road | walk to the nearest viewpoint there (eased step, longer for a longer walk, instant under reduced motion) |
+| walk bar | turn left 45° · walk to the viewpoint ahead (or turn round at a dead end) · turn right 45°. **Hold** a turn arrow and it keeps turning, 105° a second |
+| ← → / A D · ↑ ↓ / W S · PgUp PgDn · Home | turn 26° · walk ahead / back · tilt · face down the street again |
 | click a house marked `?` | open its options; 1–4 / a–d pick, Esc closes. The camera walks to the viewpoint in front of the house and faces its number (see *Reading a number* below) |
 | click any other house | walk up to it and face its number, so a neighbour can be read from a phone |
 | the "N houses left" chip | walk to the nearest house still to fill in and face it |
@@ -108,6 +112,43 @@ The Reset view chip appears when the view is zoomed, tilted well up or down,
 or facing backwards. The first-run hint, the "click a glowing house" tip, the
 `?` help button, the "N houses left" chip and the halos behind unsolved plates
 work as in the apartment course.
+
+## Turning
+
+The course used to let the world follow the finger exactly — a drag across the
+canvas turned one field of view. That is the honest rate, and it read as stuck,
+because this camera's *horizontal* field is narrow: 38° on a portrait phone,
+77° on a desktop. Coming about took 1975 px of swiping on a phone and 2230 px on
+a desktop — five screen-widths and two. (The apartment course, orbiting a
+building, turns 360° per canvas height; nothing here needs to be that quick, but
+the gap was the complaint.)
+
+`dragRates(pointerType)` now cuts the rate from the **horizontal** field across
+the canvas **width** and multiplies it: `TURN_GAIN_TOUCH` 3.4 for a thumb,
+`TURN_GAIN_MOUSE` 2.6 for a mouse, which can be dragged further and wants the
+finer hand. Tilt keeps `TILT_GAIN` 1.3 of the vertical field across the height —
+its whole range is 84°, so it is an axis you place rather than throw. Because
+the rate is still cut from the field of view, a zoomed-in view slows down in
+step and a plate can still be framed by hand.
+
+| | before | now |
+|---|---|---|
+| phone portrait (375 px) | 0.091°/px · 180° in 1975 px | 0.348°/px · 180° in 517 px |
+| desktop (1024 px) | 0.081°/px · 180° in 2230 px | 0.197°/px · 180° in 916 px |
+| one 250 px thumb-swipe | 23° | 87°, or **172°** with its glide |
+
+The glide is the other half of it. The speed handed to it is read off the last
+90 ms of the drag (`trackFlick` / `releaseFlick`) rather than off the final
+pointer event, so a swipe that eases off still carries and a finger that came to
+rest stops dead; it is capped (`FLICK_MAX_YAW`, about 975° a second) so the
+hardest flick spins you most of the way round and no further, and the loop
+decays it by the clock (`GLIDE_DECAY`), so the tail is the same length on a
+60 Hz screen and a 120 Hz one. Under reduced motion there is no glide at all.
+
+Two more ways round, for anyone who would rather not swipe: **holding** a walk-bar
+turn arrow keeps turning at 105° a second after a 240 ms press (a tap still
+turns its 45°), and a trackpad's two-finger sweep sideways turns while a
+vertical one still zooms.
 
 ## Reading a number
 

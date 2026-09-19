@@ -182,6 +182,15 @@ Same skeleton as the apartment course (same panel ids, same `document` events, s
   chevrons on the road (`placeChevrons`), the `#viewbar` walk bar (map · turn · walk ·
   turn), the `#minimap` dots, double-click / click on the road, arrow keys / WASD.
   `resetView` faces down the street again (Home key, `#resetview` chip).
+- **How far a drag turns you** is `dragRates(pointerType)`: yaw is a multiple
+  (`TURN_GAIN_MOUSE` / `TURN_GAIN_TOUCH`) of the horizontal field of view across
+  the canvas width, tilt a little over the vertical field across its height, so
+  a phone swipe comes about in one go and a zoomed-in view still nudges finely.
+  A flick hands the glide a speed in radians a second (`trackFlick` reads it off
+  the last 90 ms of the drag, `releaseFlick` caps it); the loop decays it by the
+  clock (`GLIDE_DECAY`), not per frame. Holding a walk-bar arrow keeps turning
+  (`startHold`); a trackpad's sideways sweep turns as well. **These numbers are
+  the feel of the course; change them deliberately and in all four files.**
 - **Chrome block (phones)**, the same model as the apartment course: listens to the
   events below and sets `body.stage-quiz` / `.stage-example` / `.quiz-open` / `.map-open`.
   On quiz streets the jump bar is a progress strip (tap to expand; the part buttons peek

@@ -162,7 +162,7 @@
     border: 1px solid rgba(255,255,255,0.14); border-radius: 999px;
     padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.45);
   }
-  #viewbar button.vbtn { padding: 0 14px; min-height: 40px; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  #viewbar button.vbtn { padding: 0 14px; min-height: 40px; font-size: 15px; display: flex; align-items: center; gap: 6px; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
   #viewbar button.vbtn.turn { width: 40px; padding: 0; justify-content: center; font-size: 18px; }
   #viewbar button.vbtn.walk { background: #57c97e; color: #08130c; border-color: transparent; font-weight: 600; }
   #viewbar button.vbtn.walk:hover:not(:disabled) { background: #6fe096; }
@@ -2210,7 +2210,7 @@ function turnBy(deg, ms = 320) { easeLook({ yaw: look.yaw + THREE.MathUtils.degT
 
 /* ---- walking between viewpoints ---- */
 let walking = false, walkRAF = 0, walkSeq = 0;
-function walkTo(idx, via = 'ui', ms = 640) {
+function walkTo(idx, via = 'ui', ms) {
   const ud = curUD();
   if (!ud) return;
   const nd = ud.layout.nodes[idx];
@@ -2221,6 +2221,9 @@ function walkTo(idx, via = 'ui', ms = 640) {
   ud.node = idx;
   for (const c of ud.chevrons) c.visible = false;
   const p0 = camera.position.clone(), p1 = new THREE.Vector3(nd.x, EYE, nd.z);
+  // a step to the next viewpoint takes about as long as it always did; a tap
+  // far down the road, or a dot at the other end of the map, reads as a walk
+  if (ms === undefined) ms = THREE.MathUtils.clamp(300 + p0.distanceTo(p1) * 23, 430, 1100);
   const land = () => { walking = false; walkRAF = 0; camera.position.copy(p1); afterMove(via); };
   if (ms <= 0) { land(); return; }
   walking = true;
@@ -2287,11 +2290,40 @@ function syncWalkButton() {
   ui.walkBtn.querySelector('span[aria-hidden]').textContent = ahead ? '▲' : '↻';
   ui.walkBtn.querySelector('.vlabel').textContent = ahead ? 'Walk' : 'Turn';
 }
+/* the walk bar: a tap on an arrow turns 45 degrees, holding one keeps turning,
+   so a phone can come about without a row of taps */
+const HOLD_MS = 240, HOLD_RATE = 105;           // degrees a second once the hold takes over
+let holdRAF = 0, holdTimer = 0, holdEnded = 0;
+function stopHold() {
+  clearTimeout(holdTimer);
+  if (holdRAF) { cancelAnimationFrame(holdRAF); holdEnded = performance.now(); }
+  holdTimer = holdRAF = 0;
+}
+function startHold(dir) {
+  lookSeq++; if (lookRAF) { cancelAnimationFrame(lookRAF); lookRAF = 0; }   // the hold takes over from any eased turn
+  look.vyaw = look.vpitch = 0;
+  let last = performance.now();
+  const spin = now => {
+    look.yaw += THREE.MathUtils.degToRad(dir * HOLD_RATE) * Math.min(0.05, (now - last) / 1000);
+    last = now;
+    applyLook(); updateResetChip(); mmSync();
+    holdRAF = requestAnimationFrame(spin);
+  };
+  holdRAF = requestAnimationFrame(spin);
+}
 for (const btn of ui.viewbar.querySelectorAll('button[data-view]')) {
+  const v = btn.dataset.view, dir = v === 'turn-left' ? 1 : -1;
   btn.onclick = () => {
-    const v = btn.dataset.view;
+    if (performance.now() - holdEnded < 400) return;   // the hold has just turned: no extra 45 on release
     if (v === 'turn-left') turnBy(45); else if (v === 'turn-right') turnBy(-45); else walkAhead('button');
   };
+  if (v === 'walk') continue;
+  btn.addEventListener('pointerdown', e => {
+    if (e.button) return;
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    holdTimer = setTimeout(() => startHold(dir), HOLD_MS);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.addEventListener(ev, stopHold);
 }
 
 /* ---- the default view at a viewpoint, and the Reset view chip ---- */
@@ -2484,14 +2516,53 @@ function frameStage(st) {
 /* ---- pointer: drag to look, click to pick, pinch / wheel to zoom ---- */
 const canvas = renderer.domElement;
 const pointers = new Map();
-let dragStart = null, dragged = false, pinch0 = null, lastMove = null;
+let dragStart = null, dragged = false, pinch0 = null;
 let dragging = false;
 canvas.style.cursor = 'grab';
+/* How far a drag turns you. Letting the world follow the finger exactly — one
+   field of view across the canvas — reads as slow on a street, because the
+   horizontal field is narrow (about 40 degrees on a portrait phone): coming
+   about took better than two screen-widths of swiping. Yaw runs at a multiple
+   of that honest rate, more for a thumb than for a mouse, so one swipe turns a
+   useful arc; it is still cut from the field of view, so a zoomed-in view
+   keeps its fine control. Tilt stays near the honest rate — its whole range is
+   84 degrees, and it is an axis you place rather than throw. */
+const TURN_GAIN_MOUSE = 2.6, TURN_GAIN_TOUCH = 3.4, TILT_GAIN = 1.3;
+function dragRates(pointerType) {
+  const vFov = THREE.MathUtils.degToRad(look.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const gain = pointerType === 'touch' ? TURN_GAIN_TOUCH : TURN_GAIN_MOUSE;
+  return { yaw: gain * hFov / canvas.clientWidth, pitch: TILT_GAIN * vFov / canvas.clientHeight };
+}
+/* the glide after a flick: the speed is read off the last 90 ms of the drag
+   rather than off its final event, so a swipe that eases off still carries and
+   a finger that came to rest stops dead */
+const FLICK_MS = 90, FLICK_MAX_YAW = 17, FLICK_MAX_PITCH = 7;   // radians a second: the hardest flick spins you most of the way round, no further
+let flick = [];
+function trackFlick(dyaw, dpitch) {
+  const now = performance.now();
+  flick.push({ t: now, dyaw, dpitch });
+  while (flick.length > 1 && now - flick[0].t > FLICK_MS) flick.shift();
+}
+function releaseFlick() {
+  const now = performance.now(), last = flick[flick.length - 1];
+  look.vyaw = look.vpitch = 0;
+  if (!last || now - last.t > 70 || prefersReducedMotion()) { flick = []; return; }
+  while (flick.length > 1 && last.t - flick[0].t > FLICK_MS) flick.shift();
+  const span = last.t - flick[0].t;
+  if (span >= 8) {
+    let y = 0, p = 0;
+    for (let i = 1; i < flick.length; i++) { y += flick[i].dyaw; p += flick[i].dpitch; }
+    look.vyaw = THREE.MathUtils.clamp(y / span * 1000, -FLICK_MAX_YAW, FLICK_MAX_YAW);          // radians a second
+    look.vpitch = THREE.MathUtils.clamp(p / span * 1000, -FLICK_MAX_PITCH, FLICK_MAX_PITCH);
+  }
+  flick = [];
+}
 canvas.addEventListener('pointerdown', e => {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   canvas.setPointerCapture(e.pointerId);
   if (pointers.size === 1) {
-    dragStart = { x: e.clientX, y: e.clientY }; dragged = false; lastMove = { x: e.clientX, y: e.clientY, t: performance.now() };
+    dragStart = { x: e.clientX, y: e.clientY }; dragged = false; flick = [];
     lookSeq++; if (lookRAF) { cancelAnimationFrame(lookRAF); lookRAF = 0; }   // a touch abandons a pending intro swing
     look.vyaw = look.vpitch = 0;
   } else if (pointers.size === 2) {
@@ -2512,16 +2583,15 @@ canvas.addEventListener('pointermove', e => {
   }
   if (pointers.size !== 1) return;
   const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
-  if (!dragged && dragStart && Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) > 5) {
+  const slop = e.pointerType === 'touch' ? 9 : 5;   // a finger wobbles more than a mouse: a wobble must stay a tap
+  if (!dragged && dragStart && Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) > slop) {
     dragged = true; dragging = true; canvas.style.cursor = 'grabbing';
     if (hintOnDrag) hintOnDrag();
   }
   if (!dragged) return;
-  const k = THREE.MathUtils.degToRad(look.fov) / canvas.clientHeight;   // a full-height drag turns one field of view
-  look.yaw += dx * k; look.pitch += dy * k;
-  const now = performance.now(), dt = Math.max(1, now - (lastMove ? lastMove.t : now));
-  look.vyaw = dx * k / dt * 16; look.vpitch = dy * k / dt * 16;          // per-frame velocity for the glide
-  lastMove = { x: e.clientX, y: e.clientY, t: now };
+  const r = dragRates(e.pointerType);
+  look.yaw += dx * r.yaw; look.pitch += dy * r.pitch;
+  trackFlick(dx * r.yaw, dy * r.pitch);
   applyLook(); updateResetChip(); mmSync();
 });
 function endPointer(e) {
@@ -2533,7 +2603,7 @@ function endPointer(e) {
     const wasDrag = dragged;
     dragging = false; canvas.style.cursor = hovered ? 'pointer' : 'grab';
     if (!wasDrag && e.type === 'pointerup' && dragStart) handleClick(e.clientX, e.clientY);
-    else if (wasDrag && performance.now() - (lastMove ? lastMove.t : 0) > 80) { look.vyaw = look.vpitch = 0; }
+    else if (wasDrag) releaseFlick();
     dragStart = null; dragged = false;
   }
 }
@@ -2542,6 +2612,11 @@ canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('pointerleave', e => { if (!pointers.has(e.pointerId)) { hoverPt = null; hoverDirty = true; } });
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {        // a trackpad's two-finger sweep sideways turns
+    look.yaw -= e.deltaX * dragRates('mouse').yaw;
+    applyLook(); updateResetChip(); mmSync();
+    return;
+  }
   look.fov = THREE.MathUtils.clamp(look.fov * Math.exp(e.deltaY * 0.0012), FOV_MIN, FOV_MAX);
   applyLook(); updateResetChip();
 }, { passive: false });
@@ -2574,7 +2649,7 @@ function pickAt(clientX, clientY) {
     return { house: h };
   }
   if (raycaster.ray.intersectPlane(groundPlane, hitPt)) {
-    let best = -1, bd = 6.5;
+    let best = -1, bd = 8.5;      // viewpoints stand 14 m apart, so this leaves no dead spot on the road between them
     ud.layout.nodes.forEach((nd, i) => {
       const d = Math.hypot(nd.x - hitPt.x, nd.z - hitPt.z);
       if (d < bd && i !== ud.node) { bd = d; best = i; }
@@ -3596,8 +3671,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Home') { e.preventDefault(); resetView(); return; }
   if (t && t !== document.body && t !== canvas && typeof t.closest === 'function' && t.closest('button, a[href], [tabindex]:not(canvas)')) return;
   switch (e.key.toLowerCase()) {
-    case 'arrowleft': case 'a': e.preventDefault(); turnBy(20, 220); break;
-    case 'arrowright': case 'd': e.preventDefault(); turnBy(-20, 220); break;
+    case 'arrowleft': case 'a': e.preventDefault(); turnBy(26, 190); break;
+    case 'arrowright': case 'd': e.preventDefault(); turnBy(-26, 190); break;
     case 'arrowup': case 'w': e.preventDefault(); walkAhead('key'); break;
     case 'arrowdown': case 's': e.preventDefault(); walkBack('key'); break;
     case 'pageup': e.preventDefault(); easeLook({ pitch: look.pitch + 0.18 }, 200); break;
@@ -3639,19 +3714,26 @@ addEventListener('resize', () => {
   sizeConfetti();
   rerenderPromptIfLayoutChanged();
 });
-(function tick() {
-  // glide after a flick, then settle
-  if (!dragging && (Math.abs(look.vyaw) > 1e-4 || Math.abs(look.vpitch) > 1e-4)) {
-    look.yaw += look.vyaw; look.pitch += look.vpitch;
-    look.vyaw *= 0.9; look.vpitch *= 0.9;
-    if (Math.abs(look.vyaw) <= 1e-4) look.vyaw = 0;
-    if (Math.abs(look.vpitch) <= 1e-4) look.vpitch = 0;
-    applyLook(); mmSync(); if (!look.vyaw && !look.vpitch) updateResetChip();
+const GLIDE_DECAY = 0.002, GLIDE_STOP = 0.02;   // a flick keeps a five-hundredth of its speed a second on, and settles at about a degree a second
+let tPrev = performance.now();
+(function tick(now) {
+  const dt = Math.min(0.05, Math.max(0, (now - tPrev) / 1000)); tPrev = now;
+  // glide after a flick, then settle. The speed is in radians a second, so the
+  // tail is the same length on a 60 Hz screen and on a 120 Hz one.
+  if (!dragging && (Math.abs(look.vyaw) > GLIDE_STOP || Math.abs(look.vpitch) > GLIDE_STOP)) {
+    look.yaw += look.vyaw * dt; look.pitch += look.vpitch * dt;
+    const damp = Math.pow(GLIDE_DECAY, dt);
+    look.vyaw *= damp; look.vpitch *= damp;
+    if (Math.abs(look.vyaw) <= GLIDE_STOP) look.vyaw = 0;
+    if (Math.abs(look.vpitch) <= GLIDE_STOP) look.vpitch = 0;
+    applyLook();
+    if (look.pitch <= PITCH_MIN + 1e-6 || look.pitch >= PITCH_MAX - 1e-6) look.vpitch = 0;   // stop dead at the tilt limit
+    mmSync(); if (!look.vyaw && !look.vpitch) updateResetChip();
   }
   renderer.render(scene, camera);
   drawConfetti();
   requestAnimationFrame(tick);
-})();
+})(performance.now());
 
 showStage(0);
 
